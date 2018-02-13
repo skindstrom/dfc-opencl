@@ -53,7 +53,7 @@ int main(void) {
 
 void Print_Result(unsigned char *pattern, uint32_t *id_list,
                   uint32_t list_size) {
-  int i;
+  unsigned i;
   printf(" [Matched!] Pattern: %s, IDs:", pattern);
 
   for (i = 0; i < list_size; i++) {

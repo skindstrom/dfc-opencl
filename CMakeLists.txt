@@ -1,7 +1,9 @@
 cmake_minimum_required (VERSION 3.1)
 project(OpenCL-DFC)
 
+# required for crc32 checksum
 SET( CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -march=native" )
+SET( CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -Wall -Wpedantic -Wextra -Werror" )
 
 set(EXT_PROJECTS_DIR external)
 

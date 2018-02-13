@@ -27,7 +27,7 @@ static void *DFC_REALLOC(void *p, uint16_t n, dfcDataType type,
 static void DFC_FREE(void *p, int n, dfcMemoryType type);
 static void *DFC_MALLOC(int n, dfcMemoryType type);
 static void Build_pattern(DFC_PATTERN *p, uint8_t *flag, uint8_t *temp,
-                          uint32_t i, int j, int k);
+                          int j, int k);
 static inline DFC_PATTERN *DFC_InitHashLookup(DFC_STRUCTURE *ctx, uint8_t *pat,
                                               uint16_t patlen);
 static inline int DFC_InitHashAdd(DFC_STRUCTURE *ctx, DFC_PATTERN *p);
@@ -817,22 +817,22 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
 
         if (plist->n == 2) {
           for (j = plist->n - 2, k = 0; j < plist->n; j++, k++) {
-            Build_pattern(plist, flag, temp, i, j, k);
+            Build_pattern(plist, flag, temp, j, k);
           }
         } else if (plist->n == 3) {
           for (j = plist->n - 2, k = 0; j < plist->n; j++, k++) {
-            Build_pattern(plist, flag, temp, i, j, k);
+            Build_pattern(plist, flag, temp, j, k);
           }
         } else if (plist->n < 8) {
           for (j = plist->n - 4, k = 0; j < plist->n - 2; j++, k++) {
-            Build_pattern(plist, flag, temp, i, j, k);
+            Build_pattern(plist, flag, temp, j, k);
           }
         } else {  // len >= 8
           for (j = min_pattern_interval * (plist->n - 8) / pattern_interval,
               k = 0;
                j < min_pattern_interval * (plist->n - 8) / pattern_interval + 2;
                j++, k++) {
-            Build_pattern(plist, flag, temp, i, j, k);
+            Build_pattern(plist, flag, temp, j, k);
           }
         }
 
@@ -859,14 +859,14 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
 
         if (plist->n < 8) {
           for (j = plist->n - 4, k = 0; j < plist->n; j++, k++) {
-            Build_pattern(plist, flag, temp, i, j, k);
+            Build_pattern(plist, flag, temp, j, k);
           }
         } else {
           for (j = min_pattern_interval * (plist->n - 8) / pattern_interval,
               k = 0;
                j < min_pattern_interval * (plist->n - 8) / pattern_interval + 4;
                j++, k++) {
-            Build_pattern(plist, flag, temp, i, j, k);
+            Build_pattern(plist, flag, temp, j, k);
           }
         }
 
@@ -899,7 +899,7 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
             k = 0;
              j < min_pattern_interval * (plist->n - 8) / pattern_interval + 8;
              j++, k++) {
-          Build_pattern(plist, flag, temp, i, j, k);
+          Build_pattern(plist, flag, temp, j, k);
         }
 
         byteIndex = BINDEX((*(((uint16_t *)temp) + 3)) & DF_MASK);
@@ -944,7 +944,7 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
         }
 
         for (j = plist->n - 2, k = 0; j < plist->n; j++, k++) {
-          Build_pattern(plist, flag, temp, i, j, k);
+          Build_pattern(plist, flag, temp, j, k);
         }
 
         // 2.
@@ -1027,7 +1027,7 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
         }
 
         for (j = plist->n - 4, k = 0; j < plist->n; j++, k++) {
-          Build_pattern(plist, flag, temp, i, j, k);
+          Build_pattern(plist, flag, temp, j, k);
         }
 
         // 2.
@@ -1116,7 +1116,7 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
         }
 #else
         for (j = plist->n - 8, k = 0; j < plist->n; j++, k++) {
-          Build_pattern(plist, flag, temp, i, j, k);
+          Build_pattern(plist, flag, temp, j, k);
         }
 #endif
 
@@ -1386,7 +1386,7 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
                 }
 
                 for (l = pat_len - 2, k = 0; l <= pat_len - 1; l++, k++) {
-                  Build_pattern(dfc->dfcMatchList[tempPID[m]], flag, temp, 0, l,
+                  Build_pattern(dfc->dfcMatchList[tempPID[m]], flag, temp, l,
                                 k);
                 }
 
@@ -1523,7 +1523,7 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
                 }
 
                 for (l = pat_len - 2, k = 0; l <= pat_len - 1; l++, k++) {
-                  Build_pattern(dfc->dfcMatchList[tempPID[m]], flag, temp, 0, l,
+                  Build_pattern(dfc->dfcMatchList[tempPID[m]], flag, temp, l,
                                 k);
                 }
 
@@ -1566,6 +1566,7 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
 }
 
 static int Verification_CT1(VERIFI_ARGUMENT) {
+  (void)(starting_point); // knowingly doesn't use the variable
   int i;
   for (i = 0; i < dfc->CompactTable1[*(buf - 2)].cnt; i++) {
     PID_TYPE pid = dfc->CompactTable1[*(buf - 2)].pid[i];
@@ -2107,7 +2108,7 @@ static void *DFC_MALLOC(int n, dfcMemoryType type) {
 }
 
 static void Build_pattern(DFC_PATTERN *p, uint8_t *flag, uint8_t *temp,
-                          uint32_t i, int j, int k) {
+                          int j, int k) {
   if (p->nocase) {
     if ((p->patrn[j] >= 65 && p->patrn[j] <= 90) ||
         (p->patrn[j] >= 97 && p->patrn[j] <= 122)) {
