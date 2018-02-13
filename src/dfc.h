@@ -66,20 +66,13 @@ extern "C" {
   if (!p) {                            \
     printf("DFC-No Memory: %s!\n", s); \
   }
-/****************************************************/
 
-/****************************************************/
-
-/* Compact Table Structures */
 /* Compact Table (CT1) */
 typedef struct pid_list_ {
   PID_TYPE pid[CT_TYPE1_PID_CNT_MAX];
   uint16_t cnt;
 } CT_Type_1;
 
-/****************************************************/
-/*                For New designed CT2              */
-/****************************************************/
 typedef struct CT_Type_2_2B_Array_ {
   uint16_t pat;      // 2B pattern
   PID_CNT_TYPE cnt;  // Number of PIDs
@@ -123,7 +116,7 @@ typedef struct CT_Type_2_8B_ {
   BUC_CNT_TYPE cnt;
   CT_Type_2_8B_Array *array;
 } CT_Type_2_8B;
-/****************************************************/
+
 
 typedef struct _dfc_pattern {
   struct _dfc_pattern *next;
@@ -174,7 +167,6 @@ typedef struct {
 
 } DFC_STRUCTURE;
 
-/****************************************************/
 typedef enum _dfcMemoryType {
   DFC_MEMORY_TYPE__NONE = 0,
   DFC_MEMORY_TYPE__DFC,
@@ -193,18 +185,16 @@ typedef enum _dfcDataType {
   DFC_CT_Type_2_2B_Array,
   DFC_CT_Type_2_8B_Array
 } dfcDataType;
-/****************************************************/
 
-/****************************************************/
+
 DFC_STRUCTURE *DFC_New(void);
 int DFC_AddPattern(DFC_STRUCTURE *dfc, unsigned char *pat, int n, int nocase,
                    PID_TYPE sid);
 int DFC_Compile(DFC_STRUCTURE *dfc);
 
 int DFC_Search(SEARCH_ARGUMENT);
-void DFC_PrintInfo(DFC_STRUCTURE *dfc);  // Print info
+void DFC_PrintInfo(DFC_STRUCTURE *dfc); 
 void DFC_FreeStructure(DFC_STRUCTURE *dfc);
-/****************************************************/
 
 #ifdef __cplusplus
 }

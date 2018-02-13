@@ -14,5 +14,5 @@ set(DFC_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/dfc.c)
 add_library(dfc SHARED ${DFC_HEADERS} ${DFC_SOURCES})
 target_include_directories(dfc PUBLIC ${DFC_INCLUDE_DIR})
 
-#add_subdirectory(${EXT_PROJECTS_DIR}/catch)
 add_subdirectory(tests)
+add_subdirectory(example)

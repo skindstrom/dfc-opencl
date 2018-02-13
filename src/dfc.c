@@ -18,9 +18,7 @@
 #define ENABLE_RECURSIVE
 
 #define COUNT_MATCH
-/*************************************************************************************/
 
-/*************************************************************************************/
 static unsigned char xlatcase[256];
 
 /* For extracting position */
@@ -35,14 +33,15 @@ static int dfc_memory_ct2 = 0;
 static int dfc_memory_ct3 = 0;
 static int dfc_memory_ct4 = 0;
 static int dfc_memory_ct8 = 0;
-/*************************************************************************************/
 
-/*************************************************************************************/
+
 static float my_sqrtf(float input, float x);
 static void init_xlatcase();
 static inline void ConvertCaseEx(unsigned char *d, unsigned char *s, int m);
 static inline int my_strncmp(unsigned char *a, unsigned char *b, int n);
 static inline int my_strncasecmp(unsigned char *a, unsigned char *b, int n);
+
+
 static void *DFC_REALLOC(void *p, uint16_t n, dfcDataType type,
                          dfcMemoryType type2);
 static void DFC_FREE(void *p, int n, dfcMemoryType type);
@@ -52,7 +51,7 @@ static void Build_pattern(DFC_PATTERN *p, uint8_t *flag, uint8_t *temp,
 static inline DFC_PATTERN *DFC_InitHashLookup(DFC_STRUCTURE *ctx, uint8_t *pat,
                                               uint16_t patlen);
 static inline int DFC_InitHashAdd(DFC_STRUCTURE *ctx, DFC_PATTERN *p);
-/*************************************************************************************/
+
 
 /*
  *  Create a new DFC state machine
@@ -694,11 +693,8 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
   dfc_memory_ct8 = 0;
   dfc_total_memory = sizeof(DFC_STRUCTURE) + dfc_pattern_memory;
 
-  /* #######################################################################################
-   */
-  /* ###############                  MatchList initialization
-   * ################ */
-  /* #######################################################################################
+  /*
+   * MatchList initialization
    */
   int begin_node_flag = 1;
   for (i = 0; i < INIT_HASH_SIZE; i++) {
@@ -733,14 +729,8 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
     dfc->dfcMatchList[plist->iid] = plist;
   }
 
-  /* #######################################################################################
-   */
-
-  /* #######################################################################################
-   */
-  /* ###############              0. Direct Filters initialization
-   * ################ */
-  /* #######################################################################################
+  /*
+   * Direct Filters initialization
    */
 
   /* Initializing Bloom Filter */
@@ -758,182 +748,14 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
     dfc->cDF0[i] = 0;
   }
 
-  /* #######################################################################################
-   */
-
-  /* #######################################################################################
-   */
-  /* ###############            1. Decide extracting position
-   * ################ */
-  /* #######################################################################################
+  /*
+   *    Decide extracting position (mostly removed)
    */
   pattern_interval = 32;
-  min_pattern_interval = 0;
-#if 0
-    int min_bit_count = 65536;
-    int max_bucket_cnt = 0;
-
-    uint8_t tmpADD_DF_8_1_2[DF_SIZE_REAL];
-    uint8_t tmpADD_DF_8_1_3[DF_SIZE_REAL];
-    uint8_t tmpADD_DF_8_1_4[DF_SIZE_REAL];
-    uint8_t tmpDirectFilter1[DF_SIZE_REAL];
-	CT_Type_2_8B tmpCompactTable8[CT8_TABLE_SIZE];
-
-    for(i = 0; i <= pattern_interval; i++)
-    {
-        int l;
-        int pcount = 0;
-		memset(tmpDirectFilter1, 0, sizeof(uint8_t) * DF_SIZE_REAL);
-		memset(tmpADD_DF_8_1_2, 0, sizeof(uint8_t) * DF_SIZE_REAL);
-		memset(tmpADD_DF_8_1_3, 0, sizeof(uint8_t) * DF_SIZE_REAL);
-		memset(tmpADD_DF_8_1_4, 0, sizeof(uint8_t) * DF_SIZE_REAL);
-		memset(tmpCompactTable8, 0, sizeof(CT_Type_2_8B) * CT8_TABLE_SIZE);
-
-        for(plist = dfc->dfcPatterns; plist != NULL; plist = plist->next){
-            if (plist->n > 1) {
-                alpha_cnt = 0;
-
-                do {
-                    for (j=1, k=0; j>=0; --j, k++) {
-                        flag[k] =  (alpha_cnt >> j) & 1;
-                    }
-
-                    if (plist->n == 2) {
-                        for (j=plist->n - 2, k=0; j< plist->n; j++, k++){
-                            Build_pattern(plist, flag, temp, i,j,k);
-                        }
-                    }else if (plist->n == 3) {
-                        for (j=0 , k=0; j < 2; j++, k++){
-                            Build_pattern(plist, flag, temp, i,j,k);
-                        }
-                    }else if (plist->n < 8) {
-                        for (j=plist->n - 4, k=0; j< plist->n-2; j++, k++){
-                            Build_pattern(plist, flag, temp, i,j,k);
-                        }
-                    } else { // len >= 8
-						uint8_t temp2[8];
-                        for (j = i*(plist->n-8)/pattern_interval, k=0; 
-							 j < i*(plist->n-8)/pattern_interval+8; j++,k++){
-                            Build_pattern(plist, flag, temp, i,j,k);
-							temp2[k] = plist->patrn[j];
-                        }
-						uint64_t crc = _mm_crc32_u64(0, *(uint64_t*)temp2);
-						crc &= CT8_TABLE_SIZE_MASK;
-
-#if 1
-						if( tmpCompactTable8[crc].cnt != 0){ 
-							for(j = 0; j < tmpCompactTable8[crc].cnt; j++){
-								if( tmpCompactTable8[crc].array[j].pat == *(uint64_t*)temp2 )
-									break;	
-							}
-
-							if( j == tmpCompactTable8[crc].cnt){ // If not found,
-								tmpCompactTable8[crc].cnt++;
-								tmpCompactTable8[crc].array = 
-									(CT_Type_2_8B_Array *)DFC_REALLOC((void*)tmpCompactTable8[crc].array,
-									tmpCompactTable8[crc].cnt, DFC_CT_Type_2_8B_Array, DFC_MEMORY_TYPE__NONE);
-								tmpCompactTable8[crc].
-										array[tmpCompactTable8[crc].cnt-1].pat=*(uint64_t*)temp2;
-
-								tmpCompactTable8[crc].array[tmpCompactTable8[crc].cnt-1].cnt = 1;
-							}
-						}else{ // If there is no elements in the CT8,
-							tmpCompactTable8[crc].cnt = 1;
-							tmpCompactTable8[crc].array =
-									 (CT_Type_2_8B_Array *)DFC_MALLOC(sizeof(CT_Type_2_8B_Array),
-																				 DFC_MEMORY_TYPE__NONE);
-							memset(tmpCompactTable8[crc].array, 0, sizeof(CT_Type_2_8B_Array));
-
-							tmpCompactTable8[crc].array[0].pat = *(uint64_t*)temp2;
-							tmpCompactTable8[crc].array[0].cnt = 1;
-						}
-#endif
-                    }
-
-                    byteIndex = (uint32_t)BINDEX((*(uint16_t*)temp) & DF_MASK);
-                    bitMask = BMASK((*(uint16_t*)temp) & DF_MASK);
-
-                    tmpDirectFilter1[byteIndex] |= bitMask;
-                    if(!i)
-                    {
-                        if (plist->n == 2) {
-                            dfc->DirectFilter5[byteIndex] |= bitMask;
-                        } else if (plist->n == 3) {
-                            dfc->DirectFilter6[byteIndex] |= bitMask;
-                        }
-                    }
-                    alpha_cnt++;
-                } while (alpha_cnt < 4);
-            }
-            if (plist->n >= 8) {
-                alpha_cnt = 0;
-                pcount++;
-                do {
-                    for (j=7, k=0; j>=0; --j, k++) {
-                        flag[k] =  (alpha_cnt >> j) & 1;
-                    }
-
-                    for (j=i*(plist->n - 8)/pattern_interval, k=0; j< i*(plist->n-8)/pattern_interval+8; j++, k++){
-                        Build_pattern(plist, flag, temp, i,j,k);
-                    }
-
-                    byteIndex = BINDEX((*(((uint16_t*)temp)+1)) & DF_MASK);
-                    bitMask = BMASK((*(((uint16_t*)temp)+1)) & DF_MASK);
-                    tmpADD_DF_8_1_2[byteIndex] |= bitMask;
-
-                    byteIndex = BINDEX((*(((uint16_t*)temp)+2)) & DF_MASK);
-                    bitMask = BMASK((*(((uint16_t*)temp)+2)) & DF_MASK);
-                    tmpADD_DF_8_1_3[byteIndex] |= bitMask;
-
-                    byteIndex = BINDEX((*(((uint16_t*)temp)+3)) & DF_MASK);
-                    bitMask = BMASK((*(((uint16_t*)temp)+3)) & DF_MASK);
-                    tmpADD_DF_8_1_4[byteIndex] |= bitMask;
-
-                    alpha_cnt++;
-                } while (alpha_cnt < 256);
-            }
-        }
-        int bit_count = 0;
-        int bit_count_8_2 = 0;
-        int bit_count_8_3 = 0;
-        int bit_count_8_4 = 0;
-        int bit_count_ct8 = 0;
-        for(l = 0; l < DF_SIZE_REAL; l++)
-        {
-            bit_count += __builtin_popcount(tmpDirectFilter1[l]);
-            bit_count_8_2 += __builtin_popcount(tmpADD_DF_8_1_2[l]);
-            bit_count_8_3 += __builtin_popcount(tmpADD_DF_8_1_3[l]);
-            bit_count_8_4 += __builtin_popcount(tmpADD_DF_8_1_4[l]);
-        }
-        for(l = 0; l < CT8_TABLE_SIZE; l++)
-        {
-            //bit_count_ct8 += __builtin_popcount(tmpCompactTable8[l]);
-            bit_count_ct8 += tmpCompactTable8[l].cnt;
-			DFC_FREE(tmpCompactTable8[l].array, sizeof(CT_Type_2_8B_Array) * tmpCompactTable8[l].cnt);
-		}
-        //if(bit_count < min_bit_count && (double)bit_count_8/pcount < 1.45)
-        //if(bit_count < min_bit_count)
-        //if(bit_count_ct8 < max_bucket_cnt)
-        if(bit_count_8_3 + bit_count_8_4 < min_bit_count)
-        {
-            min_bit_count = bit_count_8_3 + bit_count_8_4;
-            min_pattern_interval = i;
-        }
-		//printf("position: %d, DF1: %d, DF3_2 (8B): %d, DF3_3 (8B): %d, DF3_4 (8B): %d # of buckets in CT8: %d\n",
-		//			 i, bit_count, bit_count_8_2, bit_count_8_3, bit_count_8_4 , bit_count_ct8);
-    }
-#endif
   min_pattern_interval = 32;
-  // printf("Extracting Position : %d/%d\n", min_pattern_interval,
-  // pattern_interval);
 
-  /* #######################################################################################
-   */
-
-  /* #######################################################################################
-   */
-  /* ###############               Direct Filters setup ################ */
-  /* #######################################################################################
+  /*
+   *                Direct Filters setup
    */
   memset(dfc->CompactTable1, 0, sizeof(CT_Type_1) * CT1_TABLE_SIZE);
 
@@ -1019,7 +841,6 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
             Build_pattern(plist, flag, temp, i, j, k);
           }
         } else if (plist->n == 3) {
-          // for (j=0 , k=0; j < 2; j++, k++){
           for (j = plist->n - 2, k = 0; j < plist->n; j++, k++) {
             Build_pattern(plist, flag, temp, i, j, k);
           }
@@ -1117,15 +938,8 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
     }
   }
 
-  // printf("DF Initialization is done.\n");
-  /* #######################################################################################
-   */
-
-  /* #######################################################################################
-   */
-  /* ###############                Compact Tables initialization
-   * ################ */
-  /* #######################################################################################
+  /*
+   * Compact Tables initialization
    */
 
   dfc_memory_ct2 += sizeof(CT_Type_2) * CT2_TABLE_SIZE;
@@ -1137,13 +951,8 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
   dfc_memory_ct8 += sizeof(CT_Type_2_8B) * CT8_TABLE_SIZE;
   memset(dfc->CompactTable8, 0, sizeof(CT_Type_2_8B) * CT8_TABLE_SIZE);
 
-  /* #######################################################################################
-   */
-
-  /* #######################################################################################
-   */
-  /* ###############                   Compact Tables setup ################ */
-  /* #######################################################################################
+  /*
+   * Compact Tables setup
    */
 
   for (plist = dfc->dfcPatterns; plist != NULL; plist = plist->next) {
@@ -1400,18 +1209,12 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
       } while (alpha_cnt < 256);
     }
   }
-    // printf("CT Initialization is done.\n");
-/* #######################################################################################
- */
+    /*
+     * Recursive filtering
+     */
 
-/* #######################################################################################
- */
-/* ###############                   Recursive filtering ################ */
-/* #######################################################################################
- */
 #ifdef ENABLE_RECURSIVE
-    // Only for CT2 firstly
-#if 1
+  // Only for CT2 firstly
   for (i = 0; i < CT2_TABLE_SIZE; i++) {
     for (n = 0; n < dfc->CompactTable2[i].cnt; n++) {
       /* If the number of PID is bigger than 3, do recursive filtering */
@@ -1434,7 +1237,7 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
             DFC_MEMORY_TYPE__CT2);
         memcpy(tempPID, dfc->CompactTable2[i].array[n].pid,
                sizeof(PID_TYPE) * dfc->CompactTable2[i].array[n].cnt);
-        // free(dfc->CompactTable2[i].array[n].pid);
+        
         DFC_FREE(dfc->CompactTable2[i].array[n].pid,
                  dfc->CompactTable2[i].array[n].cnt * sizeof(PID_TYPE),
                  DFC_MEMORY_TYPE__CT2);
@@ -1443,7 +1246,7 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
         int temp_cnt = 0;  // cnt for 2 byte patterns.
 
         for (m = 0; m < dfc->CompactTable2[i].array[n].cnt; m++) {
-          // DFC_PATTERN *mlist = dfc->dfcMatchList[];
+          
           int pat_len = dfc->dfcMatchList[tempPID[m]]->n - 2;
 
           if (pat_len == 0) { /* When pat length is 2 */
@@ -1508,7 +1311,6 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
       }
     }
   }
-#endif
   // Only for CT4 firstly
   for (i = 0; i < CT4_TABLE_SIZE; i++) {
     for (n = 0; n < dfc->CompactTable4[i].cnt; n++) {
@@ -1541,7 +1343,7 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
         int temp_cnt = 0;  // cnt for 4 byte patterns.
 
         for (m = 0; m < dfc->CompactTable4[i].array[n].cnt; m++) {
-          // DFC_PATTERN *mlist = dfc->dfcMatchList[];
+          
           int pat_len = dfc->dfcMatchList[tempPID[m]]->n - 4;
 
           if (pat_len == 0) { /* When pat length is 4 */
@@ -1646,7 +1448,6 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
     }
   }
 
-#if 1
   /* For CT8 */
   for (i = 0; i < CT8_TABLE_SIZE; i++) {
     for (n = 0; n < dfc->CompactTable8[i].cnt; n++) {
@@ -1671,7 +1472,7 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
             DFC_MEMORY_TYPE__CT8);
         memcpy(tempPID, dfc->CompactTable8[i].array[n].pid,
                sizeof(PID_TYPE) * dfc->CompactTable8[i].array[n].cnt);
-        // free(dfc->CompactTable8[i].array[n].pid);
+        
         DFC_FREE(dfc->CompactTable8[i].array[n].pid,
                  dfc->CompactTable8[i].array[n].cnt * sizeof(PID_TYPE),
                  DFC_MEMORY_TYPE__CT8);
@@ -1680,7 +1481,6 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
         int temp_cnt = 0;  // cnt for 8 byte patterns.
 
         for (m = 0; m < dfc->CompactTable8[i].array[n].cnt; m++) {
-          // DFC_PATTERN *mlist = dfc->dfcMatchList[];
           int pat_len = dfc->dfcMatchList[tempPID[m]]->n - 8;
 
           if (pat_len == 0) { /* When pat length is 8 */
@@ -1785,24 +1585,6 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
     }
   }
 #endif
-#endif
-
-/* #######################################################################################
- */
-
-    // printf("Recursive Initialization is done.\n");
-
-/* #######################################################################################
- */
-/* ###############                   Print Information ################ */
-/* #######################################################################################
- */
-#ifdef PRINT_INFO
-    // DFC_PrintInfo(dfc);
-#endif
-  /* #######################################################################################
-   */
-
   return 0;
 }
 
@@ -2043,7 +1825,6 @@ static int Verification_CT8_plus(VERIFI_ARGUMENT) {
             }
           }
         }
-#if 1
       } else {
         for (j = 0; j < dfc->CompactTable8[crc].array[i].cnt; j++) {
           PID_TYPE pid = dfc->CompactTable8[crc].array[i].pid[j];
@@ -2119,7 +1900,6 @@ static int Verification_CT8_plus(VERIFI_ARGUMENT) {
           }
         }
       }
-#endif
       break;
     }
   }
@@ -2144,26 +1924,11 @@ static inline int Progressive_Filtering(PROGRE_ARGUMENT) {
 
     if (unlikely((mask & dfc->ADD_DF_4_plus[index]))) {
       if (unlikely(mask & dfc->ADD_DF_4_1[index])) {
-        // if (unlikely(msk & dfc->cDF2[idx])) {
         matches = Verification_CT4_7(VERIFI_PARAMETER);
-        // matches ++;
-        //}
       }
-
-      // DTYPE data8 = *(uint16_t*)(&buf[4]);
-      // BTYPE index8 = BINDEX(data8);
-      // BTYPE mask8 = BMASK(data8);
-
-      // if (unlikely(mask8 & dfc->ADD_DF_8_1[index8])) {
-      // data8 = *(uint16_t*)(&buf[2]);
-      // index8 = BINDEX(data8);
-      // mask8 = BMASK(data8);
-      // if (unlikely(mask8 & dfc->ADD_DF_8_2[index8])) {
       if ((rest_len >= 8)) {
         matches = Verification_CT8_plus(VERIFI_PARAMETER);
-        // matches ++;
       }
-      //}
     }
   }
 #else
@@ -2208,9 +1973,7 @@ int DFC_Search(SEARCH_ARGUMENT) {
   return matches;
 }
 
-/*************************************************************************************/
-/*                                       Utility */
-/*************************************************************************************/
+// Utility functions
 static float my_sqrtf(float input, float x) {
   int i;
   if (x == 0 && input == 0) return 0;
@@ -2334,7 +2097,7 @@ static void *DFC_REALLOC(void *p, uint16_t n, dfcDataType type,
       }
       return p;
     default:
-      printf("ERROR! Data Type is not correct!\n");
+      fprintf(stderr, "ERROR! Data Type is not correct!\n");
       break;
   }
   return NULL;
@@ -2363,7 +2126,8 @@ static void DFC_FREE(void *p, int n, dfcMemoryType type) {
     case DFC_MEMORY_TYPE__NONE:
       break;
     default:
-      // printf("%s(%d) Invalid memory type\n", __FILE__, __LINE__);
+      fprintf(stderr, "%s(%d) Invalid memory type\n", __FILE__, __LINE__);
+      exit(1);
       break;
   }
   dfc_total_memory -= n;
@@ -2489,7 +2253,3 @@ static inline int DFC_InitHashAdd(DFC_STRUCTURE *ctx, DFC_PATTERN *p) {
 
   return 0;
 }
-
-/*************************************************************************************/
-//}
-//#endif
