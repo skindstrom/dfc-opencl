@@ -70,7 +70,8 @@ DFC_STRUCTURE * DFC_New (void)
     if (p)
     {
         memset (p, 0, sizeof (DFC_STRUCTURE));
-        p->init_hash = malloc(sizeof(DFC_PATTERN *) * INIT_HASH_SIZE);
+        p->init_hash = (DFC_PATTERN**)malloc(sizeof(DFC_PATTERN *) * 
+INIT_HASH_SIZE);
         if(p->init_hash == NULL){
             exit(1);
         }

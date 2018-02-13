@@ -16,6 +16,10 @@
 
 #include "dfc_framework.h"
 
+#ifdef __cplusplus
+extern "C"{
+#endif 
+
 /****************************************************/
 /*         Parameters: DF size, CT size             */
 /****************************************************/
@@ -206,5 +210,9 @@ int DFC_Search(SEARCH_ARGUMENT);
 void DFC_PrintInfo(DFC_STRUCTURE* dfc); // Print info
 void DFC_FreeStructure(DFC_STRUCTURE *dfc);
 /****************************************************/
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
