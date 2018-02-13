@@ -9,7 +9,7 @@ void addCaseSensitivePattern(DFC_STRUCTURE* dfc, const std::string& pattern,
                  patternId);
 }
 void addCaseInSensitivePattern(DFC_STRUCTURE* dfc, const std::string& pattern,
-                             PID_TYPE patternId) {
+                               PID_TYPE patternId) {
   DFC_AddPattern(dfc, (unsigned char*)pattern.data(), pattern.size(), 1,
                  patternId);
 }
