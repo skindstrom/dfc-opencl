@@ -10,8 +10,8 @@
 static unsigned char xlatcase[256];
 
 /* For extracting position */
-int pattern_interval;
-int min_pattern_interval;
+static const int pattern_interval = 32;
+static const int min_pattern_interval = 32;
 
 static int dfc_total_memory = 0;
 static int dfc_pattern_memory = 0;
@@ -26,11 +26,26 @@ static void *DFC_REALLOC(void *p, uint16_t n, dfcDataType type,
                          dfcMemoryType type2);
 static void DFC_FREE(void *p, int n, dfcMemoryType type);
 static void *DFC_MALLOC(int n, dfcMemoryType type);
-static void Build_pattern(DFC_PATTERN *p, uint8_t *flag, uint8_t *temp,
-                          int j, int k);
+static void Build_pattern(DFC_PATTERN *p, uint8_t *flag, uint8_t *temp, int j,
+                          int k);
 static inline DFC_PATTERN *DFC_InitHashLookup(DFC_STRUCTURE *ctx, uint8_t *pat,
                                               uint16_t patlen);
 static inline int DFC_InitHashAdd(DFC_STRUCTURE *ctx, DFC_PATTERN *p);
+
+static void initializeMemoryTracking();
+static void setupMatchList(DFC_STRUCTURE *dfc);
+
+static void initializeDirectFilterMemory(DFC_STRUCTURE *dfc);
+static void setupDirectFilters(DFC_STRUCTURE *dfc);
+static void setup1BDirectFilter(DFC_STRUCTURE *dfc, DFC_PATTERN *plist);
+static void setup1BDirectFilterWithPattern(DFC_STRUCTURE *dfc, uint8_t pattern);
+static void setup1BPlusDirectFilter(DFC_STRUCTURE *dfc, DFC_PATTERN *plist);
+
+static void initializeCompactTableMemory(DFC_STRUCTURE *dfc);
+static void setupCompactTables(DFC_STRUCTURE *dfc);
+static void setupRecursiveFiltering(DFC_STRUCTURE *dfc);
+
+static uint8_t toggleCharacterCase(uint8_t);
 
 /*
  *  Create a new DFC state machine
@@ -652,921 +667,21 @@ static void Add_PID_to_2B_CT(CT_Type_2_2B *CompactTable, uint8_t *temp,
 }
 
 int DFC_Compile(DFC_STRUCTURE *dfc) {
-  uint32_t i = 0;
-  uint32_t alpha_cnt;
-
-  int j, k, l;
-  BUC_CNT_TYPE m, n;
-  DFC_PATTERN *plist;
-
-  uint8_t temp[8], flag[8];
-  uint16_t fragment_16;
-  uint32_t fragment_32;
-  uint64_t fragment_64;
-  uint32_t byteIndex, bitMask;
-
-  dfc_memory_ct1 = sizeof(CT_Type_1) * CT1_TABLE_SIZE;
-  dfc_memory_ct2 = 0;
-  dfc_memory_ct3 = 0;
-  dfc_memory_ct4 = 0;
-  dfc_memory_ct8 = 0;
-  dfc_total_memory = sizeof(DFC_STRUCTURE) + dfc_pattern_memory;
-
-  /*
-   * MatchList initialization
-   */
-  int begin_node_flag = 1;
-  for (i = 0; i < INIT_HASH_SIZE; i++) {
-    DFC_PATTERN *node = dfc->init_hash[i], *prev_node;
-    int first_node_flag = 1;
-    while (node != NULL) {
-      if (begin_node_flag) {
-        begin_node_flag = 0;
-        dfc->dfcPatterns = node;
-      } else {
-        if (first_node_flag) {
-          first_node_flag = 0;
-          prev_node->next = node;
-        }
-      }
-      prev_node = node;
-      node = node->next;
-    }
-  }
-
-  free(dfc->init_hash);
-  dfc->init_hash = NULL;
-
-  dfc->dfcMatchList = (DFC_PATTERN **)DFC_MALLOC(
-      sizeof(DFC_PATTERN *) * dfc->numPatterns, DFC_MEMORY_TYPE__PATTERN);
-  MEMASSERT_DFC(dfc->dfcMatchList, "DFC_Compile");
-
-  for (plist = dfc->dfcPatterns; plist != NULL; plist = plist->next) {
-    if (dfc->dfcMatchList[plist->iid] != NULL) {
-      fprintf(stderr, "Internal ID ERROR : %u\n", plist->iid);
-    }
-    dfc->dfcMatchList[plist->iid] = plist;
-  }
-
-  /*
-   * Direct Filters initialization
-   */
-
-  /* Initializing Bloom Filter */
-  for (i = 0; i < DF_SIZE_REAL; i++) {
-    dfc->DirectFilter1[i] = 0;
-    dfc->ADD_DF_4_plus[i] = 0;
-    dfc->ADD_DF_8_1[i] = 0;
-    dfc->ADD_DF_4_1[i] = 0;
-    dfc->cDF2[i] = 0;
-    dfc->ADD_DF_8_2[i] = 0;
-    dfc->cDF1[i] = 0;
-  }
-
-  for (i = 0; i < 256; i++) {
-    dfc->cDF0[i] = 0;
-  }
-
-  /*
-   *    Decide extracting position (mostly removed)
-   */
-  pattern_interval = 32;
-  min_pattern_interval = 32;
-
-  /*
-   *                Direct Filters setup
-   */
-  memset(dfc->CompactTable1, 0, sizeof(CT_Type_1) * CT1_TABLE_SIZE);
-
-  for (plist = dfc->dfcPatterns; plist != NULL; plist = plist->next) {
-    /* 0. Initialization for DF8 (for 1B patterns)*/
-    if (plist->n == 1) {
-      temp[0] = plist->casepatrn[0];
-      for (j = 0; j < 256; j++) {
-        temp[1] = j;
-
-        fragment_16 = (temp[1] << 8) | temp[0];
-        byteIndex = (uint32_t)BINDEX(fragment_16 & DF_MASK);
-        bitMask = BMASK(fragment_16 & DF_MASK);
-
-        dfc->DirectFilter1[byteIndex] |= bitMask;
-      }
-
-      dfc->cDF0[temp[0]] = 1;
-      if (dfc->CompactTable1[temp[0]].cnt == 0) {
-        dfc->CompactTable1[temp[0]].cnt++;
-        dfc->CompactTable1[temp[0]].pid[0] = plist->iid;
-      } else {
-        for (k = 0; k < dfc->CompactTable1[temp[0]].cnt; k++) {
-          if (dfc->CompactTable1[temp[0]].pid[k] == plist->iid) break;
-        }
-        if (k == dfc->CompactTable1[temp[0]].cnt) {
-          dfc->CompactTable1[temp[0]].pid[dfc->CompactTable1[temp[0]].cnt++] =
-              plist->iid;
-          if (dfc->CompactTable1[temp[0]].cnt >= CT_TYPE1_PID_CNT_MAX)
-            printf("Too many PIDs in CT1. You should expand the size.\n");
-        }
-      }
-
-      if (plist->nocase) {
-        if (plist->casepatrn[0] >= 97 /*a*/ &&
-            plist->casepatrn[0] <= 122 /*z*/) {
-          /* when the pattern is lower case */
-          temp[0] = toupper(plist->casepatrn[0]);
-        } else {
-          /* when the pattern is upper case */
-          temp[0] = tolower(plist->casepatrn[0]);
-        }
-
-        for (j = 0; j < 256; j++) {
-          temp[1] = j;
-
-          fragment_16 = (temp[1] << 8) | temp[0];
-          byteIndex = (uint32_t)BINDEX(fragment_16 & DF_MASK);
-          bitMask = BMASK(fragment_16 & DF_MASK);
-
-          dfc->DirectFilter1[byteIndex] |= bitMask;
-        }
-
-        dfc->cDF0[temp[0]] = 1;
-        if (dfc->CompactTable1[temp[0]].cnt == 0) {
-          dfc->CompactTable1[temp[0]].cnt++;
-          dfc->CompactTable1[temp[0]].pid[0] = plist->iid;
-        } else {
-          for (k = 0; k < dfc->CompactTable1[temp[0]].cnt; k++) {
-            if (dfc->CompactTable1[temp[0]].pid[k] == plist->iid) break;
-          }
-          if (k == dfc->CompactTable1[temp[0]].cnt) {
-            dfc->CompactTable1[temp[0]].pid[dfc->CompactTable1[temp[0]].cnt++] =
-                plist->iid;
-            if (dfc->CompactTable1[temp[0]].cnt >= CT_TYPE1_PID_CNT_MAX)
-              printf("Too many PIDs in CT1. You should expand the size.\n");
-          }
-        }
-      }
-    }
-
-    /* 1. Initialization for DF1 */
-    if (plist->n > 1) {
-      alpha_cnt = 0;
-
-      do {
-        for (j = 1, k = 0; j >= 0; --j, k++) {
-          flag[k] = (alpha_cnt >> j) & 1;
-        }
-
-        if (plist->n == 2) {
-          for (j = plist->n - 2, k = 0; j < plist->n; j++, k++) {
-            Build_pattern(plist, flag, temp, j, k);
-          }
-        } else if (plist->n == 3) {
-          for (j = plist->n - 2, k = 0; j < plist->n; j++, k++) {
-            Build_pattern(plist, flag, temp, j, k);
-          }
-        } else if (plist->n < 8) {
-          for (j = plist->n - 4, k = 0; j < plist->n - 2; j++, k++) {
-            Build_pattern(plist, flag, temp, j, k);
-          }
-        } else {  // len >= 8
-          for (j = min_pattern_interval * (plist->n - 8) / pattern_interval,
-              k = 0;
-               j < min_pattern_interval * (plist->n - 8) / pattern_interval + 2;
-               j++, k++) {
-            Build_pattern(plist, flag, temp, j, k);
-          }
-        }
-
-        fragment_16 = (temp[1] << 8) | temp[0];
-        byteIndex = (uint32_t)BINDEX(fragment_16 & DF_MASK);
-        bitMask = BMASK(fragment_16 & DF_MASK);
-
-        dfc->DirectFilter1[byteIndex] |= bitMask;
-
-        if (plist->n == 2 || plist->n == 3) dfc->cDF1[byteIndex] |= bitMask;
-
-        alpha_cnt++;
-      } while (alpha_cnt < 4);
-    }
-
-    /* Initializing 4B DF, 8B DF */
-    if (plist->n >= 4) {
-      alpha_cnt = 0;
-
-      do {
-        for (j = 3, k = 0; j >= 0; --j, k++) {
-          flag[k] = (alpha_cnt >> j) & 1;
-        }
-
-        if (plist->n < 8) {
-          for (j = plist->n - 4, k = 0; j < plist->n; j++, k++) {
-            Build_pattern(plist, flag, temp, j, k);
-          }
-        } else {
-          for (j = min_pattern_interval * (plist->n - 8) / pattern_interval,
-              k = 0;
-               j < min_pattern_interval * (plist->n - 8) / pattern_interval + 4;
-               j++, k++) {
-            Build_pattern(plist, flag, temp, j, k);
-          }
-        }
-
-        byteIndex = BINDEX((*(((uint16_t *)temp) + 1)) & DF_MASK);
-        bitMask = BMASK((*(((uint16_t *)temp) + 1)) & DF_MASK);
-
-        dfc->ADD_DF_4_plus[byteIndex] |= bitMask;
-        if (plist->n >= 4 && plist->n < 8) {
-          dfc->ADD_DF_4_1[byteIndex] |= bitMask;
-
-          fragment_16 = (temp[1] << 8) | temp[0];
-          byteIndex = BINDEX(fragment_16 & DF_MASK);
-          bitMask = BMASK(fragment_16 & DF_MASK);
-
-          dfc->cDF2[byteIndex] |= bitMask;
-        }
-        alpha_cnt++;
-      } while (alpha_cnt < 16);
-    }
-
-    if (plist->n >= 8) {
-      alpha_cnt = 0;
-
-      do {
-        for (j = 7, k = 0; j >= 0; --j, k++) {
-          flag[k] = (alpha_cnt >> j) & 1;
-        }
-
-        for (j = min_pattern_interval * (plist->n - 8) / pattern_interval,
-            k = 0;
-             j < min_pattern_interval * (plist->n - 8) / pattern_interval + 8;
-             j++, k++) {
-          Build_pattern(plist, flag, temp, j, k);
-        }
-
-        byteIndex = BINDEX((*(((uint16_t *)temp) + 3)) & DF_MASK);
-        bitMask = BMASK((*(((uint16_t *)temp) + 3)) & DF_MASK);
-
-        dfc->ADD_DF_8_1[byteIndex] |= bitMask;
-
-        byteIndex = BINDEX((*(((uint16_t *)temp) + 2)) & DF_MASK);
-        bitMask = BMASK((*(((uint16_t *)temp) + 2)) & DF_MASK);
-
-        dfc->ADD_DF_8_2[byteIndex] |= bitMask;
-
-        alpha_cnt++;
-      } while (alpha_cnt < 256);
-    }
-  }
-
-  /*
-   * Compact Tables initialization
-   */
-
-  dfc_memory_ct2 += sizeof(CT_Type_2) * CT2_TABLE_SIZE;
-  memset(dfc->CompactTable2, 0, sizeof(CT_Type_2) * CT2_TABLE_SIZE);
-
-  dfc_memory_ct4 += sizeof(CT_Type_2) * CT4_TABLE_SIZE;
-  memset(dfc->CompactTable4, 0, sizeof(CT_Type_2) * CT4_TABLE_SIZE);
-
-  dfc_memory_ct8 += sizeof(CT_Type_2_8B) * CT8_TABLE_SIZE;
-  memset(dfc->CompactTable8, 0, sizeof(CT_Type_2_8B) * CT8_TABLE_SIZE);
-
-  /*
-   * Compact Tables setup
-   */
-
-  for (plist = dfc->dfcPatterns; plist != NULL; plist = plist->next) {
-    if (plist->n == 2 || plist->n == 3) {
-      alpha_cnt = 0;
-
-      do {
-        for (j = 1, k = 0; j >= 0; --j, k++) {
-          flag[k] = (alpha_cnt >> j) & 1;
-        }
-
-        for (j = plist->n - 2, k = 0; j < plist->n; j++, k++) {
-          Build_pattern(plist, flag, temp, j, k);
-        }
-
-        // 2.
-        fragment_16 = (temp[1] << 8) | temp[0];
-        uint32_t crc = _mm_crc32_u16(0, fragment_16);
-
-        // 3.
-        crc &= CT2_TABLE_SIZE_MASK;
-
-        // 4.
-        if (dfc->CompactTable2[crc].cnt != 0) {
-          for (n = 0; n < dfc->CompactTable2[crc].cnt; n++) {
-            if (dfc->CompactTable2[crc].array[n].pat == fragment_16) break;
-          }
-
-          if (n == dfc->CompactTable2[crc].cnt) {  // If not found,
-            dfc->CompactTable2[crc].cnt++;
-            dfc->CompactTable2[crc].array = (CT_Type_2_Array *)DFC_REALLOC(
-                (void *)dfc->CompactTable2[crc].array,
-                dfc->CompactTable2[crc].cnt, DFC_CT_Type_2_Array,
-                DFC_MEMORY_TYPE__CT2);
-            dfc->CompactTable2[crc].array[dfc->CompactTable2[crc].cnt - 1].pat =
-                fragment_16;
-
-            dfc->CompactTable2[crc].array[dfc->CompactTable2[crc].cnt - 1].cnt =
-                1;
-            dfc->CompactTable2[crc].array[dfc->CompactTable2[crc].cnt - 1].pid =
-                (PID_TYPE *)DFC_MALLOC(sizeof(PID_TYPE), DFC_MEMORY_TYPE__CT2);
-            dfc->CompactTable2[crc]
-                .array[dfc->CompactTable2[crc].cnt - 1]
-                .pid[0] = plist->iid;
-            dfc->CompactTable2[crc]
-                .array[dfc->CompactTable2[crc].cnt - 1]
-                .DirectFilter = NULL;
-            dfc->CompactTable2[crc]
-                .array[dfc->CompactTable2[crc].cnt - 1]
-                .CompactTable = NULL;
-          } else {  // If found,
-            for (m = 0; m < dfc->CompactTable2[crc].array[n].cnt; m++) {
-              if (dfc->CompactTable2[crc].array[n].pid[m] == plist->iid) break;
-            }
-            if (m == dfc->CompactTable2[crc].array[n].cnt) {
-              dfc->CompactTable2[crc].array[n].cnt++;
-              dfc->CompactTable2[crc].array[n].pid = (PID_TYPE *)DFC_REALLOC(
-                  (void *)dfc->CompactTable2[crc].array[n].pid,
-                  dfc->CompactTable2[crc].array[n].cnt, DFC_PID_TYPE,
-                  DFC_MEMORY_TYPE__CT2);
-              dfc->CompactTable2[crc]
-                  .array[n]
-                  .pid[dfc->CompactTable2[crc].array[n].cnt - 1] = plist->iid;
-            }
-          }
-        } else {  // If there is no elements in the CT4,
-          dfc->CompactTable2[crc].cnt = 1;
-          dfc->CompactTable2[crc].array = (CT_Type_2_Array *)DFC_MALLOC(
-              sizeof(CT_Type_2_Array), DFC_MEMORY_TYPE__CT2);
-          memset(dfc->CompactTable2[crc].array, 0, sizeof(CT_Type_2_Array));
-
-          dfc->CompactTable2[crc].array[0].pat = fragment_16;
-          dfc->CompactTable2[crc].array[0].cnt = 1;
-          dfc->CompactTable2[crc].array[0].pid =
-              (PID_TYPE *)DFC_MALLOC(sizeof(PID_TYPE), DFC_MEMORY_TYPE__CT2);
-          dfc->CompactTable2[crc].array[0].pid[0] = plist->iid;
-          dfc->CompactTable2[crc].array[0].DirectFilter = NULL;
-          dfc->CompactTable2[crc].array[0].CompactTable = NULL;
-        }
-
-        alpha_cnt++;
-      } while (alpha_cnt < 4);
-    }
-
-    /* CT4 initialization */
-    if (plist->n >= 4 && plist->n < 8) {
-      alpha_cnt = 0;
-      do {
-        // 1.
-
-        for (j = 3, k = 0; j >= 0; --j, k++) {
-          flag[k] = (alpha_cnt >> j) & 1;
-        }
-
-        for (j = plist->n - 4, k = 0; j < plist->n; j++, k++) {
-          Build_pattern(plist, flag, temp, j, k);
-        }
-
-        // 2.
-        fragment_32 =
-            (temp[3] << 24) | (temp[2] << 16) | (temp[1] << 8) | temp[0];
-        uint32_t crc = _mm_crc32_u32(0, fragment_32);
-
-        // 3.
-        crc &= CT4_TABLE_SIZE_MASK;
-
-        // 4.
-        if (dfc->CompactTable4[crc].cnt != 0) {
-          for (n = 0; n < dfc->CompactTable4[crc].cnt; n++) {
-            if (dfc->CompactTable4[crc].array[n].pat == fragment_32) break;
-          }
-
-          if (n == dfc->CompactTable4[crc].cnt) {  // If not found,
-            dfc->CompactTable4[crc].cnt++;
-            dfc->CompactTable4[crc].array = (CT_Type_2_Array *)DFC_REALLOC(
-                (void *)dfc->CompactTable4[crc].array,
-                dfc->CompactTable4[crc].cnt, DFC_CT_Type_2_Array,
-                DFC_MEMORY_TYPE__CT4);
-            dfc->CompactTable4[crc].array[dfc->CompactTable4[crc].cnt - 1].pat =
-                fragment_32;
-
-            dfc->CompactTable4[crc].array[dfc->CompactTable4[crc].cnt - 1].cnt =
-                1;
-            dfc->CompactTable4[crc].array[dfc->CompactTable4[crc].cnt - 1].pid =
-                (PID_TYPE *)DFC_MALLOC(sizeof(PID_TYPE), DFC_MEMORY_TYPE__CT4);
-            dfc->CompactTable4[crc]
-                .array[dfc->CompactTable4[crc].cnt - 1]
-                .pid[0] = plist->iid;
-            dfc->CompactTable4[crc]
-                .array[dfc->CompactTable4[crc].cnt - 1]
-                .DirectFilter = NULL;
-            dfc->CompactTable4[crc]
-                .array[dfc->CompactTable4[crc].cnt - 1]
-                .CompactTable = NULL;
-          } else {  // If found,
-            for (m = 0; m < dfc->CompactTable4[crc].array[n].cnt; m++) {
-              if (dfc->CompactTable4[crc].array[n].pid[m] == plist->iid) break;
-            }
-            if (m == dfc->CompactTable4[crc].array[n].cnt) {
-              dfc->CompactTable4[crc].array[n].cnt++;
-              dfc->CompactTable4[crc].array[n].pid = (PID_TYPE *)DFC_REALLOC(
-                  (void *)dfc->CompactTable4[crc].array[n].pid,
-                  dfc->CompactTable4[crc].array[n].cnt, DFC_PID_TYPE,
-                  DFC_MEMORY_TYPE__CT4);
-              dfc->CompactTable4[crc]
-                  .array[n]
-                  .pid[dfc->CompactTable4[crc].array[n].cnt - 1] = plist->iid;
-            }
-          }
-        } else {  // If there is no elements in the CT4,
-          dfc->CompactTable4[crc].cnt = 1;
-          dfc->CompactTable4[crc].array = (CT_Type_2_Array *)DFC_MALLOC(
-              sizeof(CT_Type_2_Array), DFC_MEMORY_TYPE__CT4);
-          memset(dfc->CompactTable4[crc].array, 0, sizeof(CT_Type_2_Array));
-
-          dfc->CompactTable4[crc].array[0].pat = fragment_32;
-          dfc->CompactTable4[crc].array[0].cnt = 1;
-          dfc->CompactTable4[crc].array[0].pid =
-              (PID_TYPE *)DFC_MALLOC(sizeof(PID_TYPE), DFC_MEMORY_TYPE__CT4);
-          dfc->CompactTable4[crc].array[0].pid[0] = plist->iid;
-          dfc->CompactTable4[crc].array[0].DirectFilter = NULL;
-          dfc->CompactTable4[crc].array[0].CompactTable = NULL;
-        }
-        alpha_cnt++;
-      } while (alpha_cnt < 16);
-    }
-
-    /* CT8 initialization */
-    if (plist->n >= 8) {
-      alpha_cnt = 0;
-      do {
-        for (j = 7, k = 0; j >= 0; --j, k++) {
-          flag[k] = (alpha_cnt >> j) & 1;
-        }
-
-#ifdef CT8_SWITCH
-        for (j = min_pattern_interval * (plist->n - 8) / pattern_interval,
-            k = 0;
-             j < min_pattern_interval * (plist->n - 8) / pattern_interval + 8;
-             j++, k++) {
-          temp[k] = plist->patrn[j];
-        }
-#else
-        for (j = plist->n - 8, k = 0; j < plist->n; j++, k++) {
-          Build_pattern(plist, flag, temp, j, k);
-        }
-#endif
-
-        // 1. Calulating Indice
-        fragment_32 =
-            (temp[7] << 24) | (temp[6] << 16) | (temp[5] << 8) | temp[4];
-        fragment_64 = ((uint64_t)fragment_32 << 32) | (temp[3] << 24) |
-                      (temp[2] << 16) | (temp[1] << 8) | temp[0];
-        uint64_t crc = _mm_crc32_u64(0, fragment_64);
-        crc &= CT8_TABLE_SIZE_MASK;
-
-        if (dfc->CompactTable8[crc].cnt != 0) {
-          for (n = 0; n < dfc->CompactTable8[crc].cnt; n++) {
-            if (dfc->CompactTable8[crc].array[n].pat == fragment_64) break;
-          }
-
-          if (n == dfc->CompactTable8[crc].cnt) {  // If not found,
-            dfc->CompactTable8[crc].cnt++;
-            dfc->CompactTable8[crc].array = (CT_Type_2_8B_Array *)DFC_REALLOC(
-                (void *)dfc->CompactTable8[crc].array,
-                dfc->CompactTable8[crc].cnt, DFC_CT_Type_2_8B_Array,
-                DFC_MEMORY_TYPE__CT8);
-            dfc->CompactTable8[crc].array[dfc->CompactTable8[crc].cnt - 1].pat =
-                fragment_64;
-
-            dfc->CompactTable8[crc].array[dfc->CompactTable8[crc].cnt - 1].cnt =
-                1;
-            dfc->CompactTable8[crc].array[dfc->CompactTable8[crc].cnt - 1].pid =
-                (PID_TYPE *)DFC_MALLOC(sizeof(PID_TYPE), DFC_MEMORY_TYPE__CT8);
-            dfc->CompactTable8[crc]
-                .array[dfc->CompactTable8[crc].cnt - 1]
-                .pid[0] = plist->iid;
-            dfc->CompactTable8[crc]
-                .array[dfc->CompactTable8[crc].cnt - 1]
-                .DirectFilter = NULL;
-            dfc->CompactTable8[crc]
-                .array[dfc->CompactTable8[crc].cnt - 1]
-                .CompactTable = NULL;
-          } else {  // If found,
-            for (m = 0; m < dfc->CompactTable8[crc].array[n].cnt; m++) {
-              if (dfc->CompactTable8[crc].array[n].pid[m] == plist->iid) break;
-            }
-            if (m == dfc->CompactTable8[crc].array[n].cnt) {
-              dfc->CompactTable8[crc].array[n].cnt++;
-              dfc->CompactTable8[crc].array[n].pid = (PID_TYPE *)DFC_REALLOC(
-                  (void *)dfc->CompactTable8[crc].array[n].pid,
-                  dfc->CompactTable8[crc].array[n].cnt, DFC_PID_TYPE,
-                  DFC_MEMORY_TYPE__CT8);
-              dfc->CompactTable8[crc]
-                  .array[n]
-                  .pid[dfc->CompactTable8[crc].array[n].cnt - 1] = plist->iid;
-            }
-          }
-        } else {  // If there is no elements in the CT8,
-          dfc->CompactTable8[crc].cnt = 1;
-          dfc->CompactTable8[crc].array = (CT_Type_2_8B_Array *)DFC_MALLOC(
-              sizeof(CT_Type_2_8B_Array), DFC_MEMORY_TYPE__CT8);
-          memset(dfc->CompactTable8[crc].array, 0, sizeof(CT_Type_2_8B_Array));
-
-          dfc->CompactTable8[crc].array[0].pat = fragment_64;
-          dfc->CompactTable8[crc].array[0].cnt = 1;
-          dfc->CompactTable8[crc].array[0].pid =
-              (PID_TYPE *)DFC_MALLOC(sizeof(PID_TYPE), DFC_MEMORY_TYPE__CT8);
-          dfc->CompactTable8[crc].array[0].pid[0] = plist->iid;
-          dfc->CompactTable8[crc].array[0].DirectFilter = NULL;
-          dfc->CompactTable8[crc].array[0].CompactTable = NULL;
-        }
-        alpha_cnt++;
-      } while (alpha_cnt < 256);
-    }
-  }
-    /*
-     * Recursive filtering
-     */
+  initializeMemoryTracking();
+
+  setupMatchList(dfc);
+  setupDirectFilters(dfc);
+  setupCompactTables(dfc);
 
 #ifdef ENABLE_RECURSIVE
-  // Only for CT2 firstly
-  for (i = 0; i < CT2_TABLE_SIZE; i++) {
-    for (n = 0; n < dfc->CompactTable2[i].cnt; n++) {
-      /* If the number of PID is bigger than 3, do recursive filtering */
-      if (dfc->CompactTable2[i].array[n].cnt >= RECURSIVE_BOUNDARY) {
-        /* Initialization */
-        dfc->CompactTable2[i].array[n].DirectFilter = (uint8_t *)DFC_MALLOC(
-            sizeof(uint8_t) * DF_SIZE_REAL, DFC_MEMORY_TYPE__CT2);
-        dfc->CompactTable2[i].array[n].CompactTable =
-            (CT_Type_2_2B *)DFC_MALLOC(sizeof(CT_Type_2_2B) * RECURSIVE_CT_SIZE,
-                                       DFC_MEMORY_TYPE__CT2);
-
-        if (!dfc->CompactTable2[i].array[n].DirectFilter ||
-            !dfc->CompactTable2[i].array[n].CompactTable) {
-          fprintf(stderr, "Failed to allocate memory for recursive things.\n");
-          return -1;
-        }
-
-        PID_TYPE *tempPID = (PID_TYPE *)DFC_MALLOC(
-            sizeof(PID_TYPE) * dfc->CompactTable2[i].array[n].cnt,
-            DFC_MEMORY_TYPE__CT2);
-        memcpy(tempPID, dfc->CompactTable2[i].array[n].pid,
-               sizeof(PID_TYPE) * dfc->CompactTable2[i].array[n].cnt);
-
-        DFC_FREE(dfc->CompactTable2[i].array[n].pid,
-                 dfc->CompactTable2[i].array[n].cnt * sizeof(PID_TYPE),
-                 DFC_MEMORY_TYPE__CT2);
-        dfc->CompactTable2[i].array[n].pid = NULL;
-
-        int temp_cnt = 0;  // cnt for 2 byte patterns.
-
-        for (m = 0; m < dfc->CompactTable2[i].array[n].cnt; m++) {
-          int pat_len = dfc->dfcMatchList[tempPID[m]]->n - 2;
-
-          if (pat_len == 0) { /* When pat length is 2 */
-            temp_cnt++;
-            dfc->CompactTable2[i].array[n].pid =
-                (PID_TYPE *)realloc(dfc->CompactTable2[i].array[n].pid,
-                                    sizeof(PID_TYPE) * temp_cnt);
-            dfc->CompactTable2[i].array[n].pid[temp_cnt - 1] = tempPID[m];
-          } else if (pat_len == 1) { /* When pat length is 3 */
-            if (dfc->dfcMatchList[tempPID[m]]->nocase) {
-              temp[1] = tolower(dfc->dfcMatchList[tempPID[m]]->patrn[0]);
-              for (l = 0; l < 256; l++) {
-                temp[0] = l;
-
-                fragment_16 = (temp[1] << 8) | temp[0];
-                byteIndex = BINDEX(fragment_16);
-                bitMask = BMASK(fragment_16);
-
-                dfc->CompactTable2[i].array[n].DirectFilter[byteIndex] |=
-                    bitMask;
-
-                Add_PID_to_2B_CT(dfc->CompactTable2[i].array[n].CompactTable,
-                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT2);
-              }
-
-              temp[1] = toupper(dfc->dfcMatchList[tempPID[m]]->patrn[0]);
-              for (l = 0; l < 256; l++) {
-                temp[0] = l;
-
-                fragment_16 = (temp[1] << 8) | temp[0];
-                byteIndex = BINDEX(fragment_16);
-                bitMask = BMASK(fragment_16);
-
-                dfc->CompactTable2[i].array[n].DirectFilter[byteIndex] |=
-                    bitMask;
-
-                Add_PID_to_2B_CT(dfc->CompactTable2[i].array[n].CompactTable,
-                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT2);
-              }
-            } else {
-              temp[1] = dfc->dfcMatchList[tempPID[m]]->casepatrn[0];
-              for (l = 0; l < 256; l++) {
-                temp[0] = l;
-
-                fragment_16 = (temp[1] << 8) | temp[0];
-                byteIndex = BINDEX(fragment_16);
-                bitMask = BMASK(fragment_16);
-
-                dfc->CompactTable2[i].array[n].DirectFilter[byteIndex] |=
-                    bitMask;
-
-                Add_PID_to_2B_CT(dfc->CompactTable2[i].array[n].CompactTable,
-                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT2);
-              }
-            }
-          }
-        }
-
-        dfc->CompactTable2[i].array[n].cnt = temp_cnt;
-        DFC_FREE(tempPID, sizeof(PID_TYPE) * dfc->CompactTable2[i].array[n].cnt,
-                 DFC_MEMORY_TYPE__CT2);
-      }
-    }
-  }
-  // Only for CT4 firstly
-  for (i = 0; i < CT4_TABLE_SIZE; i++) {
-    for (n = 0; n < dfc->CompactTable4[i].cnt; n++) {
-      /* If the number of PID is bigger than 3, do recursive filtering */
-      if (dfc->CompactTable4[i].array[n].cnt >= RECURSIVE_BOUNDARY) {
-        /* Initialization */
-        dfc->CompactTable4[i].array[n].DirectFilter = (uint8_t *)DFC_MALLOC(
-            sizeof(uint8_t) * DF_SIZE_REAL, DFC_MEMORY_TYPE__CT4);
-        dfc->CompactTable4[i].array[n].CompactTable =
-            (CT_Type_2_2B *)DFC_MALLOC(sizeof(CT_Type_2_2B) * RECURSIVE_CT_SIZE,
-                                       DFC_MEMORY_TYPE__CT4);
-
-        if (!dfc->CompactTable4[i].array[n].DirectFilter ||
-            !dfc->CompactTable4[i].array[n].CompactTable) {
-          fprintf(stderr, "Failed to allocate memory for recursive things.\n");
-          return -1;
-        }
-
-        PID_TYPE *tempPID = (PID_TYPE *)DFC_MALLOC(
-            sizeof(PID_TYPE) * dfc->CompactTable4[i].array[n].cnt,
-            DFC_MEMORY_TYPE__CT4);
-        memcpy(tempPID, dfc->CompactTable4[i].array[n].pid,
-               sizeof(PID_TYPE) * dfc->CompactTable4[i].array[n].cnt);
-        // free(dfc->CompactTable4[i].array[n].pid);
-        DFC_FREE(dfc->CompactTable4[i].array[n].pid,
-                 dfc->CompactTable4[i].array[n].cnt * sizeof(PID_TYPE),
-                 DFC_MEMORY_TYPE__CT4);
-        dfc->CompactTable4[i].array[n].pid = NULL;
-
-        int temp_cnt = 0;  // cnt for 4 byte patterns.
-
-        for (m = 0; m < dfc->CompactTable4[i].array[n].cnt; m++) {
-          int pat_len = dfc->dfcMatchList[tempPID[m]]->n - 4;
-
-          if (pat_len == 0) { /* When pat length is 4 */
-            temp_cnt++;
-            dfc->CompactTable4[i].array[n].pid =
-                (PID_TYPE *)realloc(dfc->CompactTable4[i].array[n].pid,
-                                    sizeof(PID_TYPE) * temp_cnt);
-            dfc->CompactTable4[i].array[n].pid[temp_cnt - 1] = tempPID[m];
-          } else if (pat_len == 1) { /* When pat length is 5 */
-            if (dfc->dfcMatchList[tempPID[m]]->nocase) {
-              temp[1] = tolower(dfc->dfcMatchList[tempPID[m]]->patrn[0]);
-              for (l = 0; l < 256; l++) {
-                temp[0] = l;
-
-                fragment_16 = (temp[1] << 8) | temp[0];
-                byteIndex = BINDEX(fragment_16);
-                bitMask = BMASK(fragment_16);
-
-                dfc->CompactTable4[i].array[n].DirectFilter[byteIndex] |=
-                    bitMask;
-
-                Add_PID_to_2B_CT(dfc->CompactTable4[i].array[n].CompactTable,
-                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT4);
-              }
-
-              temp[1] = toupper(dfc->dfcMatchList[tempPID[m]]->patrn[0]);
-              for (l = 0; l < 256; l++) {
-                temp[0] = l;
-
-                fragment_16 = (temp[1] << 8) | temp[0];
-                byteIndex = BINDEX(fragment_16);
-                bitMask = BMASK(fragment_16);
-
-                dfc->CompactTable4[i].array[n].DirectFilter[byteIndex] |=
-                    bitMask;
-
-                Add_PID_to_2B_CT(dfc->CompactTable4[i].array[n].CompactTable,
-                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT4);
-              }
-            } else {
-              temp[1] = dfc->dfcMatchList[tempPID[m]]->casepatrn[0];
-              for (l = 0; l < 256; l++) {
-                temp[0] = l;
-
-                fragment_16 = (temp[1] << 8) | temp[0];
-                byteIndex = BINDEX(fragment_16);
-                bitMask = BMASK(fragment_16);
-
-                dfc->CompactTable4[i].array[n].DirectFilter[byteIndex] |=
-                    bitMask;
-
-                Add_PID_to_2B_CT(dfc->CompactTable4[i].array[n].CompactTable,
-                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT4);
-              }
-            }
-
-          } else { /* When pat length is 7 (pat_len is equal to 2(6) or 3(7)) */
-            if (dfc->dfcMatchList[tempPID[m]]->nocase) {
-              alpha_cnt = 0;
-              do {
-                for (l = 1, k = 0; l >= 0; --l, k++) {
-                  flag[k] = (alpha_cnt >> l) & 1;
-                }
-
-                for (l = pat_len - 2, k = 0; l <= pat_len - 1; l++, k++) {
-                  Build_pattern(dfc->dfcMatchList[tempPID[m]], flag, temp, l,
-                                k);
-                }
-
-                fragment_16 = (temp[1] << 8) | temp[0];
-                byteIndex = BINDEX(fragment_16);
-                bitMask = BMASK(fragment_16);
-
-                dfc->CompactTable4[i].array[n].DirectFilter[byteIndex] |=
-                    bitMask;
-
-                Add_PID_to_2B_CT(dfc->CompactTable4[i].array[n].CompactTable,
-                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT4);
-
-                alpha_cnt++;
-              } while (alpha_cnt < 4);
-            } else { /* case sensitive pattern */
-              temp[0] = dfc->dfcMatchList[tempPID[m]]->casepatrn[pat_len - 2];
-              temp[1] = dfc->dfcMatchList[tempPID[m]]->casepatrn[pat_len - 1];
-
-              fragment_16 = (temp[1] << 8) | temp[0];
-              byteIndex = BINDEX(fragment_16);
-              bitMask = BMASK(fragment_16);
-
-              dfc->CompactTable4[i].array[n].DirectFilter[byteIndex] |= bitMask;
-
-              Add_PID_to_2B_CT(dfc->CompactTable4[i].array[n].CompactTable,
-                               temp, tempPID[m], DFC_MEMORY_TYPE__CT4);
-            }
-          }
-        }
-
-        dfc->CompactTable4[i].array[n].cnt = temp_cnt;
-        DFC_FREE(tempPID, sizeof(PID_TYPE) * dfc->CompactTable4[i].array[n].cnt,
-                 DFC_MEMORY_TYPE__CT4);
-      }
-    }
-  }
-
-  /* For CT8 */
-  for (i = 0; i < CT8_TABLE_SIZE; i++) {
-    for (n = 0; n < dfc->CompactTable8[i].cnt; n++) {
-      /* If the number of PID is bigger than RECURSIVE_BOUNDARY, do recursive
-       * filtering */
-      if (dfc->CompactTable8[i].array[n].cnt >= RECURSIVE_BOUNDARY) {
-        /* Initialization */
-        dfc->CompactTable8[i].array[n].DirectFilter = (uint8_t *)DFC_MALLOC(
-            DF_SIZE_REAL * sizeof(uint8_t), DFC_MEMORY_TYPE__CT8);
-        dfc->CompactTable8[i].array[n].CompactTable =
-            (CT_Type_2_2B *)DFC_MALLOC(sizeof(CT_Type_2_2B) * RECURSIVE_CT_SIZE,
-                                       DFC_MEMORY_TYPE__CT8);
-
-        if (!dfc->CompactTable8[i].array[n].DirectFilter ||
-            !dfc->CompactTable8[i].array[n].CompactTable) {
-          fprintf(stderr, "Failed to allocate memory for recursive things.\n");
-          return -1;
-        }
-
-        PID_TYPE *tempPID = (PID_TYPE *)DFC_MALLOC(
-            sizeof(PID_TYPE) * dfc->CompactTable8[i].array[n].cnt,
-            DFC_MEMORY_TYPE__CT8);
-        memcpy(tempPID, dfc->CompactTable8[i].array[n].pid,
-               sizeof(PID_TYPE) * dfc->CompactTable8[i].array[n].cnt);
-
-        DFC_FREE(dfc->CompactTable8[i].array[n].pid,
-                 dfc->CompactTable8[i].array[n].cnt * sizeof(PID_TYPE),
-                 DFC_MEMORY_TYPE__CT8);
-        dfc->CompactTable8[i].array[n].pid = NULL;
-
-        int temp_cnt = 0;  // cnt for 8 byte patterns.
-
-        for (m = 0; m < dfc->CompactTable8[i].array[n].cnt; m++) {
-          int pat_len = dfc->dfcMatchList[tempPID[m]]->n - 8;
-
-          if (pat_len == 0) { /* When pat length is 8 */
-            temp_cnt++;
-            dfc->CompactTable8[i].array[n].pid =
-                (PID_TYPE *)realloc(dfc->CompactTable8[i].array[n].pid,
-                                    sizeof(PID_TYPE) * temp_cnt);
-            dfc->CompactTable8[i].array[n].pid[temp_cnt - 1] = tempPID[m];
-          } else if (pat_len == 1) { /* When pat length is 9 */
-            if (dfc->dfcMatchList[tempPID[m]]->nocase) {
-              temp[1] = tolower(dfc->dfcMatchList[tempPID[m]]->patrn[0]);
-              for (l = 0; l < 256; l++) {
-                temp[0] = l;
-
-                fragment_16 = (temp[1] << 8) | temp[0];
-                byteIndex = BINDEX(fragment_16);
-                bitMask = BMASK(fragment_16);
-
-                dfc->CompactTable8[i].array[n].DirectFilter[byteIndex] |=
-                    bitMask;
-
-                Add_PID_to_2B_CT(dfc->CompactTable8[i].array[n].CompactTable,
-                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT8);
-              }
-
-              temp[1] = toupper(dfc->dfcMatchList[tempPID[m]]->patrn[0]);
-              for (l = 0; l < 256; l++) {
-                temp[0] = l;
-
-                fragment_16 = (temp[1] << 8) | temp[0];
-                byteIndex = BINDEX(fragment_16);
-                bitMask = BMASK(fragment_16);
-
-                dfc->CompactTable8[i].array[n].DirectFilter[byteIndex] |=
-                    bitMask;
-
-                Add_PID_to_2B_CT(dfc->CompactTable8[i].array[n].CompactTable,
-                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT8);
-              }
-            } else {
-              temp[1] = dfc->dfcMatchList[tempPID[m]]->casepatrn[0];
-              for (l = 0; l < 256; l++) {
-                temp[0] = l;
-
-                fragment_16 = (temp[1] << 8) | temp[0];
-                byteIndex = BINDEX(fragment_16);
-                bitMask = BMASK(fragment_16);
-
-                dfc->CompactTable8[i].array[n].DirectFilter[byteIndex] |=
-                    bitMask;
-
-                Add_PID_to_2B_CT(dfc->CompactTable8[i].array[n].CompactTable,
-                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT8);
-              }
-            }
-
-          } else { /* longer than or equal to 10 */
-            if (dfc->dfcMatchList[tempPID[m]]->nocase) {
-              alpha_cnt = 0;
-              do {
-                for (l = 1, k = 0; l >= 0; --l, k++) {
-                  flag[k] = (alpha_cnt >> l) & 1;
-                }
-
-                for (l = pat_len - 2, k = 0; l <= pat_len - 1; l++, k++) {
-                  Build_pattern(dfc->dfcMatchList[tempPID[m]], flag, temp, l,
-                                k);
-                }
-
-                fragment_16 = (temp[1] << 8) | temp[0];
-                byteIndex = BINDEX(fragment_16);
-                bitMask = BMASK(fragment_16);
-
-                dfc->CompactTable8[i].array[n].DirectFilter[byteIndex] |=
-                    bitMask;
-
-                Add_PID_to_2B_CT(dfc->CompactTable8[i].array[n].CompactTable,
-                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT8);
-
-                alpha_cnt++;
-              } while (alpha_cnt < 4);
-            } else { /* case sensitive pattern */
-              temp[0] = dfc->dfcMatchList[tempPID[m]]->casepatrn[pat_len - 2];
-              temp[1] = dfc->dfcMatchList[tempPID[m]]->casepatrn[pat_len - 1];
-
-              fragment_16 = (temp[1] << 8) | temp[0];
-              byteIndex = BINDEX(fragment_16);
-              bitMask = BMASK(fragment_16);
-
-              dfc->CompactTable8[i].array[n].DirectFilter[byteIndex] |= bitMask;
-
-              Add_PID_to_2B_CT(dfc->CompactTable8[i].array[n].CompactTable,
-                               temp, tempPID[m], DFC_MEMORY_TYPE__CT8);
-            }
-          }
-        }
-
-        dfc->CompactTable8[i].array[n].cnt = temp_cnt;
-        DFC_FREE(tempPID, sizeof(PID_TYPE) * dfc->CompactTable8[i].array[n].cnt,
-                 DFC_MEMORY_TYPE__CT8);
-      }
-    }
-  }
+  setupRecursiveFiltering(dfc);
 #endif
+
   return 0;
 }
 
 static int Verification_CT1(VERIFI_ARGUMENT) {
-  (void)(starting_point); // knowingly doesn't use the variable
+  (void)(starting_point);  // knowingly doesn't use the variable
   int i;
   for (i = 0; i < dfc->CompactTable1[*(buf - 2)].cnt; i++) {
     PID_TYPE pid = dfc->CompactTable1[*(buf - 2)].pid[i];
@@ -1937,7 +1052,9 @@ int DFC_Search(SEARCH_ARGUMENT) {
     }
   }
 
-  /* It is needed to check last 1 byte from payload */
+  /* It is needed to check last 1 byte from payload, because above every 2 bytes
+   * are used. That means that the last case when there is only 1 byte left is
+   * not handled. */
   if (dfc->cDF0[buf[buflen - 1]]) {
     int i;
     for (i = 0; i < dfc->CompactTable1[buf[buflen - 1]].cnt; i++) {
@@ -2107,8 +1224,8 @@ static void *DFC_MALLOC(int n, dfcMemoryType type) {
   return p;
 }
 
-static void Build_pattern(DFC_PATTERN *p, uint8_t *flag, uint8_t *temp,
-                          int j, int k) {
+static void Build_pattern(DFC_PATTERN *p, uint8_t *flag, uint8_t *temp, int j,
+                          int k) {
   if (p->nocase) {
     if ((p->patrn[j] >= 65 && p->patrn[j] <= 90) ||
         (p->patrn[j] >= 97 && p->patrn[j] <= 122)) {
@@ -2193,4 +1310,916 @@ static inline int DFC_InitHashAdd(DFC_STRUCTURE *ctx, DFC_PATTERN *p) {
   tt->next = p;
 
   return 0;
+}
+
+static void initializeMemoryTracking() {
+  dfc_memory_ct1 = sizeof(CT_Type_1) * CT1_TABLE_SIZE;
+  dfc_memory_ct2 = 0;
+  dfc_memory_ct3 = 0;
+  dfc_memory_ct4 = 0;
+  dfc_memory_ct8 = 0;
+  dfc_total_memory = sizeof(DFC_STRUCTURE) + dfc_pattern_memory;
+}
+
+static void setupMatchList(DFC_STRUCTURE *dfc) {
+  int begin_node_flag = 1;
+  for (int i = 0; i < INIT_HASH_SIZE; i++) {
+    DFC_PATTERN *node = dfc->init_hash[i], *prev_node;
+    int first_node_flag = 1;
+    while (node != NULL) {
+      if (begin_node_flag) {
+        begin_node_flag = 0;
+        dfc->dfcPatterns = node;
+      } else {
+        if (first_node_flag) {
+          first_node_flag = 0;
+          prev_node->next = node;
+        }
+      }
+      prev_node = node;
+      node = node->next;
+    }
+  }
+
+  free(dfc->init_hash);
+  dfc->init_hash = NULL;
+
+  dfc->dfcMatchList = (DFC_PATTERN **)DFC_MALLOC(
+      sizeof(DFC_PATTERN *) * dfc->numPatterns, DFC_MEMORY_TYPE__PATTERN);
+  MEMASSERT_DFC(dfc->dfcMatchList, "setupMatchList");
+
+  for (DFC_PATTERN *plist = dfc->dfcPatterns; plist != NULL;
+       plist = plist->next) {
+    if (dfc->dfcMatchList[plist->iid] != NULL) {
+      fprintf(stderr, "Internal ID ERROR : %u\n", plist->iid);
+    }
+    dfc->dfcMatchList[plist->iid] = plist;
+  }
+}
+
+static void setupDirectFilters(DFC_STRUCTURE *dfc) {
+  initializeDirectFilterMemory(dfc);
+
+  uint8_t temp[8], flag[8];
+
+  for (DFC_PATTERN *plist = dfc->dfcPatterns; plist != NULL;
+       plist = plist->next) {
+    if (plist->n == 1) {
+      setup1BDirectFilter(dfc, plist);
+    }
+
+    /* 1. Initialization for DF1 */
+    if (plist->n > 1) {
+      setup1BPlusDirectFilter(dfc, plist);
+    }
+
+    /* Initializing 4B DF, 8B DF */
+    if (plist->n >= 4) {
+      uint32_t alpha_cnt = 0;
+
+      do {
+        for (int j = 3, k = 0; j >= 0; --j, k++) {
+          flag[k] = (alpha_cnt >> j) & 1;
+        }
+
+        if (plist->n < 8) {
+          for (int j = plist->n - 4, k = 0; j < plist->n; j++, k++) {
+            Build_pattern(plist, flag, temp, j, k);
+          }
+        } else {
+          for (int j = min_pattern_interval * (plist->n - 8) / pattern_interval,
+                   k = 0;
+               j < min_pattern_interval * (plist->n - 8) / pattern_interval + 4;
+               j++, k++) {
+            Build_pattern(plist, flag, temp, j, k);
+          }
+        }
+
+        uint32_t byteIndex = BINDEX((*(((uint16_t *)temp) + 1)) & DF_MASK);
+        uint32_t bitMask = BMASK((*(((uint16_t *)temp) + 1)) & DF_MASK);
+
+        dfc->ADD_DF_4_plus[byteIndex] |= bitMask;
+        if (plist->n >= 4 && plist->n < 8) {
+          dfc->ADD_DF_4_1[byteIndex] |= bitMask;
+
+          uint32_t fragment_16 = (temp[1] << 8) | temp[0];
+          uint32_t byteIndex = BINDEX(fragment_16 & DF_MASK);
+          uint32_t bitMask = BMASK(fragment_16 & DF_MASK);
+
+          dfc->cDF2[byteIndex] |= bitMask;
+        }
+        alpha_cnt++;
+      } while (alpha_cnt < 16);
+    }
+
+    if (plist->n >= 8) {
+      uint32_t alpha_cnt = 0;
+
+      do {
+        for (int j = 7, k = 0; j >= 0; --j, k++) {
+          flag[k] = (alpha_cnt >> j) & 1;
+        }
+
+        for (int j = min_pattern_interval * (plist->n - 8) / pattern_interval,
+                 k = 0;
+             j < min_pattern_interval * (plist->n - 8) / pattern_interval + 8;
+             j++, k++) {
+          Build_pattern(plist, flag, temp, j, k);
+        }
+
+        uint32_t byteIndex = BINDEX((*(((uint16_t *)temp) + 3)) & DF_MASK);
+        uint32_t bitMask = BMASK((*(((uint16_t *)temp) + 3)) & DF_MASK);
+
+        dfc->ADD_DF_8_1[byteIndex] |= bitMask;
+
+        byteIndex = BINDEX((*(((uint16_t *)temp) + 2)) & DF_MASK);
+        bitMask = BMASK((*(((uint16_t *)temp) + 2)) & DF_MASK);
+
+        dfc->ADD_DF_8_2[byteIndex] |= bitMask;
+
+        alpha_cnt++;
+      } while (alpha_cnt < 256);
+    }
+  }
+}
+
+static void setup1BDirectFilter(DFC_STRUCTURE *dfc, DFC_PATTERN *plist) {
+  uint8_t pattern = plist->casepatrn[0];
+  setup1BDirectFilterWithPattern(dfc, pattern);
+
+  if (plist->nocase) {
+    setup1BDirectFilterWithPattern(dfc, toggleCharacterCase(pattern));
+  }
+}
+
+static void setup1BDirectFilterWithPattern(DFC_STRUCTURE *dfc,
+                                           uint8_t pattern) {
+  dfc->cDF0[pattern] = 1;
+  for (int j = 0; j < 256; j++) {
+    uint16_t fragment_16 = (j << 8) | pattern;
+    uint32_t byteIndex = (uint32_t)BINDEX(fragment_16 & DF_MASK);
+    uint32_t bitMask = BMASK(fragment_16 & DF_MASK);
+
+    dfc->DirectFilter1[byteIndex] |= bitMask;
+  }
+}
+
+static void setup1BPlusDirectFilter(DFC_STRUCTURE *dfc, DFC_PATTERN *plist) {
+  uint8_t temp[8], flag[8];
+  uint32_t alpha_cnt = 0;
+
+  do {
+    for (int j = 1, k = 0; j >= 0; --j, k++) {
+      flag[k] = (alpha_cnt >> j) & 1;
+    }
+
+    if (plist->n == 2) {
+      for (int j = plist->n - 2, k = 0; j < plist->n; j++, k++) {
+        Build_pattern(plist, flag, temp, j, k);
+      }
+    } else if (plist->n == 3) {
+      for (int j = plist->n - 2, k = 0; j < plist->n; j++, k++) {
+        Build_pattern(plist, flag, temp, j, k);
+      }
+    } else if (plist->n < 8) {
+      for (int j = plist->n - 4, k = 0; j < plist->n - 2; j++, k++) {
+        Build_pattern(plist, flag, temp, j, k);
+      }
+    } else {  // len >= 8
+      for (int j = min_pattern_interval * (plist->n - 8) / pattern_interval,
+               k = 0;
+           j < min_pattern_interval * (plist->n - 8) / pattern_interval + 2;
+           j++, k++) {
+        Build_pattern(plist, flag, temp, j, k);
+      }
+    }
+
+    uint16_t fragment_16 = (temp[1] << 8) | temp[0];
+    uint32_t byteIndex = (uint32_t)BINDEX(fragment_16 & DF_MASK);
+    uint32_t bitMask = BMASK(fragment_16 & DF_MASK);
+
+    dfc->DirectFilter1[byteIndex] |= bitMask;
+
+    if (plist->n == 2 || plist->n == 3) dfc->cDF1[byteIndex] |= bitMask;
+
+    alpha_cnt++;
+  } while (alpha_cnt < 4);
+}
+
+static void initializeDirectFilterMemory(DFC_STRUCTURE *dfc) {
+  memset(dfc->CompactTable1, 0, sizeof(CT_Type_1) * CT1_TABLE_SIZE);
+
+  for (int i = 0; i < DF_SIZE_REAL; i++) {
+    dfc->DirectFilter1[i] = 0;
+    dfc->ADD_DF_4_plus[i] = 0;
+    dfc->ADD_DF_8_1[i] = 0;
+    dfc->ADD_DF_4_1[i] = 0;
+    dfc->cDF2[i] = 0;
+    dfc->ADD_DF_8_2[i] = 0;
+    dfc->cDF1[i] = 0;
+  }
+
+  for (int i = 0; i < 256; i++) {
+    dfc->cDF0[i] = 0;
+  }
+}
+
+static void initializeCompactTableMemory(DFC_STRUCTURE *dfc) {
+  dfc_memory_ct2 += sizeof(CT_Type_2) * CT2_TABLE_SIZE;
+  memset(dfc->CompactTable2, 0, sizeof(CT_Type_2) * CT2_TABLE_SIZE);
+
+  dfc_memory_ct4 += sizeof(CT_Type_2) * CT4_TABLE_SIZE;
+  memset(dfc->CompactTable4, 0, sizeof(CT_Type_2) * CT4_TABLE_SIZE);
+
+  dfc_memory_ct8 += sizeof(CT_Type_2_8B) * CT8_TABLE_SIZE;
+  memset(dfc->CompactTable8, 0, sizeof(CT_Type_2_8B) * CT8_TABLE_SIZE);
+}
+
+static void setupCompactTables(DFC_STRUCTURE *dfc) {
+  initializeCompactTableMemory(dfc);
+
+  uint8_t temp[8], flag[8];
+
+  for (DFC_PATTERN *plist = dfc->dfcPatterns; plist != NULL;
+       plist = plist->next) {
+    if (plist->n == 1) {
+      uint8_t pattern = plist->casepatrn[0];
+
+      if (dfc->CompactTable1[pattern].cnt == 0) {
+        dfc->CompactTable1[pattern].cnt++;
+        dfc->CompactTable1[pattern].pid[0] = plist->iid;
+      } else {
+        int k;
+        for (k = 0; k < dfc->CompactTable1[pattern].cnt; k++) {
+          if (dfc->CompactTable1[pattern].pid[k] == plist->iid) break;
+        }
+        if (k == dfc->CompactTable1[pattern].cnt) {
+          dfc->CompactTable1[pattern].pid[dfc->CompactTable1[pattern].cnt++] =
+              plist->iid;
+          if (dfc->CompactTable1[pattern].cnt >= CT_TYPE1_PID_CNT_MAX)
+            printf("Too many PIDs in CT1. You should expand the size.\n");
+        }
+      }
+
+      if (plist->nocase) {
+        pattern = toggleCharacterCase(pattern);
+
+        if (dfc->CompactTable1[pattern].cnt == 0) {
+          dfc->CompactTable1[pattern].cnt++;
+          dfc->CompactTable1[pattern].pid[0] = plist->iid;
+        } else {
+          int k;
+          for (k = 0; k < dfc->CompactTable1[pattern].cnt; k++) {
+            if (dfc->CompactTable1[pattern].pid[k] == plist->iid) break;
+          }
+          if (k == dfc->CompactTable1[pattern].cnt) {
+            dfc->CompactTable1[pattern].pid[dfc->CompactTable1[pattern].cnt++] =
+                plist->iid;
+            if (dfc->CompactTable1[pattern].cnt >= CT_TYPE1_PID_CNT_MAX)
+              printf("Too many PIDs in CT1. You should expand the size.\n");
+          }
+        }
+      }
+    }
+
+    if (plist->n == 2 || plist->n == 3) {
+      uint32_t alpha_cnt = 0;
+
+      do {
+        for (int j = 1, k = 0; j >= 0; --j, k++) {
+          flag[k] = (alpha_cnt >> j) & 1;
+        }
+
+        for (int j = plist->n - 2, k = 0; j < plist->n; j++, k++) {
+          Build_pattern(plist, flag, temp, j, k);
+        }
+
+        // 2.
+        uint16_t fragment_16 = (temp[1] << 8) | temp[0];
+        uint32_t crc = _mm_crc32_u16(0, fragment_16);
+
+        // 3.
+        crc &= CT2_TABLE_SIZE_MASK;
+
+        // 4.
+        if (dfc->CompactTable2[crc].cnt != 0) {
+          BUC_CNT_TYPE n;
+          for (n = 0; n < dfc->CompactTable2[crc].cnt; n++) {
+            if (dfc->CompactTable2[crc].array[n].pat == fragment_16) break;
+          }
+
+          if (n == dfc->CompactTable2[crc].cnt) {  // If not found,
+            dfc->CompactTable2[crc].cnt++;
+            dfc->CompactTable2[crc].array = (CT_Type_2_Array *)DFC_REALLOC(
+                (void *)dfc->CompactTable2[crc].array,
+                dfc->CompactTable2[crc].cnt, DFC_CT_Type_2_Array,
+                DFC_MEMORY_TYPE__CT2);
+            dfc->CompactTable2[crc].array[dfc->CompactTable2[crc].cnt - 1].pat =
+                fragment_16;
+
+            dfc->CompactTable2[crc].array[dfc->CompactTable2[crc].cnt - 1].cnt =
+                1;
+            dfc->CompactTable2[crc].array[dfc->CompactTable2[crc].cnt - 1].pid =
+                (PID_TYPE *)DFC_MALLOC(sizeof(PID_TYPE), DFC_MEMORY_TYPE__CT2);
+            dfc->CompactTable2[crc]
+                .array[dfc->CompactTable2[crc].cnt - 1]
+                .pid[0] = plist->iid;
+            dfc->CompactTable2[crc]
+                .array[dfc->CompactTable2[crc].cnt - 1]
+                .DirectFilter = NULL;
+            dfc->CompactTable2[crc]
+                .array[dfc->CompactTable2[crc].cnt - 1]
+                .CompactTable = NULL;
+          } else {  // If found,
+            BUC_CNT_TYPE m;
+            for (m = 0; m < dfc->CompactTable2[crc].array[n].cnt; m++) {
+              if (dfc->CompactTable2[crc].array[n].pid[m] == plist->iid) break;
+            }
+            if (m == dfc->CompactTable2[crc].array[n].cnt) {
+              dfc->CompactTable2[crc].array[n].cnt++;
+              dfc->CompactTable2[crc].array[n].pid = (PID_TYPE *)DFC_REALLOC(
+                  (void *)dfc->CompactTable2[crc].array[n].pid,
+                  dfc->CompactTable2[crc].array[n].cnt, DFC_PID_TYPE,
+                  DFC_MEMORY_TYPE__CT2);
+              dfc->CompactTable2[crc]
+                  .array[n]
+                  .pid[dfc->CompactTable2[crc].array[n].cnt - 1] = plist->iid;
+            }
+          }
+        } else {  // If there is no elements in the CT4,
+          dfc->CompactTable2[crc].cnt = 1;
+          dfc->CompactTable2[crc].array = (CT_Type_2_Array *)DFC_MALLOC(
+              sizeof(CT_Type_2_Array), DFC_MEMORY_TYPE__CT2);
+          memset(dfc->CompactTable2[crc].array, 0, sizeof(CT_Type_2_Array));
+
+          dfc->CompactTable2[crc].array[0].pat = fragment_16;
+          dfc->CompactTable2[crc].array[0].cnt = 1;
+          dfc->CompactTable2[crc].array[0].pid =
+              (PID_TYPE *)DFC_MALLOC(sizeof(PID_TYPE), DFC_MEMORY_TYPE__CT2);
+          dfc->CompactTable2[crc].array[0].pid[0] = plist->iid;
+          dfc->CompactTable2[crc].array[0].DirectFilter = NULL;
+          dfc->CompactTable2[crc].array[0].CompactTable = NULL;
+        }
+
+        alpha_cnt++;
+      } while (alpha_cnt < 4);
+    }
+
+    /* CT4 initialization */
+    if (plist->n >= 4 && plist->n < 8) {
+      uint32_t alpha_cnt = 0;
+      do {
+        // 1.
+
+        for (int j = 3, k = 0; j >= 0; --j, k++) {
+          flag[k] = (alpha_cnt >> j) & 1;
+        }
+
+        for (int j = plist->n - 4, k = 0; j < plist->n; j++, k++) {
+          Build_pattern(plist, flag, temp, j, k);
+        }
+
+        // 2.
+        uint32_t fragment_32 =
+            (temp[3] << 24) | (temp[2] << 16) | (temp[1] << 8) | temp[0];
+        uint32_t crc = _mm_crc32_u32(0, fragment_32);
+
+        // 3.
+        crc &= CT4_TABLE_SIZE_MASK;
+
+        // 4.
+        if (dfc->CompactTable4[crc].cnt != 0) {
+          BUC_CNT_TYPE n;
+          for (n = 0; n < dfc->CompactTable4[crc].cnt; n++) {
+            if (dfc->CompactTable4[crc].array[n].pat == fragment_32) break;
+          }
+
+          if (n == dfc->CompactTable4[crc].cnt) {  // If not found,
+            dfc->CompactTable4[crc].cnt++;
+            dfc->CompactTable4[crc].array = (CT_Type_2_Array *)DFC_REALLOC(
+                (void *)dfc->CompactTable4[crc].array,
+                dfc->CompactTable4[crc].cnt, DFC_CT_Type_2_Array,
+                DFC_MEMORY_TYPE__CT4);
+            dfc->CompactTable4[crc].array[dfc->CompactTable4[crc].cnt - 1].pat =
+                fragment_32;
+
+            dfc->CompactTable4[crc].array[dfc->CompactTable4[crc].cnt - 1].cnt =
+                1;
+            dfc->CompactTable4[crc].array[dfc->CompactTable4[crc].cnt - 1].pid =
+                (PID_TYPE *)DFC_MALLOC(sizeof(PID_TYPE), DFC_MEMORY_TYPE__CT4);
+            dfc->CompactTable4[crc]
+                .array[dfc->CompactTable4[crc].cnt - 1]
+                .pid[0] = plist->iid;
+            dfc->CompactTable4[crc]
+                .array[dfc->CompactTable4[crc].cnt - 1]
+                .DirectFilter = NULL;
+            dfc->CompactTable4[crc]
+                .array[dfc->CompactTable4[crc].cnt - 1]
+                .CompactTable = NULL;
+          } else {  // If found,
+            BUC_CNT_TYPE m;
+            for (m = 0; m < dfc->CompactTable4[crc].array[n].cnt; m++) {
+              if (dfc->CompactTable4[crc].array[n].pid[m] == plist->iid) break;
+            }
+            if (m == dfc->CompactTable4[crc].array[n].cnt) {
+              dfc->CompactTable4[crc].array[n].cnt++;
+              dfc->CompactTable4[crc].array[n].pid = (PID_TYPE *)DFC_REALLOC(
+                  (void *)dfc->CompactTable4[crc].array[n].pid,
+                  dfc->CompactTable4[crc].array[n].cnt, DFC_PID_TYPE,
+                  DFC_MEMORY_TYPE__CT4);
+              dfc->CompactTable4[crc]
+                  .array[n]
+                  .pid[dfc->CompactTable4[crc].array[n].cnt - 1] = plist->iid;
+            }
+          }
+        } else {  // If there is no elements in the CT4,
+          dfc->CompactTable4[crc].cnt = 1;
+          dfc->CompactTable4[crc].array = (CT_Type_2_Array *)DFC_MALLOC(
+              sizeof(CT_Type_2_Array), DFC_MEMORY_TYPE__CT4);
+          memset(dfc->CompactTable4[crc].array, 0, sizeof(CT_Type_2_Array));
+
+          dfc->CompactTable4[crc].array[0].pat = fragment_32;
+          dfc->CompactTable4[crc].array[0].cnt = 1;
+          dfc->CompactTable4[crc].array[0].pid =
+              (PID_TYPE *)DFC_MALLOC(sizeof(PID_TYPE), DFC_MEMORY_TYPE__CT4);
+          dfc->CompactTable4[crc].array[0].pid[0] = plist->iid;
+          dfc->CompactTable4[crc].array[0].DirectFilter = NULL;
+          dfc->CompactTable4[crc].array[0].CompactTable = NULL;
+        }
+        alpha_cnt++;
+      } while (alpha_cnt < 16);
+    }
+
+    /* CT8 initialization */
+    if (plist->n >= 8) {
+      uint32_t alpha_cnt = 0;
+      do {
+        for (int j = 7, k = 0; j >= 0; --j, k++) {
+          flag[k] = (alpha_cnt >> j) & 1;
+        }
+
+#ifdef CT8_SWITCH
+        for (int j = min_pattern_interval * (plist->n - 8) / pattern_interval,
+                 k = 0;
+             j < min_pattern_interval * (plist->n - 8) / pattern_interval + 8;
+             j++, k++) {
+          temp[k] = plist->patrn[j];
+        }
+#else
+        for (int j = plist->n - 8, k = 0; j < plist->n; j++, k++) {
+          Build_pattern(plist, flag, temp, j, k);
+        }
+#endif
+
+        // 1. Calulating Indice
+        uint32_t fragment_32 =
+            (temp[7] << 24) | (temp[6] << 16) | (temp[5] << 8) | temp[4];
+        uint64_t fragment_64 = ((uint64_t)fragment_32 << 32) | (temp[3] << 24) |
+                               (temp[2] << 16) | (temp[1] << 8) | temp[0];
+        uint64_t crc = _mm_crc32_u64(0, fragment_64);
+        crc &= CT8_TABLE_SIZE_MASK;
+
+        if (dfc->CompactTable8[crc].cnt != 0) {
+          BUC_CNT_TYPE n;
+          for (n = 0; n < dfc->CompactTable8[crc].cnt; n++) {
+            if (dfc->CompactTable8[crc].array[n].pat == fragment_64) break;
+          }
+
+          if (n == dfc->CompactTable8[crc].cnt) {  // If not found,
+            dfc->CompactTable8[crc].cnt++;
+            dfc->CompactTable8[crc].array = (CT_Type_2_8B_Array *)DFC_REALLOC(
+                (void *)dfc->CompactTable8[crc].array,
+                dfc->CompactTable8[crc].cnt, DFC_CT_Type_2_8B_Array,
+                DFC_MEMORY_TYPE__CT8);
+            dfc->CompactTable8[crc].array[dfc->CompactTable8[crc].cnt - 1].pat =
+                fragment_64;
+
+            dfc->CompactTable8[crc].array[dfc->CompactTable8[crc].cnt - 1].cnt =
+                1;
+            dfc->CompactTable8[crc].array[dfc->CompactTable8[crc].cnt - 1].pid =
+                (PID_TYPE *)DFC_MALLOC(sizeof(PID_TYPE), DFC_MEMORY_TYPE__CT8);
+            dfc->CompactTable8[crc]
+                .array[dfc->CompactTable8[crc].cnt - 1]
+                .pid[0] = plist->iid;
+            dfc->CompactTable8[crc]
+                .array[dfc->CompactTable8[crc].cnt - 1]
+                .DirectFilter = NULL;
+            dfc->CompactTable8[crc]
+                .array[dfc->CompactTable8[crc].cnt - 1]
+                .CompactTable = NULL;
+          } else {  // If found,
+            BUC_CNT_TYPE m;
+            for (m = 0; m < dfc->CompactTable8[crc].array[n].cnt; m++) {
+              if (dfc->CompactTable8[crc].array[n].pid[m] == plist->iid) break;
+            }
+            if (m == dfc->CompactTable8[crc].array[n].cnt) {
+              dfc->CompactTable8[crc].array[n].cnt++;
+              dfc->CompactTable8[crc].array[n].pid = (PID_TYPE *)DFC_REALLOC(
+                  (void *)dfc->CompactTable8[crc].array[n].pid,
+                  dfc->CompactTable8[crc].array[n].cnt, DFC_PID_TYPE,
+                  DFC_MEMORY_TYPE__CT8);
+              dfc->CompactTable8[crc]
+                  .array[n]
+                  .pid[dfc->CompactTable8[crc].array[n].cnt - 1] = plist->iid;
+            }
+          }
+        } else {  // If there is no elements in the CT8,
+          dfc->CompactTable8[crc].cnt = 1;
+          dfc->CompactTable8[crc].array = (CT_Type_2_8B_Array *)DFC_MALLOC(
+              sizeof(CT_Type_2_8B_Array), DFC_MEMORY_TYPE__CT8);
+          memset(dfc->CompactTable8[crc].array, 0, sizeof(CT_Type_2_8B_Array));
+
+          dfc->CompactTable8[crc].array[0].pat = fragment_64;
+          dfc->CompactTable8[crc].array[0].cnt = 1;
+          dfc->CompactTable8[crc].array[0].pid =
+              (PID_TYPE *)DFC_MALLOC(sizeof(PID_TYPE), DFC_MEMORY_TYPE__CT8);
+          dfc->CompactTable8[crc].array[0].pid[0] = plist->iid;
+          dfc->CompactTable8[crc].array[0].DirectFilter = NULL;
+          dfc->CompactTable8[crc].array[0].CompactTable = NULL;
+        }
+        alpha_cnt++;
+      } while (alpha_cnt < 256);
+    }
+  }
+}
+
+static void setupRecursiveFiltering(DFC_STRUCTURE *dfc) {
+  uint8_t temp[8], flag[8];
+  // Only for CT2 firstly
+  for (int i = 0; i < CT2_TABLE_SIZE; i++) {
+    for (BUC_CNT_TYPE n = 0; n < dfc->CompactTable2[i].cnt; n++) {
+      /* If the number of PID is bigger than 3, do recursive filtering */
+      if (dfc->CompactTable2[i].array[n].cnt >= RECURSIVE_BOUNDARY) {
+        /* Initialization */
+        dfc->CompactTable2[i].array[n].DirectFilter = (uint8_t *)DFC_MALLOC(
+            sizeof(uint8_t) * DF_SIZE_REAL, DFC_MEMORY_TYPE__CT2);
+        dfc->CompactTable2[i].array[n].CompactTable =
+            (CT_Type_2_2B *)DFC_MALLOC(sizeof(CT_Type_2_2B) * RECURSIVE_CT_SIZE,
+                                       DFC_MEMORY_TYPE__CT2);
+
+        if (!dfc->CompactTable2[i].array[n].DirectFilter ||
+            !dfc->CompactTable2[i].array[n].CompactTable) {
+          fprintf(stderr, "Failed to allocate memory for recursive things.\n");
+          exit(1);
+        }
+
+        PID_TYPE *tempPID = (PID_TYPE *)DFC_MALLOC(
+            sizeof(PID_TYPE) * dfc->CompactTable2[i].array[n].cnt,
+            DFC_MEMORY_TYPE__CT2);
+        memcpy(tempPID, dfc->CompactTable2[i].array[n].pid,
+               sizeof(PID_TYPE) * dfc->CompactTable2[i].array[n].cnt);
+
+        DFC_FREE(dfc->CompactTable2[i].array[n].pid,
+                 dfc->CompactTable2[i].array[n].cnt * sizeof(PID_TYPE),
+                 DFC_MEMORY_TYPE__CT2);
+        dfc->CompactTable2[i].array[n].pid = NULL;
+
+        int temp_cnt = 0;  // cnt for 2 byte patterns.
+
+        for (BUC_CNT_TYPE m = 0; m < dfc->CompactTable2[i].array[n].cnt; m++) {
+          int pat_len = dfc->dfcMatchList[tempPID[m]]->n - 2;
+
+          if (pat_len == 0) { /* When pat length is 2 */
+            temp_cnt++;
+            dfc->CompactTable2[i].array[n].pid =
+                (PID_TYPE *)realloc(dfc->CompactTable2[i].array[n].pid,
+                                    sizeof(PID_TYPE) * temp_cnt);
+            dfc->CompactTable2[i].array[n].pid[temp_cnt - 1] = tempPID[m];
+          } else if (pat_len == 1) { /* When pat length is 3 */
+            if (dfc->dfcMatchList[tempPID[m]]->nocase) {
+              temp[1] = tolower(dfc->dfcMatchList[tempPID[m]]->patrn[0]);
+              for (int l = 0; l < 256; l++) {
+                temp[0] = l;
+
+                uint16_t fragment_16 = (temp[1] << 8) | temp[0];
+                uint32_t byteIndex = BINDEX(fragment_16);
+                uint32_t bitMask = BMASK(fragment_16);
+
+                dfc->CompactTable2[i].array[n].DirectFilter[byteIndex] |=
+                    bitMask;
+
+                Add_PID_to_2B_CT(dfc->CompactTable2[i].array[n].CompactTable,
+                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT2);
+              }
+
+              temp[1] = toupper(dfc->dfcMatchList[tempPID[m]]->patrn[0]);
+              for (int l = 0; l < 256; l++) {
+                temp[0] = l;
+
+                uint16_t fragment_16 = (temp[1] << 8) | temp[0];
+                uint32_t byteIndex = BINDEX(fragment_16);
+                uint32_t bitMask = BMASK(fragment_16);
+
+                dfc->CompactTable2[i].array[n].DirectFilter[byteIndex] |=
+                    bitMask;
+
+                Add_PID_to_2B_CT(dfc->CompactTable2[i].array[n].CompactTable,
+                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT2);
+              }
+            } else {
+              temp[1] = dfc->dfcMatchList[tempPID[m]]->casepatrn[0];
+              for (int l = 0; l < 256; l++) {
+                temp[0] = l;
+
+                uint16_t fragment_16 = (temp[1] << 8) | temp[0];
+                uint32_t byteIndex = BINDEX(fragment_16);
+                uint32_t bitMask = BMASK(fragment_16);
+
+                dfc->CompactTable2[i].array[n].DirectFilter[byteIndex] |=
+                    bitMask;
+
+                Add_PID_to_2B_CT(dfc->CompactTable2[i].array[n].CompactTable,
+                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT2);
+              }
+            }
+          }
+        }
+
+        dfc->CompactTable2[i].array[n].cnt = temp_cnt;
+        DFC_FREE(tempPID, sizeof(PID_TYPE) * dfc->CompactTable2[i].array[n].cnt,
+                 DFC_MEMORY_TYPE__CT2);
+      }
+    }
+  }
+  // Only for CT4 firstly
+  for (int i = 0; i < CT4_TABLE_SIZE; i++) {
+    for (BUC_CNT_TYPE n = 0; n < dfc->CompactTable4[i].cnt; n++) {
+      /* If the number of PID is bigger than 3, do recursive filtering */
+      if (dfc->CompactTable4[i].array[n].cnt >= RECURSIVE_BOUNDARY) {
+        /* Initialization */
+        dfc->CompactTable4[i].array[n].DirectFilter = (uint8_t *)DFC_MALLOC(
+            sizeof(uint8_t) * DF_SIZE_REAL, DFC_MEMORY_TYPE__CT4);
+        dfc->CompactTable4[i].array[n].CompactTable =
+            (CT_Type_2_2B *)DFC_MALLOC(sizeof(CT_Type_2_2B) * RECURSIVE_CT_SIZE,
+                                       DFC_MEMORY_TYPE__CT4);
+
+        if (!dfc->CompactTable4[i].array[n].DirectFilter ||
+            !dfc->CompactTable4[i].array[n].CompactTable) {
+          fprintf(stderr, "Failed to allocate memory for recursive things.\n");
+          exit(1);
+        }
+
+        PID_TYPE *tempPID = (PID_TYPE *)DFC_MALLOC(
+            sizeof(PID_TYPE) * dfc->CompactTable4[i].array[n].cnt,
+            DFC_MEMORY_TYPE__CT4);
+        memcpy(tempPID, dfc->CompactTable4[i].array[n].pid,
+               sizeof(PID_TYPE) * dfc->CompactTable4[i].array[n].cnt);
+        // free(dfc->CompactTable4[i].array[n].pid);
+        DFC_FREE(dfc->CompactTable4[i].array[n].pid,
+                 dfc->CompactTable4[i].array[n].cnt * sizeof(PID_TYPE),
+                 DFC_MEMORY_TYPE__CT4);
+        dfc->CompactTable4[i].array[n].pid = NULL;
+
+        int temp_cnt = 0;  // cnt for 4 byte patterns.
+
+        for (BUC_CNT_TYPE m = 0; m < dfc->CompactTable4[i].array[n].cnt; m++) {
+          int pat_len = dfc->dfcMatchList[tempPID[m]]->n - 4;
+
+          if (pat_len == 0) { /* When pat length is 4 */
+            temp_cnt++;
+            dfc->CompactTable4[i].array[n].pid =
+                (PID_TYPE *)realloc(dfc->CompactTable4[i].array[n].pid,
+                                    sizeof(PID_TYPE) * temp_cnt);
+            dfc->CompactTable4[i].array[n].pid[temp_cnt - 1] = tempPID[m];
+          } else if (pat_len == 1) { /* When pat length is 5 */
+            if (dfc->dfcMatchList[tempPID[m]]->nocase) {
+              temp[1] = tolower(dfc->dfcMatchList[tempPID[m]]->patrn[0]);
+              for (int l = 0; l < 256; l++) {
+                temp[0] = l;
+
+                uint16_t fragment_16 = (temp[1] << 8) | temp[0];
+                uint32_t byteIndex = BINDEX(fragment_16);
+                uint32_t bitMask = BMASK(fragment_16);
+
+                dfc->CompactTable4[i].array[n].DirectFilter[byteIndex] |=
+                    bitMask;
+
+                Add_PID_to_2B_CT(dfc->CompactTable4[i].array[n].CompactTable,
+                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT4);
+              }
+
+              temp[1] = toupper(dfc->dfcMatchList[tempPID[m]]->patrn[0]);
+              for (int l = 0; l < 256; l++) {
+                temp[0] = l;
+
+                uint16_t fragment_16 = (temp[1] << 8) | temp[0];
+                uint32_t byteIndex = BINDEX(fragment_16);
+                uint32_t bitMask = BMASK(fragment_16);
+
+                dfc->CompactTable4[i].array[n].DirectFilter[byteIndex] |=
+                    bitMask;
+
+                Add_PID_to_2B_CT(dfc->CompactTable4[i].array[n].CompactTable,
+                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT4);
+              }
+            } else {
+              temp[1] = dfc->dfcMatchList[tempPID[m]]->casepatrn[0];
+              for (int l = 0; l < 256; l++) {
+                temp[0] = l;
+
+                uint16_t fragment_16 = (temp[1] << 8) | temp[0];
+                uint32_t byteIndex = BINDEX(fragment_16);
+                uint32_t bitMask = BMASK(fragment_16);
+
+                dfc->CompactTable4[i].array[n].DirectFilter[byteIndex] |=
+                    bitMask;
+
+                Add_PID_to_2B_CT(dfc->CompactTable4[i].array[n].CompactTable,
+                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT4);
+              }
+            }
+
+          } else { /* When pat length is 7 (pat_len is equal to 2(6) or 3(7)) */
+            if (dfc->dfcMatchList[tempPID[m]]->nocase) {
+              uint32_t alpha_cnt = 0;
+              do {
+                for (int l = 1, k = 0; l >= 0; --l, k++) {
+                  flag[k] = (alpha_cnt >> l) & 1;
+                }
+
+                for (int l = pat_len - 2, k = 0; l <= pat_len - 1; l++, k++) {
+                  Build_pattern(dfc->dfcMatchList[tempPID[m]], flag, temp, l,
+                                k);
+                }
+
+                uint16_t fragment_16 = (temp[1] << 8) | temp[0];
+                uint32_t byteIndex = BINDEX(fragment_16);
+                uint32_t bitMask = BMASK(fragment_16);
+
+                dfc->CompactTable4[i].array[n].DirectFilter[byteIndex] |=
+                    bitMask;
+
+                Add_PID_to_2B_CT(dfc->CompactTable4[i].array[n].CompactTable,
+                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT4);
+
+                alpha_cnt++;
+              } while (alpha_cnt < 4);
+            } else { /* case sensitive pattern */
+              temp[0] = dfc->dfcMatchList[tempPID[m]]->casepatrn[pat_len - 2];
+              temp[1] = dfc->dfcMatchList[tempPID[m]]->casepatrn[pat_len - 1];
+
+              uint16_t fragment_16 = (temp[1] << 8) | temp[0];
+              uint32_t byteIndex = BINDEX(fragment_16);
+              uint32_t bitMask = BMASK(fragment_16);
+
+              dfc->CompactTable4[i].array[n].DirectFilter[byteIndex] |= bitMask;
+
+              Add_PID_to_2B_CT(dfc->CompactTable4[i].array[n].CompactTable,
+                               temp, tempPID[m], DFC_MEMORY_TYPE__CT4);
+            }
+          }
+        }
+
+        dfc->CompactTable4[i].array[n].cnt = temp_cnt;
+        DFC_FREE(tempPID, sizeof(PID_TYPE) * dfc->CompactTable4[i].array[n].cnt,
+                 DFC_MEMORY_TYPE__CT4);
+      }
+    }
+  }
+
+  /* For CT8 */
+  for (int i = 0; i < CT8_TABLE_SIZE; i++) {
+    for (BUC_CNT_TYPE n = 0; n < dfc->CompactTable8[i].cnt; n++) {
+      /* If the number of PID is bigger than RECURSIVE_BOUNDARY, do recursive
+       * filtering */
+      if (dfc->CompactTable8[i].array[n].cnt >= RECURSIVE_BOUNDARY) {
+        /* Initialization */
+        dfc->CompactTable8[i].array[n].DirectFilter = (uint8_t *)DFC_MALLOC(
+            DF_SIZE_REAL * sizeof(uint8_t), DFC_MEMORY_TYPE__CT8);
+        dfc->CompactTable8[i].array[n].CompactTable =
+            (CT_Type_2_2B *)DFC_MALLOC(sizeof(CT_Type_2_2B) * RECURSIVE_CT_SIZE,
+                                       DFC_MEMORY_TYPE__CT8);
+
+        if (!dfc->CompactTable8[i].array[n].DirectFilter ||
+            !dfc->CompactTable8[i].array[n].CompactTable) {
+          fprintf(stderr, "Failed to allocate memory for recursive things.\n");
+          exit(1);
+        }
+
+        PID_TYPE *tempPID = (PID_TYPE *)DFC_MALLOC(
+            sizeof(PID_TYPE) * dfc->CompactTable8[i].array[n].cnt,
+            DFC_MEMORY_TYPE__CT8);
+        memcpy(tempPID, dfc->CompactTable8[i].array[n].pid,
+               sizeof(PID_TYPE) * dfc->CompactTable8[i].array[n].cnt);
+
+        DFC_FREE(dfc->CompactTable8[i].array[n].pid,
+                 dfc->CompactTable8[i].array[n].cnt * sizeof(PID_TYPE),
+                 DFC_MEMORY_TYPE__CT8);
+        dfc->CompactTable8[i].array[n].pid = NULL;
+
+        int temp_cnt = 0;  // cnt for 8 byte patterns.
+
+        for (BUC_CNT_TYPE m = 0; m < dfc->CompactTable8[i].array[n].cnt; m++) {
+          int pat_len = dfc->dfcMatchList[tempPID[m]]->n - 8;
+
+          if (pat_len == 0) { /* When pat length is 8 */
+            temp_cnt++;
+            dfc->CompactTable8[i].array[n].pid =
+                (PID_TYPE *)realloc(dfc->CompactTable8[i].array[n].pid,
+                                    sizeof(PID_TYPE) * temp_cnt);
+            dfc->CompactTable8[i].array[n].pid[temp_cnt - 1] = tempPID[m];
+          } else if (pat_len == 1) { /* When pat length is 9 */
+            if (dfc->dfcMatchList[tempPID[m]]->nocase) {
+              temp[1] = tolower(dfc->dfcMatchList[tempPID[m]]->patrn[0]);
+              for (int l = 0; l < 256; l++) {
+                temp[0] = l;
+
+                uint16_t fragment_16 = (temp[1] << 8) | temp[0];
+                uint32_t byteIndex = BINDEX(fragment_16);
+                uint32_t bitMask = BMASK(fragment_16);
+
+                dfc->CompactTable8[i].array[n].DirectFilter[byteIndex] |=
+                    bitMask;
+
+                Add_PID_to_2B_CT(dfc->CompactTable8[i].array[n].CompactTable,
+                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT8);
+              }
+
+              temp[1] = toupper(dfc->dfcMatchList[tempPID[m]]->patrn[0]);
+              for (int l = 0; l < 256; l++) {
+                temp[0] = l;
+
+                uint16_t fragment_16 = (temp[1] << 8) | temp[0];
+                uint32_t byteIndex = BINDEX(fragment_16);
+                uint32_t bitMask = BMASK(fragment_16);
+
+                dfc->CompactTable8[i].array[n].DirectFilter[byteIndex] |=
+                    bitMask;
+
+                Add_PID_to_2B_CT(dfc->CompactTable8[i].array[n].CompactTable,
+                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT8);
+              }
+            } else {
+              temp[1] = dfc->dfcMatchList[tempPID[m]]->casepatrn[0];
+              for (int l = 0; l < 256; l++) {
+                temp[0] = l;
+
+                uint16_t fragment_16 = (temp[1] << 8) | temp[0];
+                uint32_t byteIndex = BINDEX(fragment_16);
+                uint32_t bitMask = BMASK(fragment_16);
+
+                dfc->CompactTable8[i].array[n].DirectFilter[byteIndex] |=
+                    bitMask;
+
+                Add_PID_to_2B_CT(dfc->CompactTable8[i].array[n].CompactTable,
+                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT8);
+              }
+            }
+
+          } else { /* longer than or equal to 10 */
+            if (dfc->dfcMatchList[tempPID[m]]->nocase) {
+              uint32_t alpha_cnt = 0;
+              do {
+                for (int l = 1, k = 0; l >= 0; --l, k++) {
+                  flag[k] = (alpha_cnt >> l) & 1;
+                }
+
+                for (int l = pat_len - 2, k = 0; l <= pat_len - 1; l++, k++) {
+                  Build_pattern(dfc->dfcMatchList[tempPID[m]], flag, temp, l,
+                                k);
+                }
+
+                uint16_t fragment_16 = (temp[1] << 8) | temp[0];
+                uint32_t byteIndex = BINDEX(fragment_16);
+                uint32_t bitMask = BMASK(fragment_16);
+
+                dfc->CompactTable8[i].array[n].DirectFilter[byteIndex] |=
+                    bitMask;
+
+                Add_PID_to_2B_CT(dfc->CompactTable8[i].array[n].CompactTable,
+                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT8);
+
+                alpha_cnt++;
+              } while (alpha_cnt < 4);
+            } else { /* case sensitive pattern */
+              temp[0] = dfc->dfcMatchList[tempPID[m]]->casepatrn[pat_len - 2];
+              temp[1] = dfc->dfcMatchList[tempPID[m]]->casepatrn[pat_len - 1];
+
+              uint16_t fragment_16 = (temp[1] << 8) | temp[0];
+              uint32_t byteIndex = BINDEX(fragment_16);
+              uint32_t bitMask = BMASK(fragment_16);
+
+              dfc->CompactTable8[i].array[n].DirectFilter[byteIndex] |= bitMask;
+
+              Add_PID_to_2B_CT(dfc->CompactTable8[i].array[n].CompactTable,
+                               temp, tempPID[m], DFC_MEMORY_TYPE__CT8);
+            }
+          }
+        }
+
+        dfc->CompactTable8[i].array[n].cnt = temp_cnt;
+        DFC_FREE(tempPID, sizeof(PID_TYPE) * dfc->CompactTable8[i].array[n].cnt,
+                 DFC_MEMORY_TYPE__CT8);
+      }
+    }
+  }
+}
+
+static uint8_t toggleCharacterCase(uint8_t character) {
+  if (character >= 97 /*a*/ && character <= 122 /*z*/) {
+    return toupper(character);
+  } else {
+    return tolower(character);
+  }
+  return character;
 }
