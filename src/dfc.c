@@ -4,20 +4,8 @@
 /*********************************/
 
 #include "dfc.h"
-
-/*************************************************************************************/
-#define INIT_HASH_SIZE 65536
-#define RECURSIVE_BOUNDARY 10
-/*************************************************************************************/
-
-/*************************************************************************************/
-#define PRINT_INFO
-#define CT8_SWITCH
-
-#define ENABLE_PROGRESSIVE_FILTERING
-#define ENABLE_RECURSIVE
-
-#define COUNT_MATCH
+#include "feature-flags.h"
+#include "utility.h"
 
 static unsigned char xlatcase[256];
 
@@ -34,14 +22,6 @@ static int dfc_memory_ct3 = 0;
 static int dfc_memory_ct4 = 0;
 static int dfc_memory_ct8 = 0;
 
-
-static float my_sqrtf(float input, float x);
-static void init_xlatcase();
-static inline void ConvertCaseEx(unsigned char *d, unsigned char *s, int m);
-static inline int my_strncmp(unsigned char *a, unsigned char *b, int n);
-static inline int my_strncasecmp(unsigned char *a, unsigned char *b, int n);
-
-
 static void *DFC_REALLOC(void *p, uint16_t n, dfcDataType type,
                          dfcMemoryType type2);
 static void DFC_FREE(void *p, int n, dfcMemoryType type);
@@ -52,14 +32,13 @@ static inline DFC_PATTERN *DFC_InitHashLookup(DFC_STRUCTURE *ctx, uint8_t *pat,
                                               uint16_t patlen);
 static inline int DFC_InitHashAdd(DFC_STRUCTURE *ctx, DFC_PATTERN *p);
 
-
 /*
  *  Create a new DFC state machine
  */
 DFC_STRUCTURE *DFC_New(void) {
   DFC_STRUCTURE *p;
 
-  init_xlatcase();
+  init_xlatcase(xlatcase);
 
   dfc_total_memory = 0;
   dfc_pattern_memory = 0;
@@ -211,7 +190,7 @@ int DFC_AddPattern(DFC_STRUCTURE *dfc, unsigned char *pat, int n, int nocase,
     plist->patrn = (unsigned char *)DFC_MALLOC(n, DFC_MEMORY_TYPE__PATTERN);
     MEMASSERT_DFC(plist->patrn, "DFC_AddPattern");
 
-    ConvertCaseEx(plist->patrn, pat, n);
+    ConvertCaseEx(plist->patrn, pat, n, xlatcase);
 
     plist->casepatrn = (unsigned char *)DFC_MALLOC(n, DFC_MEMORY_TYPE__PATTERN);
     MEMASSERT_DFC(plist->casepatrn, "DFC_AddPattern");
@@ -1237,7 +1216,7 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
             DFC_MEMORY_TYPE__CT2);
         memcpy(tempPID, dfc->CompactTable2[i].array[n].pid,
                sizeof(PID_TYPE) * dfc->CompactTable2[i].array[n].cnt);
-        
+
         DFC_FREE(dfc->CompactTable2[i].array[n].pid,
                  dfc->CompactTable2[i].array[n].cnt * sizeof(PID_TYPE),
                  DFC_MEMORY_TYPE__CT2);
@@ -1246,7 +1225,6 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
         int temp_cnt = 0;  // cnt for 2 byte patterns.
 
         for (m = 0; m < dfc->CompactTable2[i].array[n].cnt; m++) {
-          
           int pat_len = dfc->dfcMatchList[tempPID[m]]->n - 2;
 
           if (pat_len == 0) { /* When pat length is 2 */
@@ -1343,7 +1321,6 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
         int temp_cnt = 0;  // cnt for 4 byte patterns.
 
         for (m = 0; m < dfc->CompactTable4[i].array[n].cnt; m++) {
-          
           int pat_len = dfc->dfcMatchList[tempPID[m]]->n - 4;
 
           if (pat_len == 0) { /* When pat length is 4 */
@@ -1472,7 +1449,7 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
             DFC_MEMORY_TYPE__CT8);
         memcpy(tempPID, dfc->CompactTable8[i].array[n].pid,
                sizeof(PID_TYPE) * dfc->CompactTable8[i].array[n].cnt);
-        
+
         DFC_FREE(dfc->CompactTable8[i].array[n].pid,
                  dfc->CompactTable8[i].array[n].cnt * sizeof(PID_TYPE),
                  DFC_MEMORY_TYPE__CT8);
@@ -1783,7 +1760,7 @@ static int Verification_CT8_plus(VERIFI_ARGUMENT) {
 // 1. Convert payload to uppercase
 #ifdef CT8_SWITCH
   unsigned char temp[8];
-  ConvertCaseEx(temp, buf - 2, 8);
+  ConvertCaseEx(temp, buf - 2, 8, xlatcase);
 #else
   unsigned char *temp = buf - 2;
 #endif
@@ -1932,10 +1909,10 @@ static inline int Progressive_Filtering(PROGRE_ARGUMENT) {
     }
   }
 #else
-    matches = Verification_CT1(VERIFI_PARAMETER);
-    matches = Verification_CT2(VERIFI_PARAMETER);
-    matches = Verification_CT4_7(VERIFI_PARAMETER);
-    matches = Verification_CT8_plus(VERIFI_PARAMETER);
+  matches = Verification_CT1(VERIFI_PARAMETER);
+  matches = Verification_CT2(VERIFI_PARAMETER);
+  matches = Verification_CT4_7(VERIFI_PARAMETER);
+  matches = Verification_CT8_plus(VERIFI_PARAMETER);
 #endif
 
   return matches;
@@ -1971,43 +1948,6 @@ int DFC_Search(SEARCH_ARGUMENT) {
   }
 
   return matches;
-}
-
-// Utility functions
-static float my_sqrtf(float input, float x) {
-  int i;
-  if (x == 0 && input == 0) return 0;
-  for (i = 0; i < 10; i++) {
-    x = (x + (input / x)) / 2;
-  }
-  return x;
-}
-
-static void init_xlatcase() {
-  int i;
-  for (i = 0; i < 256; i++) xlatcase[i] = (unsigned char)toupper(i);
-}
-
-static inline void ConvertCaseEx(unsigned char *d, unsigned char *s, int m) {
-  int i;
-
-  for (i = 0; i < m; i++) d[i] = xlatcase[s[i]];
-}
-
-static inline int my_strncmp(unsigned char *a, unsigned char *b, int n) {
-  int i;
-  for (i = 0; i < n; i++) {
-    if (a[i] != b[i]) return -1;
-  }
-  return 0;
-}
-
-static inline int my_strncasecmp(unsigned char *a, unsigned char *b, int n) {
-  int i;
-  for (i = 0; i < n; i++) {
-    if (tolower(a[i]) != tolower(b[i])) return -1;
-  }
-  return 0;
 }
 
 static void *DFC_REALLOC(void *p, uint16_t n, dfcDataType type,

@@ -5,9 +5,6 @@
 #ifndef DFC_FRAMEWORK_H
 #define DFC_FRAMEWORK_H
 
-/****************************************************/
-/*   Func Argument - to define action for matching  */
-/****************************************************/
 #define ARGUMENT_FOR_MATCH void (*Match)(unsigned char *, uint32_t *, uint32_t)
 
 #define SEARCH_ARGUMENT \
@@ -29,7 +26,5 @@
 #define ACTION_FOR_MATCH                                  \
   Match(mlist->casepatrn, mlist->sids, mlist->sids_size); \
   matches++;
-
-/****************************************************/
 
 #endif

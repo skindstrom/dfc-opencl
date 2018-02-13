@@ -14,58 +14,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "constants.h"
 #include "dfc_framework.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/****************************************************/
-/*         Parameters: DF size, CT size             */
-/****************************************************/
-#define DF_SIZE 0x10000
-#define DF_SIZE_REAL 0x2000
-
-#define CT_TYPE1_PID_CNT_MAX 100
-#define CT1_TABLE_SIZE 256
-#define CT2_TABLE_SIZE 0x1000
-#define CT3_TABLE_SIZE 0x1000
-#define CT4_TABLE_SIZE 0x20000
-#define CT8_TABLE_SIZE 0x20000
-#define RECURSIVE_CT_SIZE 4096
-
-#define PID_TYPE uint32_t
-#define PID_CNT_TYPE uint32_t
-#define BUC_CNT_TYPE uint32_t
-
-#define DTYPE uint16_t
-#define BTYPE register uint16_t
-/****************************************************/
-
-/****************************************************/
-/*        You don't need to care about this         */
-/****************************************************/
-#define BINDEX(x) ((x) >> 3)
-#define BMASK(x) (1 << ((x)&0x7))
-
-#define DF_MASK (DF_SIZE - 1)
-
-#define CT2_TABLE_SIZE_MASK (CT2_TABLE_SIZE - 1)
-#define CT3_TABLE_SIZE_MASK (CT3_TABLE_SIZE - 1)
-#define CT4_TABLE_SIZE_MASK (CT4_TABLE_SIZE - 1)
-#define CT8_TABLE_SIZE_MASK (CT8_TABLE_SIZE - 1)
-
-#ifndef likely
-#define likely(expr) __builtin_expect(!!(expr), 1)
-#endif
-#ifndef unlikely
-#define unlikely(expr) __builtin_expect(!!(expr), 0)
-#endif
-
-#define MEMASSERT_DFC(p, s)            \
-  if (!p) {                            \
-    printf("DFC-No Memory: %s!\n", s); \
-  }
 
 /* Compact Table (CT1) */
 typedef struct pid_list_ {
@@ -117,7 +71,6 @@ typedef struct CT_Type_2_8B_ {
   CT_Type_2_8B_Array *array;
 } CT_Type_2_8B;
 
-
 typedef struct _dfc_pattern {
   struct _dfc_pattern *next;
 
@@ -167,33 +120,13 @@ typedef struct {
 
 } DFC_STRUCTURE;
 
-typedef enum _dfcMemoryType {
-  DFC_MEMORY_TYPE__NONE = 0,
-  DFC_MEMORY_TYPE__DFC,
-  DFC_MEMORY_TYPE__PATTERN,
-  DFC_MEMORY_TYPE__CT1,
-  DFC_MEMORY_TYPE__CT2,
-  DFC_MEMORY_TYPE__CT3,
-  DFC_MEMORY_TYPE__CT4,
-  DFC_MEMORY_TYPE__CT8
-} dfcMemoryType;
-
-typedef enum _dfcDataType {
-  DFC_NONE = 0,
-  DFC_PID_TYPE,
-  DFC_CT_Type_2_Array,
-  DFC_CT_Type_2_2B_Array,
-  DFC_CT_Type_2_8B_Array
-} dfcDataType;
-
-
 DFC_STRUCTURE *DFC_New(void);
 int DFC_AddPattern(DFC_STRUCTURE *dfc, unsigned char *pat, int n, int nocase,
                    PID_TYPE sid);
 int DFC_Compile(DFC_STRUCTURE *dfc);
 
 int DFC_Search(SEARCH_ARGUMENT);
-void DFC_PrintInfo(DFC_STRUCTURE *dfc); 
+void DFC_PrintInfo(DFC_STRUCTURE *dfc);
 void DFC_FreeStructure(DFC_STRUCTURE *dfc);
 
 #ifdef __cplusplus
