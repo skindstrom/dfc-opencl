@@ -44,12 +44,6 @@ typedef struct CT_Type_2_Array_ {
   uint32_t pat;      // Maximum 4B pattern
   PID_CNT_TYPE cnt;  // Number of PIDs
   PID_TYPE *pid;     // list of PIDs
-  uint8_t *DirectFilter;
-
-  #ifdef ENABLE_RECURSIVE
-  CT_Type_2_2B *CompactTable;
-  #endif 
-
 } CT_Type_2_Array;
 
 /* Compact Table (CT2) */
@@ -65,12 +59,6 @@ typedef struct CT_Type_2_8B_Array_ {
   uint64_t pat;      // 8B pattern
   PID_CNT_TYPE cnt;  // Number of PIDs
   PID_TYPE *pid;     // list of PIDs
-  uint8_t *DirectFilter;
-
-  #ifdef ENABLE_RECURSIVE
-  CT_Type_2_2B *CompactTable;
-  #endif
-
 } CT_Type_2_8B_Array;
 
 /* Compact Table (CT2) */

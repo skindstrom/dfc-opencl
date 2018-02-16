@@ -43,14 +43,6 @@ static void setup1BPlusDirectFilter(DFC_STRUCTURE *dfc, DFC_PATTERN *plist);
 static void initializeCompactTableMemory(DFC_STRUCTURE *dfc);
 static void setupCompactTables(DFC_STRUCTURE *dfc);
 
-#ifdef ENABLE_RECURSIVE
-
-static void setupRecursiveFiltering(DFC_STRUCTURE *dfc);
-static void Add_PID_to_2B_CT(CT_Type_2_2B *CompactTable, uint8_t *temp,
-                             PID_TYPE pid, dfcMemoryType type);
-static void DFC_FREE(void *p, int n, dfcMemoryType type);
-
-#endif
 
 static uint8_t toggleCharacterCase(uint8_t);
 
@@ -110,11 +102,6 @@ static void DFC_FreePatternList(DFC_STRUCTURE *dfc) {
 void DFC_FreeStructure(DFC_STRUCTURE *dfc) {
   BUC_CNT_TYPE j;
   int i;
-
-#ifdef ENABLE_RECURSIVE
-  BUC_CNT_TYPE l;
-  int k;
-#endif
   if (dfc == NULL) return;
 
   if (dfc->dfcPatterns != NULL) {
@@ -129,68 +116,18 @@ void DFC_FreeStructure(DFC_STRUCTURE *dfc) {
     for (j = 0; j < dfc->CompactTable2[i].cnt; j++) {
       free(dfc->CompactTable2[i].array[j].pid);
 
-      #ifdef ENABLE_RECURSIVE
-      if (dfc->CompactTable2[i].array[j].DirectFilter != NULL) {
-        free(dfc->CompactTable2[i].array[j].DirectFilter);
-      }
-
-      if (dfc->CompactTable2[i].array[j].CompactTable != NULL) {
-        for (k = 0; k < RECURSIVE_CT_SIZE; k++) {
-          for (l = 0; l < dfc->CompactTable2[i].array[j].CompactTable[k].cnt;
-               l++) {
-            free(dfc->CompactTable2[i].array[j].CompactTable[k].array[l].pid);
-          }
-          free(dfc->CompactTable2[i].array[j].CompactTable[k].array);
-        }
-        free(dfc->CompactTable2[i].array[j].CompactTable);
-      }
-      #endif
     }
   }
 
   for (i = 0; i < CT4_TABLE_SIZE; i++) {
     for (j = 0; j < dfc->CompactTable4[i].cnt; j++) {
       free(dfc->CompactTable4[i].array[j].pid);
-
-      if (dfc->CompactTable4[i].array[j].DirectFilter != NULL) {
-        free(dfc->CompactTable4[i].array[j].DirectFilter);
-      }
-
-      #ifdef ENABLE_RECURSIVE
-      if (dfc->CompactTable4[i].array[j].CompactTable != NULL) {
-        for (k = 0; k < RECURSIVE_CT_SIZE; k++) {
-          for (l = 0; l < dfc->CompactTable4[i].array[j].CompactTable[k].cnt;
-               l++) {
-            free(dfc->CompactTable4[i].array[j].CompactTable[k].array[l].pid);
-          }
-          free(dfc->CompactTable4[i].array[j].CompactTable[k].array);
-        }
-        free(dfc->CompactTable4[i].array[j].CompactTable);
-      }
-      #endif
     }
   }
 
   for (i = 0; i < CT8_TABLE_SIZE; i++) {
     for (j = 0; j < dfc->CompactTable8[i].cnt; j++) {
       free(dfc->CompactTable8[i].array[j].pid);
-
-      if (dfc->CompactTable8[i].array[j].DirectFilter != NULL) {
-        free(dfc->CompactTable8[i].array[j].DirectFilter);
-      }
-
-      #ifdef ENABLE_RECURSIVE
-      if (dfc->CompactTable8[i].array[j].CompactTable != NULL) {
-        for (k = 0; k < RECURSIVE_CT_SIZE; k++) {
-          for (l = 0; l < dfc->CompactTable8[i].array[j].CompactTable[k].cnt;
-               l++) {
-            free(dfc->CompactTable8[i].array[j].CompactTable[k].array[l].pid);
-          }
-          free(dfc->CompactTable8[i].array[j].CompactTable[k].array);
-        }
-        free(dfc->CompactTable8[i].array[j].CompactTable);
-      }
-      #endif
     }
   }
 
@@ -632,17 +569,12 @@ void DFC_PrintInfo(DFC_STRUCTURE *dfc) {
   return;
 }
 
-
 int DFC_Compile(DFC_STRUCTURE *dfc) {
   initializeMemoryTracking();
 
   setupMatchList(dfc);
   setupDirectFilters(dfc);
   setupCompactTables(dfc);
-
-#ifdef ENABLE_RECURSIVE
-  setupRecursiveFiltering(dfc);
-#endif
 
   return 0;
 }
@@ -669,74 +601,22 @@ static int Verification_CT2(VERIFI_ARGUMENT) {
   for (i = 0; i < dfc->CompactTable2[crc].cnt; i++) {
     if (dfc->CompactTable2[crc].array[i].pat == *(uint16_t *)(buf - 2)) {
       PID_CNT_TYPE j;
-      if (!dfc->CompactTable2[crc].array[i].DirectFilter) {
-        for (j = 0; j < dfc->CompactTable2[crc].array[i].cnt; j++) {
-          PID_TYPE pid = dfc->CompactTable2[crc].array[i].pid[j];
+      for (j = 0; j < dfc->CompactTable2[crc].array[i].cnt; j++) {
+        PID_TYPE pid = dfc->CompactTable2[crc].array[i].pid[j];
 
-          DFC_PATTERN *mlist = dfc->dfcMatchList[pid];
-          if (buf - starting_point >= mlist->n) {
-            if (mlist->nocase) {
-              if (!my_strncasecmp(buf - (mlist->n), mlist->casepatrn,
-                                  mlist->n - 2)) {
-                ACTION_FOR_MATCH;
-              }
-            } else {
-              if (!my_strncmp(buf - (mlist->n), mlist->casepatrn,
-                              mlist->n - 2)) {
-                ACTION_FOR_MATCH;
-              }
+        DFC_PATTERN *mlist = dfc->dfcMatchList[pid];
+        if (buf - starting_point >= mlist->n) {
+          if (mlist->nocase) {
+            if (!my_strncasecmp(buf - (mlist->n), mlist->casepatrn,
+                                mlist->n - 2)) {
+              ACTION_FOR_MATCH;
+            }
+          } else {
+            if (!my_strncmp(buf - (mlist->n), mlist->casepatrn, mlist->n - 2)) {
+              ACTION_FOR_MATCH;
             }
           }
         }
-      } else {
-        #ifdef ENABLE_RECURSIVE
-
-        for (j = 0; j < dfc->CompactTable2[crc].array[i].cnt; j++) {
-          PID_TYPE pid = dfc->CompactTable2[crc].array[i].pid[j];
-          DFC_PATTERN *mlist = dfc->dfcMatchList[pid];
-
-          ACTION_FOR_MATCH;
-        }
-        DTYPE data = *(uint16_t *)(buf - 4);
-        BTYPE index = BINDEX(data);
-        BTYPE mask = BMASK(data);
-
-        if (dfc->CompactTable2[crc].array[i].DirectFilter[index] & mask) {
-          uint32_t crc2 = _mm_crc32_u16(0, data);
-
-          // 2. calculate index
-          crc2 &= CT2_TABLE_SIZE_MASK;
-
-          BUC_CNT_TYPE k;
-          for (k = 0;
-               k < dfc->CompactTable2[crc].array[i].CompactTable[crc2].cnt;
-               k++) {
-            if (dfc->CompactTable2[crc]
-                    .array[i]
-                    .CompactTable[crc2]
-                    .array[k]
-                    .pat == data) {
-              PID_CNT_TYPE l;
-              for (l = 0; l < dfc->CompactTable2[crc]
-                                  .array[i]
-                                  .CompactTable[crc2]
-                                  .array[k]
-                                  .cnt;
-                   l++) {
-                PID_TYPE pid = dfc->CompactTable2[crc]
-                                   .array[i]
-                                   .CompactTable[crc2]
-                                   .array[k]
-                                   .pid[l];
-                DFC_PATTERN *mlist = dfc->dfcMatchList[pid];
-
-                ACTION_FOR_MATCH;
-              }
-              break;
-            }
-          }
-        }
-        #endif
       }
       break;
     }
@@ -759,87 +639,26 @@ static int Verification_CT4_7(VERIFI_ARGUMENT) {
   for (i = 0; i < dfc->CompactTable4[crc].cnt; i++) {
     if (dfc->CompactTable4[crc].array[i].pat == *(uint32_t *)temp) {
       PID_CNT_TYPE j;
-      if (!dfc->CompactTable4[crc].array[i].DirectFilter) {
-        for (j = 0; j < dfc->CompactTable4[crc].array[i].cnt; j++) {
-          PID_TYPE pid = dfc->CompactTable4[crc].array[i].pid[j];
+      for (j = 0; j < dfc->CompactTable4[crc].array[i].cnt; j++) {
+        PID_TYPE pid = dfc->CompactTable4[crc].array[i].pid[j];
 
-          DFC_PATTERN *mlist = dfc->dfcMatchList[pid];
-          if (buf - starting_point >= mlist->n - 2) {
-            if (mlist->nocase) {
-              if (!my_strncasecmp(buf - (mlist->n - 2), mlist->casepatrn,
-                                  mlist->n - 4)) {
-                ACTION_FOR_MATCH;
-              }
-            } else {
-              if (!my_strncmp(buf - (mlist->n - 2), mlist->casepatrn,
-                              mlist->n - 4)) {
-                ACTION_FOR_MATCH;
-              }
+        DFC_PATTERN *mlist = dfc->dfcMatchList[pid];
+        if (buf - starting_point >= mlist->n - 2) {
+          if (mlist->nocase) {
+            if (!my_strncasecmp(buf - (mlist->n - 2), mlist->casepatrn,
+                                mlist->n - 4)) {
+              ACTION_FOR_MATCH;
+            }
+          } else {
+            if (!my_strncmp(buf - (mlist->n - 2), mlist->casepatrn,
+                            mlist->n - 4)) {
+              ACTION_FOR_MATCH;
             }
           }
         }
-      } else {
-        #ifdef ENABLE_RECURSIVE
-        for (j = 0; j < dfc->CompactTable4[crc].array[i].cnt; j++) {
-          PID_TYPE pid = dfc->CompactTable4[crc].array[i].pid[j];
-          DFC_PATTERN *mlist = dfc->dfcMatchList[pid];
-
-          ACTION_FOR_MATCH;
-        }
-
-        DTYPE data = *(uint16_t *)(buf - 4);
-        BTYPE index = BINDEX(data);
-        BTYPE mask = BMASK(data);
-
-        if (dfc->CompactTable4[crc].array[i].DirectFilter[index] & mask) {
-          uint32_t crc2 = _mm_crc32_u16(0, data);
-
-          // 2. calculate index
-          crc2 &= CT2_TABLE_SIZE_MASK;
-
-          BUC_CNT_TYPE k;
-          for (k = 0;
-               k < dfc->CompactTable4[crc].array[i].CompactTable[crc2].cnt;
-               k++) {
-            if (dfc->CompactTable4[crc]
-                    .array[i]
-                    .CompactTable[crc2]
-                    .array[k]
-                    .pat == data) {
-              PID_CNT_TYPE l;
-              for (l = 0; l < dfc->CompactTable4[crc]
-                                  .array[i]
-                                  .CompactTable[crc2]
-                                  .array[k]
-                                  .cnt;
-                   l++) {
-                PID_TYPE pid = dfc->CompactTable4[crc]
-                                   .array[i]
-                                   .CompactTable[crc2]
-                                   .array[k]
-                                   .pid[l];
-
-                DFC_PATTERN *mlist = dfc->dfcMatchList[pid];
-                if (mlist->nocase) {
-                  if (!my_strncasecmp(buf - (mlist->n - 2), mlist->casepatrn,
-                                      mlist->n - 6)) {
-                    ACTION_FOR_MATCH;
-                  }
-                } else {
-                  if (!my_strncmp(buf - (mlist->n - 2), mlist->casepatrn,
-                                  mlist->n - 6)) {
-                    ACTION_FOR_MATCH;
-                  }
-                }
-              }
-              break;
-            }
-          }
-        }
-        #endif
       }
-      break;
     }
+    break;
   }
   return matches;
 }
@@ -869,35 +688,13 @@ static int Verification_CT8_plus(VERIFI_ARGUMENT) {
       // matches++;	break;
 
       PID_CNT_TYPE j;
-      if (!dfc->CompactTable8[crc].array[i].DirectFilter) {
-        for (j = 0; j < dfc->CompactTable8[crc].array[i].cnt; j++) {
-          PID_TYPE pid = dfc->CompactTable8[crc].array[i].pid[j];
+      for (j = 0; j < dfc->CompactTable8[crc].array[i].cnt; j++) {
+        PID_TYPE pid = dfc->CompactTable8[crc].array[i].pid[j];
 
-          DFC_PATTERN *mlist = dfc->dfcMatchList[pid];
-          int comparison_requirement =
-              min_pattern_interval * (mlist->n - 8) / pattern_interval + 2;
-          if (buf - starting_point >= comparison_requirement) {
-            if (mlist->nocase) {
-              if (!my_strncasecmp(buf - comparison_requirement,
-                                  mlist->casepatrn, mlist->n)) {
-                ACTION_FOR_MATCH;
-              }
-            } else {
-              if (!my_strncmp(buf - comparison_requirement, mlist->casepatrn,
-                              mlist->n)) {
-                ACTION_FOR_MATCH;
-              }
-            }
-          }
-        }
-      } else {
-        #ifdef ENABLE_RECURSIVE
-        for (j = 0; j < dfc->CompactTable8[crc].array[i].cnt; j++) {
-          PID_TYPE pid = dfc->CompactTable8[crc].array[i].pid[j];
-
-          DFC_PATTERN *mlist = dfc->dfcMatchList[pid];
-          int comparison_requirement =
-              min_pattern_interval * (mlist->n - 8) / pattern_interval + 2;
+        DFC_PATTERN *mlist = dfc->dfcMatchList[pid];
+        int comparison_requirement =
+            min_pattern_interval * (mlist->n - 8) / pattern_interval + 2;
+        if (buf - starting_point >= comparison_requirement) {
           if (mlist->nocase) {
             if (!my_strncasecmp(buf - comparison_requirement, mlist->casepatrn,
                                 mlist->n)) {
@@ -910,65 +707,9 @@ static int Verification_CT8_plus(VERIFI_ARGUMENT) {
             }
           }
         }
-
-        DTYPE data = *(uint16_t *)(buf - 4);
-        BTYPE index = BINDEX(data);
-        BTYPE mask = BMASK(data);
-
-        if (dfc->CompactTable8[crc].array[i].DirectFilter[index] & mask) {
-          uint32_t crc2 = _mm_crc32_u16(0, data);
-
-          // 2. calculate index
-          crc2 &= CT2_TABLE_SIZE_MASK;
-
-          BUC_CNT_TYPE k;
-          for (k = 0;
-               k < dfc->CompactTable8[crc].array[i].CompactTable[crc2].cnt;
-               k++) {
-            if (dfc->CompactTable8[crc]
-                    .array[i]
-                    .CompactTable[crc2]
-                    .array[k]
-                    .pat == data) {
-              PID_CNT_TYPE l;
-              for (l = 0; l < dfc->CompactTable8[crc]
-                                  .array[i]
-                                  .CompactTable[crc2]
-                                  .array[k]
-                                  .cnt;
-                   l++) {
-                PID_TYPE pid = dfc->CompactTable8[crc]
-                                   .array[i]
-                                   .CompactTable[crc2]
-                                   .array[k]
-                                   .pid[l];
-
-                DFC_PATTERN *mlist = dfc->dfcMatchList[pid];
-                int comparison_requirement =
-                    min_pattern_interval * (mlist->n - 8) / pattern_interval +
-                    2;
-                if (buf - starting_point >= comparison_requirement) {
-                  if (mlist->nocase) {
-                    if (!my_strncasecmp(buf - comparison_requirement,
-                                        mlist->casepatrn, mlist->n)) {
-                      ACTION_FOR_MATCH;
-                    }
-                  } else {
-                    if (!my_strncmp(buf - comparison_requirement,
-                                    mlist->casepatrn, mlist->n)) {
-                      ACTION_FOR_MATCH;
-                    }
-                  }
-                }
-              }
-              break;
-            }
-          }
-        }
-        #endif
       }
-      break;
     }
+    break;
   }
 
   return matches;
@@ -1568,14 +1309,6 @@ static void setupCompactTables(DFC_STRUCTURE *dfc) {
             dfc->CompactTable2[crc]
                 .array[dfc->CompactTable2[crc].cnt - 1]
                 .pid[0] = plist->iid;
-            dfc->CompactTable2[crc]
-                .array[dfc->CompactTable2[crc].cnt - 1]
-                .DirectFilter = NULL;
-            #ifdef ENABLE_RECURSIVE
-            dfc->CompactTable2[crc]
-                .array[dfc->CompactTable2[crc].cnt - 1]
-                .CompactTable = NULL;
-            #endif
           } else {  // If found,
             BUC_CNT_TYPE m;
             for (m = 0; m < dfc->CompactTable2[crc].array[n].cnt; m++) {
@@ -1603,10 +1336,6 @@ static void setupCompactTables(DFC_STRUCTURE *dfc) {
           dfc->CompactTable2[crc].array[0].pid =
               (PID_TYPE *)DFC_MALLOC(sizeof(PID_TYPE), DFC_MEMORY_TYPE__CT2);
           dfc->CompactTable2[crc].array[0].pid[0] = plist->iid;
-          dfc->CompactTable2[crc].array[0].DirectFilter = NULL;
-          #ifdef ENABLE_RECURSIVE
-          dfc->CompactTable2[crc].array[0].CompactTable = NULL;
-          #endif
         }
 
         alpha_cnt++;
@@ -1658,14 +1387,6 @@ static void setupCompactTables(DFC_STRUCTURE *dfc) {
             dfc->CompactTable4[crc]
                 .array[dfc->CompactTable4[crc].cnt - 1]
                 .pid[0] = plist->iid;
-            dfc->CompactTable4[crc]
-                .array[dfc->CompactTable4[crc].cnt - 1]
-                .DirectFilter = NULL;
-            #ifdef ENABLE_RECURSIVE
-            dfc->CompactTable4[crc]
-                .array[dfc->CompactTable4[crc].cnt - 1]
-                .CompactTable = NULL;
-            #endif
           } else {  // If found,
             BUC_CNT_TYPE m;
             for (m = 0; m < dfc->CompactTable4[crc].array[n].cnt; m++) {
@@ -1693,11 +1414,6 @@ static void setupCompactTables(DFC_STRUCTURE *dfc) {
           dfc->CompactTable4[crc].array[0].pid =
               (PID_TYPE *)DFC_MALLOC(sizeof(PID_TYPE), DFC_MEMORY_TYPE__CT4);
           dfc->CompactTable4[crc].array[0].pid[0] = plist->iid;
-          dfc->CompactTable4[crc].array[0].DirectFilter = NULL;
-
-          #ifdef ENABLE_RECURSIVE
-          dfc->CompactTable4[crc].array[0].CompactTable = NULL;
-          #endif
         }
         alpha_cnt++;
       } while (alpha_cnt < 16);
@@ -1754,14 +1470,6 @@ static void setupCompactTables(DFC_STRUCTURE *dfc) {
             dfc->CompactTable8[crc]
                 .array[dfc->CompactTable8[crc].cnt - 1]
                 .pid[0] = plist->iid;
-            dfc->CompactTable8[crc]
-                .array[dfc->CompactTable8[crc].cnt - 1]
-                .DirectFilter = NULL;
-            #ifdef ENABLE_RECURSIVE
-            dfc->CompactTable8[crc]
-                .array[dfc->CompactTable8[crc].cnt - 1]
-                .CompactTable = NULL;
-            #endif
           } else {  // If found,
             BUC_CNT_TYPE m;
             for (m = 0; m < dfc->CompactTable8[crc].array[n].cnt; m++) {
@@ -1789,474 +1497,12 @@ static void setupCompactTables(DFC_STRUCTURE *dfc) {
           dfc->CompactTable8[crc].array[0].pid =
               (PID_TYPE *)DFC_MALLOC(sizeof(PID_TYPE), DFC_MEMORY_TYPE__CT8);
           dfc->CompactTable8[crc].array[0].pid[0] = plist->iid;
-          dfc->CompactTable8[crc].array[0].DirectFilter = NULL;
-
-          #ifdef ENABLE_RECURSIVE
-          dfc->CompactTable8[crc].array[0].CompactTable = NULL;
-          #endif
         }
         alpha_cnt++;
       } while (alpha_cnt < 256);
     }
   }
 }
-
-#ifdef ENABLE_RECURSIVE
-static void setupRecursiveFiltering(DFC_STRUCTURE *dfc) {
-  uint8_t temp[8], flag[8];
-  // Only for CT2 firstly
-  for (int i = 0; i < CT2_TABLE_SIZE; i++) {
-    for (BUC_CNT_TYPE n = 0; n < dfc->CompactTable2[i].cnt; n++) {
-      /* If the number of PID is bigger than 3, do recursive filtering */
-      if (dfc->CompactTable2[i].array[n].cnt >= RECURSIVE_BOUNDARY) {
-        /* Initialization */
-        dfc->CompactTable2[i].array[n].DirectFilter = (uint8_t *)DFC_MALLOC(
-            sizeof(uint8_t) * DF_SIZE_REAL, DFC_MEMORY_TYPE__CT2);
-        dfc->CompactTable2[i].array[n].CompactTable =
-            (CT_Type_2_2B *)DFC_MALLOC(sizeof(CT_Type_2_2B) * RECURSIVE_CT_SIZE,
-                                       DFC_MEMORY_TYPE__CT2);
-
-        if (!dfc->CompactTable2[i].array[n].DirectFilter ||
-            !dfc->CompactTable2[i].array[n].CompactTable) {
-          fprintf(stderr, "Failed to allocate memory for recursive things.\n");
-          exit(1);
-        }
-
-        PID_TYPE *tempPID = (PID_TYPE *)DFC_MALLOC(
-            sizeof(PID_TYPE) * dfc->CompactTable2[i].array[n].cnt,
-            DFC_MEMORY_TYPE__CT2);
-        memcpy(tempPID, dfc->CompactTable2[i].array[n].pid,
-               sizeof(PID_TYPE) * dfc->CompactTable2[i].array[n].cnt);
-
-        DFC_FREE(dfc->CompactTable2[i].array[n].pid,
-                 dfc->CompactTable2[i].array[n].cnt * sizeof(PID_TYPE),
-                 DFC_MEMORY_TYPE__CT2);
-        dfc->CompactTable2[i].array[n].pid = NULL;
-
-        int temp_cnt = 0;  // cnt for 2 byte patterns.
-
-        for (BUC_CNT_TYPE m = 0; m < dfc->CompactTable2[i].array[n].cnt; m++) {
-          int pat_len = dfc->dfcMatchList[tempPID[m]]->n - 2;
-
-          if (pat_len == 0) { /* When pat length is 2 */
-            temp_cnt++;
-            dfc->CompactTable2[i].array[n].pid =
-                (PID_TYPE *)realloc(dfc->CompactTable2[i].array[n].pid,
-                                    sizeof(PID_TYPE) * temp_cnt);
-            dfc->CompactTable2[i].array[n].pid[temp_cnt - 1] = tempPID[m];
-          } else if (pat_len == 1) { /* When pat length is 3 */
-            if (dfc->dfcMatchList[tempPID[m]]->nocase) {
-              temp[1] = tolower(dfc->dfcMatchList[tempPID[m]]->patrn[0]);
-              for (int l = 0; l < 256; l++) {
-                temp[0] = l;
-
-                uint16_t fragment_16 = (temp[1] << 8) | temp[0];
-                uint32_t byteIndex = BINDEX(fragment_16);
-                uint32_t bitMask = BMASK(fragment_16);
-
-                dfc->CompactTable2[i].array[n].DirectFilter[byteIndex] |=
-                    bitMask;
-
-                Add_PID_to_2B_CT(dfc->CompactTable2[i].array[n].CompactTable,
-                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT2);
-              }
-
-              temp[1] = toupper(dfc->dfcMatchList[tempPID[m]]->patrn[0]);
-              for (int l = 0; l < 256; l++) {
-                temp[0] = l;
-
-                uint16_t fragment_16 = (temp[1] << 8) | temp[0];
-                uint32_t byteIndex = BINDEX(fragment_16);
-                uint32_t bitMask = BMASK(fragment_16);
-
-                dfc->CompactTable2[i].array[n].DirectFilter[byteIndex] |=
-                    bitMask;
-
-                Add_PID_to_2B_CT(dfc->CompactTable2[i].array[n].CompactTable,
-                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT2);
-              }
-            } else {
-              temp[1] = dfc->dfcMatchList[tempPID[m]]->casepatrn[0];
-              for (int l = 0; l < 256; l++) {
-                temp[0] = l;
-
-                uint16_t fragment_16 = (temp[1] << 8) | temp[0];
-                uint32_t byteIndex = BINDEX(fragment_16);
-                uint32_t bitMask = BMASK(fragment_16);
-
-                dfc->CompactTable2[i].array[n].DirectFilter[byteIndex] |=
-                    bitMask;
-
-                Add_PID_to_2B_CT(dfc->CompactTable2[i].array[n].CompactTable,
-                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT2);
-              }
-            }
-          }
-        }
-
-        dfc->CompactTable2[i].array[n].cnt = temp_cnt;
-        DFC_FREE(tempPID, sizeof(PID_TYPE) * dfc->CompactTable2[i].array[n].cnt,
-                 DFC_MEMORY_TYPE__CT2);
-      }
-    }
-  }
-  // Only for CT4 firstly
-  for (int i = 0; i < CT4_TABLE_SIZE; i++) {
-    for (BUC_CNT_TYPE n = 0; n < dfc->CompactTable4[i].cnt; n++) {
-      /* If the number of PID is bigger than 3, do recursive filtering */
-      if (dfc->CompactTable4[i].array[n].cnt >= RECURSIVE_BOUNDARY) {
-        /* Initialization */
-        dfc->CompactTable4[i].array[n].DirectFilter = (uint8_t *)DFC_MALLOC(
-            sizeof(uint8_t) * DF_SIZE_REAL, DFC_MEMORY_TYPE__CT4);
-        dfc->CompactTable4[i].array[n].CompactTable =
-            (CT_Type_2_2B *)DFC_MALLOC(sizeof(CT_Type_2_2B) * RECURSIVE_CT_SIZE,
-                                       DFC_MEMORY_TYPE__CT4);
-
-        if (!dfc->CompactTable4[i].array[n].DirectFilter ||
-            !dfc->CompactTable4[i].array[n].CompactTable) {
-          fprintf(stderr, "Failed to allocate memory for recursive things.\n");
-          exit(1);
-        }
-
-        PID_TYPE *tempPID = (PID_TYPE *)DFC_MALLOC(
-            sizeof(PID_TYPE) * dfc->CompactTable4[i].array[n].cnt,
-            DFC_MEMORY_TYPE__CT4);
-        memcpy(tempPID, dfc->CompactTable4[i].array[n].pid,
-               sizeof(PID_TYPE) * dfc->CompactTable4[i].array[n].cnt);
-        // free(dfc->CompactTable4[i].array[n].pid);
-        DFC_FREE(dfc->CompactTable4[i].array[n].pid,
-                 dfc->CompactTable4[i].array[n].cnt * sizeof(PID_TYPE),
-                 DFC_MEMORY_TYPE__CT4);
-        dfc->CompactTable4[i].array[n].pid = NULL;
-
-        int temp_cnt = 0;  // cnt for 4 byte patterns.
-
-        for (BUC_CNT_TYPE m = 0; m < dfc->CompactTable4[i].array[n].cnt; m++) {
-          int pat_len = dfc->dfcMatchList[tempPID[m]]->n - 4;
-
-          if (pat_len == 0) { /* When pat length is 4 */
-            temp_cnt++;
-            dfc->CompactTable4[i].array[n].pid =
-                (PID_TYPE *)realloc(dfc->CompactTable4[i].array[n].pid,
-                                    sizeof(PID_TYPE) * temp_cnt);
-            dfc->CompactTable4[i].array[n].pid[temp_cnt - 1] = tempPID[m];
-          } else if (pat_len == 1) { /* When pat length is 5 */
-            if (dfc->dfcMatchList[tempPID[m]]->nocase) {
-              temp[1] = tolower(dfc->dfcMatchList[tempPID[m]]->patrn[0]);
-              for (int l = 0; l < 256; l++) {
-                temp[0] = l;
-
-                uint16_t fragment_16 = (temp[1] << 8) | temp[0];
-                uint32_t byteIndex = BINDEX(fragment_16);
-                uint32_t bitMask = BMASK(fragment_16);
-
-                dfc->CompactTable4[i].array[n].DirectFilter[byteIndex] |=
-                    bitMask;
-
-                Add_PID_to_2B_CT(dfc->CompactTable4[i].array[n].CompactTable,
-                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT4);
-              }
-
-              temp[1] = toupper(dfc->dfcMatchList[tempPID[m]]->patrn[0]);
-              for (int l = 0; l < 256; l++) {
-                temp[0] = l;
-
-                uint16_t fragment_16 = (temp[1] << 8) | temp[0];
-                uint32_t byteIndex = BINDEX(fragment_16);
-                uint32_t bitMask = BMASK(fragment_16);
-
-                dfc->CompactTable4[i].array[n].DirectFilter[byteIndex] |=
-                    bitMask;
-
-                Add_PID_to_2B_CT(dfc->CompactTable4[i].array[n].CompactTable,
-                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT4);
-              }
-            } else {
-              temp[1] = dfc->dfcMatchList[tempPID[m]]->casepatrn[0];
-              for (int l = 0; l < 256; l++) {
-                temp[0] = l;
-
-                uint16_t fragment_16 = (temp[1] << 8) | temp[0];
-                uint32_t byteIndex = BINDEX(fragment_16);
-                uint32_t bitMask = BMASK(fragment_16);
-
-                dfc->CompactTable4[i].array[n].DirectFilter[byteIndex] |=
-                    bitMask;
-
-                Add_PID_to_2B_CT(dfc->CompactTable4[i].array[n].CompactTable,
-                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT4);
-              }
-            }
-
-          } else { /* When pat length is 7 (pat_len is equal to 2(6) or 3(7)) */
-            if (dfc->dfcMatchList[tempPID[m]]->nocase) {
-              uint32_t alpha_cnt = 0;
-              do {
-                for (int l = 1, k = 0; l >= 0; --l, k++) {
-                  flag[k] = (alpha_cnt >> l) & 1;
-                }
-
-                for (int l = pat_len - 2, k = 0; l <= pat_len - 1; l++, k++) {
-                  Build_pattern(dfc->dfcMatchList[tempPID[m]], flag, temp, l,
-                                k);
-                }
-
-                uint16_t fragment_16 = (temp[1] << 8) | temp[0];
-                uint32_t byteIndex = BINDEX(fragment_16);
-                uint32_t bitMask = BMASK(fragment_16);
-
-                dfc->CompactTable4[i].array[n].DirectFilter[byteIndex] |=
-                    bitMask;
-
-                Add_PID_to_2B_CT(dfc->CompactTable4[i].array[n].CompactTable,
-                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT4);
-
-                alpha_cnt++;
-              } while (alpha_cnt < 4);
-            } else { /* case sensitive pattern */
-              temp[0] = dfc->dfcMatchList[tempPID[m]]->casepatrn[pat_len - 2];
-              temp[1] = dfc->dfcMatchList[tempPID[m]]->casepatrn[pat_len - 1];
-
-              uint16_t fragment_16 = (temp[1] << 8) | temp[0];
-              uint32_t byteIndex = BINDEX(fragment_16);
-              uint32_t bitMask = BMASK(fragment_16);
-
-              dfc->CompactTable4[i].array[n].DirectFilter[byteIndex] |= bitMask;
-
-              Add_PID_to_2B_CT(dfc->CompactTable4[i].array[n].CompactTable,
-                               temp, tempPID[m], DFC_MEMORY_TYPE__CT4);
-            }
-          }
-        }
-
-        dfc->CompactTable4[i].array[n].cnt = temp_cnt;
-        DFC_FREE(tempPID, sizeof(PID_TYPE) * dfc->CompactTable4[i].array[n].cnt,
-                 DFC_MEMORY_TYPE__CT4);
-      }
-    }
-  }
-
-  /* For CT8 */
-  for (int i = 0; i < CT8_TABLE_SIZE; i++) {
-    for (BUC_CNT_TYPE n = 0; n < dfc->CompactTable8[i].cnt; n++) {
-      /* If the number of PID is bigger than RECURSIVE_BOUNDARY, do recursive
-       * filtering */
-      if (dfc->CompactTable8[i].array[n].cnt >= RECURSIVE_BOUNDARY) {
-        /* Initialization */
-        dfc->CompactTable8[i].array[n].DirectFilter = (uint8_t *)DFC_MALLOC(
-            DF_SIZE_REAL * sizeof(uint8_t), DFC_MEMORY_TYPE__CT8);
-        dfc->CompactTable8[i].array[n].CompactTable =
-            (CT_Type_2_2B *)DFC_MALLOC(sizeof(CT_Type_2_2B) * RECURSIVE_CT_SIZE,
-                                       DFC_MEMORY_TYPE__CT8);
-
-        if (!dfc->CompactTable8[i].array[n].DirectFilter ||
-            !dfc->CompactTable8[i].array[n].CompactTable) {
-          fprintf(stderr, "Failed to allocate memory for recursive things.\n");
-          exit(1);
-        }
-
-        PID_TYPE *tempPID = (PID_TYPE *)DFC_MALLOC(
-            sizeof(PID_TYPE) * dfc->CompactTable8[i].array[n].cnt,
-            DFC_MEMORY_TYPE__CT8);
-        memcpy(tempPID, dfc->CompactTable8[i].array[n].pid,
-               sizeof(PID_TYPE) * dfc->CompactTable8[i].array[n].cnt);
-
-        DFC_FREE(dfc->CompactTable8[i].array[n].pid,
-                 dfc->CompactTable8[i].array[n].cnt * sizeof(PID_TYPE),
-                 DFC_MEMORY_TYPE__CT8);
-        dfc->CompactTable8[i].array[n].pid = NULL;
-
-        int temp_cnt = 0;  // cnt for 8 byte patterns.
-
-        for (BUC_CNT_TYPE m = 0; m < dfc->CompactTable8[i].array[n].cnt; m++) {
-          int pat_len = dfc->dfcMatchList[tempPID[m]]->n - 8;
-
-          if (pat_len == 0) { /* When pat length is 8 */
-            temp_cnt++;
-            dfc->CompactTable8[i].array[n].pid =
-                (PID_TYPE *)realloc(dfc->CompactTable8[i].array[n].pid,
-                                    sizeof(PID_TYPE) * temp_cnt);
-            dfc->CompactTable8[i].array[n].pid[temp_cnt - 1] = tempPID[m];
-          } else if (pat_len == 1) { /* When pat length is 9 */
-            if (dfc->dfcMatchList[tempPID[m]]->nocase) {
-              temp[1] = tolower(dfc->dfcMatchList[tempPID[m]]->patrn[0]);
-              for (int l = 0; l < 256; l++) {
-                temp[0] = l;
-
-                uint16_t fragment_16 = (temp[1] << 8) | temp[0];
-                uint32_t byteIndex = BINDEX(fragment_16);
-                uint32_t bitMask = BMASK(fragment_16);
-
-                dfc->CompactTable8[i].array[n].DirectFilter[byteIndex] |=
-                    bitMask;
-
-                Add_PID_to_2B_CT(dfc->CompactTable8[i].array[n].CompactTable,
-                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT8);
-              }
-
-              temp[1] = toupper(dfc->dfcMatchList[tempPID[m]]->patrn[0]);
-              for (int l = 0; l < 256; l++) {
-                temp[0] = l;
-
-                uint16_t fragment_16 = (temp[1] << 8) | temp[0];
-                uint32_t byteIndex = BINDEX(fragment_16);
-                uint32_t bitMask = BMASK(fragment_16);
-
-                dfc->CompactTable8[i].array[n].DirectFilter[byteIndex] |=
-                    bitMask;
-
-                Add_PID_to_2B_CT(dfc->CompactTable8[i].array[n].CompactTable,
-                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT8);
-              }
-            } else {
-              temp[1] = dfc->dfcMatchList[tempPID[m]]->casepatrn[0];
-              for (int l = 0; l < 256; l++) {
-                temp[0] = l;
-
-                uint16_t fragment_16 = (temp[1] << 8) | temp[0];
-                uint32_t byteIndex = BINDEX(fragment_16);
-                uint32_t bitMask = BMASK(fragment_16);
-
-                dfc->CompactTable8[i].array[n].DirectFilter[byteIndex] |=
-                    bitMask;
-
-                Add_PID_to_2B_CT(dfc->CompactTable8[i].array[n].CompactTable,
-                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT8);
-              }
-            }
-
-          } else { /* longer than or equal to 10 */
-            if (dfc->dfcMatchList[tempPID[m]]->nocase) {
-              uint32_t alpha_cnt = 0;
-              do {
-                for (int l = 1, k = 0; l >= 0; --l, k++) {
-                  flag[k] = (alpha_cnt >> l) & 1;
-                }
-
-                for (int l = pat_len - 2, k = 0; l <= pat_len - 1; l++, k++) {
-                  Build_pattern(dfc->dfcMatchList[tempPID[m]], flag, temp, l,
-                                k);
-                }
-
-                uint16_t fragment_16 = (temp[1] << 8) | temp[0];
-                uint32_t byteIndex = BINDEX(fragment_16);
-                uint32_t bitMask = BMASK(fragment_16);
-
-                dfc->CompactTable8[i].array[n].DirectFilter[byteIndex] |=
-                    bitMask;
-
-                Add_PID_to_2B_CT(dfc->CompactTable8[i].array[n].CompactTable,
-                                 temp, tempPID[m], DFC_MEMORY_TYPE__CT8);
-
-                alpha_cnt++;
-              } while (alpha_cnt < 4);
-            } else { /* case sensitive pattern */
-              temp[0] = dfc->dfcMatchList[tempPID[m]]->casepatrn[pat_len - 2];
-              temp[1] = dfc->dfcMatchList[tempPID[m]]->casepatrn[pat_len - 1];
-
-              uint16_t fragment_16 = (temp[1] << 8) | temp[0];
-              uint32_t byteIndex = BINDEX(fragment_16);
-              uint32_t bitMask = BMASK(fragment_16);
-
-              dfc->CompactTable8[i].array[n].DirectFilter[byteIndex] |= bitMask;
-
-              Add_PID_to_2B_CT(dfc->CompactTable8[i].array[n].CompactTable,
-                               temp, tempPID[m], DFC_MEMORY_TYPE__CT8);
-            }
-          }
-        }
-
-        dfc->CompactTable8[i].array[n].cnt = temp_cnt;
-        DFC_FREE(tempPID, sizeof(PID_TYPE) * dfc->CompactTable8[i].array[n].cnt,
-                 DFC_MEMORY_TYPE__CT8);
-      }
-    }
-  }
-}
-
-static void Add_PID_to_2B_CT(CT_Type_2_2B *CompactTable, uint8_t *temp,
-                             PID_TYPE pid, dfcMemoryType type) {
-  BUC_CNT_TYPE j;
-  PID_CNT_TYPE k;
-  uint32_t crc = _mm_crc32_u16(0, *(uint16_t *)temp);
-
-  crc &= CT2_TABLE_SIZE_MASK;
-
-  if (CompactTable[crc].cnt != 0) {
-    for (j = 0; j < CompactTable[crc].cnt; j++) {
-      if (CompactTable[crc].array[j].pat == *(uint16_t *)temp) break;
-    }
-
-    if (j == CompactTable[crc].cnt) {  // If not found,
-      CompactTable[crc].cnt++;
-      CompactTable[crc].array = (CT_Type_2_2B_Array *)DFC_REALLOC(
-          (void *)CompactTable[crc].array, CompactTable[crc].cnt,
-          DFC_CT_Type_2_2B_Array, type);
-      CompactTable[crc].array[CompactTable[crc].cnt - 1].pat =
-          *(uint16_t *)temp;
-
-      CompactTable[crc].array[CompactTable[crc].cnt - 1].cnt = 1;
-      CompactTable[crc].array[CompactTable[crc].cnt - 1].pid =
-          (PID_TYPE *)DFC_MALLOC(sizeof(PID_TYPE), type);
-      CompactTable[crc].array[CompactTable[crc].cnt - 1].pid[0] = pid;
-    } else {  // If found,
-      for (k = 0; k < CompactTable[crc].array[j].cnt; k++) {
-        if (CompactTable[crc].array[j].pid[k] == pid) break;
-      }
-      if (k == CompactTable[crc].array[j].cnt) {
-        CompactTable[crc].array[j].cnt++;
-        CompactTable[crc].array[j].pid = (PID_TYPE *)DFC_REALLOC(
-            (void *)CompactTable[crc].array[j].pid,
-            CompactTable[crc].array[j].cnt, DFC_PID_TYPE, type);
-        CompactTable[crc].array[j].pid[CompactTable[crc].array[j].cnt - 1] =
-            pid;
-      }
-    }
-  } else {  // If there is no elements in the CT4,
-    CompactTable[crc].cnt = 1;
-    CompactTable[crc].array =
-        (CT_Type_2_2B_Array *)DFC_MALLOC(sizeof(CT_Type_2_2B_Array), type);
-    memset(CompactTable[crc].array, 0, sizeof(CT_Type_2_2B_Array));
-
-    CompactTable[crc].array[0].pat = *(uint16_t *)temp;
-    CompactTable[crc].array[0].cnt = 1;
-    CompactTable[crc].array[0].pid =
-        (PID_TYPE *)DFC_MALLOC(sizeof(PID_TYPE), type);
-    CompactTable[crc].array[0].pid[0] = pid;
-  }
-}
-
-static void DFC_FREE(void *p, int n, dfcMemoryType type) {
-  free(p);
-  switch (type) {
-    case DFC_MEMORY_TYPE__DFC:
-      break;
-    case DFC_MEMORY_TYPE__PATTERN:
-      dfc_pattern_memory -= n;
-      break;
-    case DFC_MEMORY_TYPE__CT2:
-      dfc_memory_ct2 -= n;
-      break;
-    case DFC_MEMORY_TYPE__CT3:
-      dfc_memory_ct3 -= n;
-      break;
-    case DFC_MEMORY_TYPE__CT4:
-      dfc_memory_ct4 -= n;
-      break;
-    case DFC_MEMORY_TYPE__CT8:
-      dfc_memory_ct8 -= n;
-      break;
-    case DFC_MEMORY_TYPE__NONE:
-      break;
-    default:
-      fprintf(stderr, "%s(%d) Invalid memory type\n", __FILE__, __LINE__);
-      exit(1);
-      break;
-  }
-  dfc_total_memory -= n;
-}
-
-#endif
 
 static uint8_t toggleCharacterCase(uint8_t character) {
   if (character >= 97 /*a*/ && character <= 122 /*z*/) {
