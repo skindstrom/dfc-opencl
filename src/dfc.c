@@ -24,7 +24,6 @@ static int dfc_memory_ct8 = 0;
 
 static void *DFC_REALLOC(void *p, uint16_t n, dfcDataType type,
                          dfcMemoryType type2);
-static void DFC_FREE(void *p, int n, dfcMemoryType type);
 static void *DFC_MALLOC(int n, dfcMemoryType type);
 static void Build_pattern(DFC_PATTERN *p, uint8_t *flag, uint8_t *temp, int j,
                           int k);
@@ -43,7 +42,15 @@ static void setup1BPlusDirectFilter(DFC_STRUCTURE *dfc, DFC_PATTERN *plist);
 
 static void initializeCompactTableMemory(DFC_STRUCTURE *dfc);
 static void setupCompactTables(DFC_STRUCTURE *dfc);
+
+#ifdef ENABLE_RECURSIVE
+
 static void setupRecursiveFiltering(DFC_STRUCTURE *dfc);
+static void Add_PID_to_2B_CT(CT_Type_2_2B *CompactTable, uint8_t *temp,
+                             PID_TYPE pid, dfcMemoryType type);
+static void DFC_FREE(void *p, int n, dfcMemoryType type);
+
+#endif
 
 static uint8_t toggleCharacterCase(uint8_t);
 
@@ -101,8 +108,13 @@ static void DFC_FreePatternList(DFC_STRUCTURE *dfc) {
 }
 
 void DFC_FreeStructure(DFC_STRUCTURE *dfc) {
-  BUC_CNT_TYPE j, l;
-  int i, k;
+  BUC_CNT_TYPE j;
+  int i;
+
+#ifdef ENABLE_RECURSIVE
+  BUC_CNT_TYPE l;
+  int k;
+#endif
   if (dfc == NULL) return;
 
   if (dfc->dfcPatterns != NULL) {
@@ -117,6 +129,7 @@ void DFC_FreeStructure(DFC_STRUCTURE *dfc) {
     for (j = 0; j < dfc->CompactTable2[i].cnt; j++) {
       free(dfc->CompactTable2[i].array[j].pid);
 
+      #ifdef ENABLE_RECURSIVE
       if (dfc->CompactTable2[i].array[j].DirectFilter != NULL) {
         free(dfc->CompactTable2[i].array[j].DirectFilter);
       }
@@ -131,6 +144,7 @@ void DFC_FreeStructure(DFC_STRUCTURE *dfc) {
         }
         free(dfc->CompactTable2[i].array[j].CompactTable);
       }
+      #endif
     }
   }
 
@@ -142,6 +156,7 @@ void DFC_FreeStructure(DFC_STRUCTURE *dfc) {
         free(dfc->CompactTable4[i].array[j].DirectFilter);
       }
 
+      #ifdef ENABLE_RECURSIVE
       if (dfc->CompactTable4[i].array[j].CompactTable != NULL) {
         for (k = 0; k < RECURSIVE_CT_SIZE; k++) {
           for (l = 0; l < dfc->CompactTable4[i].array[j].CompactTable[k].cnt;
@@ -152,6 +167,7 @@ void DFC_FreeStructure(DFC_STRUCTURE *dfc) {
         }
         free(dfc->CompactTable4[i].array[j].CompactTable);
       }
+      #endif
     }
   }
 
@@ -163,6 +179,7 @@ void DFC_FreeStructure(DFC_STRUCTURE *dfc) {
         free(dfc->CompactTable8[i].array[j].DirectFilter);
       }
 
+      #ifdef ENABLE_RECURSIVE
       if (dfc->CompactTable8[i].array[j].CompactTable != NULL) {
         for (k = 0; k < RECURSIVE_CT_SIZE; k++) {
           for (l = 0; l < dfc->CompactTable8[i].array[j].CompactTable[k].cnt;
@@ -173,6 +190,7 @@ void DFC_FreeStructure(DFC_STRUCTURE *dfc) {
         }
         free(dfc->CompactTable8[i].array[j].CompactTable);
       }
+      #endif
     }
   }
 
@@ -614,57 +632,6 @@ void DFC_PrintInfo(DFC_STRUCTURE *dfc) {
   return;
 }
 
-static void Add_PID_to_2B_CT(CT_Type_2_2B *CompactTable, uint8_t *temp,
-                             PID_TYPE pid, dfcMemoryType type) {
-  BUC_CNT_TYPE j;
-  PID_CNT_TYPE k;
-  uint32_t crc = _mm_crc32_u16(0, *(uint16_t *)temp);
-
-  crc &= CT2_TABLE_SIZE_MASK;
-
-  if (CompactTable[crc].cnt != 0) {
-    for (j = 0; j < CompactTable[crc].cnt; j++) {
-      if (CompactTable[crc].array[j].pat == *(uint16_t *)temp) break;
-    }
-
-    if (j == CompactTable[crc].cnt) {  // If not found,
-      CompactTable[crc].cnt++;
-      CompactTable[crc].array = (CT_Type_2_2B_Array *)DFC_REALLOC(
-          (void *)CompactTable[crc].array, CompactTable[crc].cnt,
-          DFC_CT_Type_2_2B_Array, type);
-      CompactTable[crc].array[CompactTable[crc].cnt - 1].pat =
-          *(uint16_t *)temp;
-
-      CompactTable[crc].array[CompactTable[crc].cnt - 1].cnt = 1;
-      CompactTable[crc].array[CompactTable[crc].cnt - 1].pid =
-          (PID_TYPE *)DFC_MALLOC(sizeof(PID_TYPE), type);
-      CompactTable[crc].array[CompactTable[crc].cnt - 1].pid[0] = pid;
-    } else {  // If found,
-      for (k = 0; k < CompactTable[crc].array[j].cnt; k++) {
-        if (CompactTable[crc].array[j].pid[k] == pid) break;
-      }
-      if (k == CompactTable[crc].array[j].cnt) {
-        CompactTable[crc].array[j].cnt++;
-        CompactTable[crc].array[j].pid = (PID_TYPE *)DFC_REALLOC(
-            (void *)CompactTable[crc].array[j].pid,
-            CompactTable[crc].array[j].cnt, DFC_PID_TYPE, type);
-        CompactTable[crc].array[j].pid[CompactTable[crc].array[j].cnt - 1] =
-            pid;
-      }
-    }
-  } else {  // If there is no elements in the CT4,
-    CompactTable[crc].cnt = 1;
-    CompactTable[crc].array =
-        (CT_Type_2_2B_Array *)DFC_MALLOC(sizeof(CT_Type_2_2B_Array), type);
-    memset(CompactTable[crc].array, 0, sizeof(CT_Type_2_2B_Array));
-
-    CompactTable[crc].array[0].pat = *(uint16_t *)temp;
-    CompactTable[crc].array[0].cnt = 1;
-    CompactTable[crc].array[0].pid =
-        (PID_TYPE *)DFC_MALLOC(sizeof(PID_TYPE), type);
-    CompactTable[crc].array[0].pid[0] = pid;
-  }
-}
 
 int DFC_Compile(DFC_STRUCTURE *dfc) {
   initializeMemoryTracking();
@@ -722,6 +689,8 @@ static int Verification_CT2(VERIFI_ARGUMENT) {
           }
         }
       } else {
+        #ifdef ENABLE_RECURSIVE
+
         for (j = 0; j < dfc->CompactTable2[crc].array[i].cnt; j++) {
           PID_TYPE pid = dfc->CompactTable2[crc].array[i].pid[j];
           DFC_PATTERN *mlist = dfc->dfcMatchList[pid];
@@ -767,6 +736,7 @@ static int Verification_CT2(VERIFI_ARGUMENT) {
             }
           }
         }
+        #endif
       }
       break;
     }
@@ -809,6 +779,7 @@ static int Verification_CT4_7(VERIFI_ARGUMENT) {
           }
         }
       } else {
+        #ifdef ENABLE_RECURSIVE
         for (j = 0; j < dfc->CompactTable4[crc].array[i].cnt; j++) {
           PID_TYPE pid = dfc->CompactTable4[crc].array[i].pid[j];
           DFC_PATTERN *mlist = dfc->dfcMatchList[pid];
@@ -865,6 +836,7 @@ static int Verification_CT4_7(VERIFI_ARGUMENT) {
             }
           }
         }
+        #endif
       }
       break;
     }
@@ -919,6 +891,7 @@ static int Verification_CT8_plus(VERIFI_ARGUMENT) {
           }
         }
       } else {
+        #ifdef ENABLE_RECURSIVE
         for (j = 0; j < dfc->CompactTable8[crc].array[i].cnt; j++) {
           PID_TYPE pid = dfc->CompactTable8[crc].array[i].pid[j];
 
@@ -992,6 +965,7 @@ static int Verification_CT8_plus(VERIFI_ARGUMENT) {
             }
           }
         }
+        #endif
       }
       break;
     }
@@ -1159,36 +1133,6 @@ static void *DFC_REALLOC(void *p, uint16_t n, dfcDataType type,
       break;
   }
   return NULL;
-}
-
-static void DFC_FREE(void *p, int n, dfcMemoryType type) {
-  free(p);
-  switch (type) {
-    case DFC_MEMORY_TYPE__DFC:
-      break;
-    case DFC_MEMORY_TYPE__PATTERN:
-      dfc_pattern_memory -= n;
-      break;
-    case DFC_MEMORY_TYPE__CT2:
-      dfc_memory_ct2 -= n;
-      break;
-    case DFC_MEMORY_TYPE__CT3:
-      dfc_memory_ct3 -= n;
-      break;
-    case DFC_MEMORY_TYPE__CT4:
-      dfc_memory_ct4 -= n;
-      break;
-    case DFC_MEMORY_TYPE__CT8:
-      dfc_memory_ct8 -= n;
-      break;
-    case DFC_MEMORY_TYPE__NONE:
-      break;
-    default:
-      fprintf(stderr, "%s(%d) Invalid memory type\n", __FILE__, __LINE__);
-      exit(1);
-      break;
-  }
-  dfc_total_memory -= n;
 }
 
 static void *DFC_MALLOC(int n, dfcMemoryType type) {
@@ -1627,9 +1571,11 @@ static void setupCompactTables(DFC_STRUCTURE *dfc) {
             dfc->CompactTable2[crc]
                 .array[dfc->CompactTable2[crc].cnt - 1]
                 .DirectFilter = NULL;
+            #ifdef ENABLE_RECURSIVE
             dfc->CompactTable2[crc]
                 .array[dfc->CompactTable2[crc].cnt - 1]
                 .CompactTable = NULL;
+            #endif
           } else {  // If found,
             BUC_CNT_TYPE m;
             for (m = 0; m < dfc->CompactTable2[crc].array[n].cnt; m++) {
@@ -1658,7 +1604,9 @@ static void setupCompactTables(DFC_STRUCTURE *dfc) {
               (PID_TYPE *)DFC_MALLOC(sizeof(PID_TYPE), DFC_MEMORY_TYPE__CT2);
           dfc->CompactTable2[crc].array[0].pid[0] = plist->iid;
           dfc->CompactTable2[crc].array[0].DirectFilter = NULL;
+          #ifdef ENABLE_RECURSIVE
           dfc->CompactTable2[crc].array[0].CompactTable = NULL;
+          #endif
         }
 
         alpha_cnt++;
@@ -1713,9 +1661,11 @@ static void setupCompactTables(DFC_STRUCTURE *dfc) {
             dfc->CompactTable4[crc]
                 .array[dfc->CompactTable4[crc].cnt - 1]
                 .DirectFilter = NULL;
+            #ifdef ENABLE_RECURSIVE
             dfc->CompactTable4[crc]
                 .array[dfc->CompactTable4[crc].cnt - 1]
                 .CompactTable = NULL;
+            #endif
           } else {  // If found,
             BUC_CNT_TYPE m;
             for (m = 0; m < dfc->CompactTable4[crc].array[n].cnt; m++) {
@@ -1744,7 +1694,10 @@ static void setupCompactTables(DFC_STRUCTURE *dfc) {
               (PID_TYPE *)DFC_MALLOC(sizeof(PID_TYPE), DFC_MEMORY_TYPE__CT4);
           dfc->CompactTable4[crc].array[0].pid[0] = plist->iid;
           dfc->CompactTable4[crc].array[0].DirectFilter = NULL;
+
+          #ifdef ENABLE_RECURSIVE
           dfc->CompactTable4[crc].array[0].CompactTable = NULL;
+          #endif
         }
         alpha_cnt++;
       } while (alpha_cnt < 16);
@@ -1804,9 +1757,11 @@ static void setupCompactTables(DFC_STRUCTURE *dfc) {
             dfc->CompactTable8[crc]
                 .array[dfc->CompactTable8[crc].cnt - 1]
                 .DirectFilter = NULL;
+            #ifdef ENABLE_RECURSIVE
             dfc->CompactTable8[crc]
                 .array[dfc->CompactTable8[crc].cnt - 1]
                 .CompactTable = NULL;
+            #endif
           } else {  // If found,
             BUC_CNT_TYPE m;
             for (m = 0; m < dfc->CompactTable8[crc].array[n].cnt; m++) {
@@ -1835,7 +1790,10 @@ static void setupCompactTables(DFC_STRUCTURE *dfc) {
               (PID_TYPE *)DFC_MALLOC(sizeof(PID_TYPE), DFC_MEMORY_TYPE__CT8);
           dfc->CompactTable8[crc].array[0].pid[0] = plist->iid;
           dfc->CompactTable8[crc].array[0].DirectFilter = NULL;
+
+          #ifdef ENABLE_RECURSIVE
           dfc->CompactTable8[crc].array[0].CompactTable = NULL;
+          #endif
         }
         alpha_cnt++;
       } while (alpha_cnt < 256);
@@ -1843,6 +1801,7 @@ static void setupCompactTables(DFC_STRUCTURE *dfc) {
   }
 }
 
+#ifdef ENABLE_RECURSIVE
 static void setupRecursiveFiltering(DFC_STRUCTURE *dfc) {
   uint8_t temp[8], flag[8];
   // Only for CT2 firstly
@@ -2214,6 +2173,90 @@ static void setupRecursiveFiltering(DFC_STRUCTURE *dfc) {
     }
   }
 }
+
+static void Add_PID_to_2B_CT(CT_Type_2_2B *CompactTable, uint8_t *temp,
+                             PID_TYPE pid, dfcMemoryType type) {
+  BUC_CNT_TYPE j;
+  PID_CNT_TYPE k;
+  uint32_t crc = _mm_crc32_u16(0, *(uint16_t *)temp);
+
+  crc &= CT2_TABLE_SIZE_MASK;
+
+  if (CompactTable[crc].cnt != 0) {
+    for (j = 0; j < CompactTable[crc].cnt; j++) {
+      if (CompactTable[crc].array[j].pat == *(uint16_t *)temp) break;
+    }
+
+    if (j == CompactTable[crc].cnt) {  // If not found,
+      CompactTable[crc].cnt++;
+      CompactTable[crc].array = (CT_Type_2_2B_Array *)DFC_REALLOC(
+          (void *)CompactTable[crc].array, CompactTable[crc].cnt,
+          DFC_CT_Type_2_2B_Array, type);
+      CompactTable[crc].array[CompactTable[crc].cnt - 1].pat =
+          *(uint16_t *)temp;
+
+      CompactTable[crc].array[CompactTable[crc].cnt - 1].cnt = 1;
+      CompactTable[crc].array[CompactTable[crc].cnt - 1].pid =
+          (PID_TYPE *)DFC_MALLOC(sizeof(PID_TYPE), type);
+      CompactTable[crc].array[CompactTable[crc].cnt - 1].pid[0] = pid;
+    } else {  // If found,
+      for (k = 0; k < CompactTable[crc].array[j].cnt; k++) {
+        if (CompactTable[crc].array[j].pid[k] == pid) break;
+      }
+      if (k == CompactTable[crc].array[j].cnt) {
+        CompactTable[crc].array[j].cnt++;
+        CompactTable[crc].array[j].pid = (PID_TYPE *)DFC_REALLOC(
+            (void *)CompactTable[crc].array[j].pid,
+            CompactTable[crc].array[j].cnt, DFC_PID_TYPE, type);
+        CompactTable[crc].array[j].pid[CompactTable[crc].array[j].cnt - 1] =
+            pid;
+      }
+    }
+  } else {  // If there is no elements in the CT4,
+    CompactTable[crc].cnt = 1;
+    CompactTable[crc].array =
+        (CT_Type_2_2B_Array *)DFC_MALLOC(sizeof(CT_Type_2_2B_Array), type);
+    memset(CompactTable[crc].array, 0, sizeof(CT_Type_2_2B_Array));
+
+    CompactTable[crc].array[0].pat = *(uint16_t *)temp;
+    CompactTable[crc].array[0].cnt = 1;
+    CompactTable[crc].array[0].pid =
+        (PID_TYPE *)DFC_MALLOC(sizeof(PID_TYPE), type);
+    CompactTable[crc].array[0].pid[0] = pid;
+  }
+}
+
+static void DFC_FREE(void *p, int n, dfcMemoryType type) {
+  free(p);
+  switch (type) {
+    case DFC_MEMORY_TYPE__DFC:
+      break;
+    case DFC_MEMORY_TYPE__PATTERN:
+      dfc_pattern_memory -= n;
+      break;
+    case DFC_MEMORY_TYPE__CT2:
+      dfc_memory_ct2 -= n;
+      break;
+    case DFC_MEMORY_TYPE__CT3:
+      dfc_memory_ct3 -= n;
+      break;
+    case DFC_MEMORY_TYPE__CT4:
+      dfc_memory_ct4 -= n;
+      break;
+    case DFC_MEMORY_TYPE__CT8:
+      dfc_memory_ct8 -= n;
+      break;
+    case DFC_MEMORY_TYPE__NONE:
+      break;
+    default:
+      fprintf(stderr, "%s(%d) Invalid memory type\n", __FILE__, __LINE__);
+      exit(1);
+      break;
+  }
+  dfc_total_memory -= n;
+}
+
+#endif
 
 static uint8_t toggleCharacterCase(uint8_t character) {
   if (character >= 97 /*a*/ && character <= 122 /*z*/) {

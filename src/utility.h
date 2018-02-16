@@ -1,6 +1,8 @@
 #ifndef DFC_UTILITY_H
 #define DFC_UTILITY_H
 
+#include <ctype.h>
+
 #define BINDEX(x) ((x) >> 3)
 #define BMASK(x) (1 << ((x)&0x7))
 
