@@ -27,6 +27,15 @@ typedef struct pid_list_ {
   uint16_t cnt;
 } CT_Type_1;
 
+typedef struct CompactTableSmallBucket_ {
+  uint32_t pattern;
+  PID_TYPE pids[MAX_PID_PER_BUCKET];
+} CompactTableSmallBucket;
+
+typedef struct CompactTableSmall_ {
+  CompactTableSmallBucket buckets[MAX_BUCKETS_FOR_INDEX];
+} CompactTableSmall;
+
 typedef struct CT_Type_2_2B_Array_ {
   uint16_t pat;      // 2B pattern
   PID_CNT_TYPE cnt;  // Number of PIDs
@@ -73,8 +82,7 @@ typedef struct _dfc_pattern {
   unsigned char *patrn;      // upper case pattern
   unsigned char *casepatrn;  // original pattern
   int n;                     // Patternlength
-  int nocase;  // Flag for case-sensitivity. (0: case-sensitive pattern, 1:
-               // opposite)
+  int is_case_insensitive;
 
   uint32_t sids_size;
   PID_TYPE *sids;  // external id (unique)
@@ -88,6 +96,9 @@ typedef struct {
   DFC_PATTERN **dfcMatchList;
 
   int numPatterns;
+
+  uint8_t directFilterSmall[DF_SIZE_REAL];
+  CompactTableSmall compactTableSmall[COMPACT_TABLE_SIZE_SMALL];
 
   /* Direct Filter (DF1) for all patterns */
   uint8_t DirectFilter1[DF_SIZE_REAL];
@@ -116,8 +127,8 @@ typedef struct {
 } DFC_STRUCTURE;
 
 DFC_STRUCTURE *DFC_New(void);
-int DFC_AddPattern(DFC_STRUCTURE *dfc, unsigned char *pat, int n, int nocase,
-                   PID_TYPE sid);
+int DFC_AddPattern(DFC_STRUCTURE *dfc, unsigned char *pat, int n,
+                   int is_case_insensitive, PID_TYPE sid);
 int DFC_Compile(DFC_STRUCTURE *dfc);
 
 int DFC_Search(SEARCH_ARGUMENT);

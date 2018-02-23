@@ -4,6 +4,7 @@
 /*********************************/
 
 #include "dfc.h"
+#include "assert.h"
 #include "feature-flags.h"
 #include "utility.h"
 
@@ -35,14 +36,19 @@ static void initializeMemoryTracking();
 static void setupMatchList(DFC_STRUCTURE *dfc);
 
 static void initializeDirectFilterMemory(DFC_STRUCTURE *dfc);
+static void initializeSmallDirectFilterMemory(DFC_STRUCTURE *dfc);
+
 static void setupDirectFilters(DFC_STRUCTURE *dfc);
 static void setup1BDirectFilter(DFC_STRUCTURE *dfc, DFC_PATTERN *plist);
 static void setup1BDirectFilterWithPattern(DFC_STRUCTURE *dfc, uint8_t pattern);
 static void setup1BPlusDirectFilter(DFC_STRUCTURE *dfc, DFC_PATTERN *plist);
+static void addPatternToSmallDirectFilter(DFC_STRUCTURE *dfc,
+                                          DFC_PATTERN *pattern);
 
+static void createPermutations(uint8_t *pattern, int patternLength,
+                               int permutationCount, uint8_t *permutations);
 static void initializeCompactTableMemory(DFC_STRUCTURE *dfc);
 static void setupCompactTables(DFC_STRUCTURE *dfc);
-
 
 static uint8_t toggleCharacterCase(uint8_t);
 
@@ -115,7 +121,6 @@ void DFC_FreeStructure(DFC_STRUCTURE *dfc) {
   for (i = 0; i < CT2_TABLE_SIZE; i++) {
     for (j = 0; j < dfc->CompactTable2[i].cnt; j++) {
       free(dfc->CompactTable2[i].array[j].pid);
-
     }
   }
 
@@ -141,14 +146,14 @@ void DFC_FreeStructure(DFC_STRUCTURE *dfc) {
  * \param dfc    Pointer to the DFC structure
  * \param pat    Pointer to the pattern
  * \param n      Pattern length
- * \param nocase Flag for case-sensitivity (0 means case-sensitive, 1 means the
- * opposite) \param sid    External id
+ * \param is_case_insensitive Flag for case-sensitivity (0 means case-sensitive,
+ * 1 means the opposite) \param sid    External id
  *
  * \retval   0 On success to add new pattern.
  * \retval   1 On success to add sid.
  */
-int DFC_AddPattern(DFC_STRUCTURE *dfc, unsigned char *pat, int n, int nocase,
-                   PID_TYPE sid) {
+int DFC_AddPattern(DFC_STRUCTURE *dfc, unsigned char *pat, int n,
+                   int is_case_insensitive, PID_TYPE sid) {
   DFC_PATTERN *plist = DFC_InitHashLookup(dfc, pat, n);
 
   if (plist == NULL) {
@@ -168,7 +173,7 @@ int DFC_AddPattern(DFC_STRUCTURE *dfc, unsigned char *pat, int n, int nocase,
     memcpy(plist->casepatrn, pat, n);
 
     plist->n = n;
-    plist->nocase = nocase;
+    plist->is_case_insensitive = is_case_insensitive;
     plist->iid = dfc->numPatterns;  // internal id
     plist->next = NULL;
 
@@ -215,7 +220,7 @@ void DFC_PrintInfo(DFC_STRUCTURE *dfc) {
   int i;
   int nl1 = 0, nl2 = 0, nl3 = 0, nl4 = 0, nl8 = 0;
 
-  int nocase_pat_cnt = 0;
+  int is_case_insensitive_pat_cnt = 0;
   for (plist = dfc->dfcPatterns; plist != NULL; plist = plist->next) {
     if (plist->n == 1) {
       nl1++;
@@ -229,8 +234,8 @@ void DFC_PrintInfo(DFC_STRUCTURE *dfc) {
       nl8++;
     }
 
-    if (plist->nocase) {
-      nocase_pat_cnt++;
+    if (plist->is_case_insensitive) {
+      is_case_insensitive_pat_cnt++;
     }
   }
 
@@ -432,7 +437,7 @@ void DFC_PrintInfo(DFC_STRUCTURE *dfc) {
       "+- [ Direct Filter + Compact Table(DFC) Summary ] "
       "-------------------------------------\n");
   printf("| Patterns: %5d (Case-Insensitive patterns: %d)\n", dfc->numPatterns,
-         nocase_pat_cnt);
+         is_case_insensitive_pat_cnt);
   printf("|   - 1B      : %5d\n", nl1);
   printf("|   - 2B      : %5d\n", nl2);
   printf("|   - 3B      : %5d\n", nl3);
@@ -606,7 +611,7 @@ static int Verification_CT2(VERIFI_ARGUMENT) {
 
         DFC_PATTERN *mlist = dfc->dfcMatchList[pid];
         if (buf - starting_point >= mlist->n) {
-          if (mlist->nocase) {
+          if (mlist->is_case_insensitive) {
             if (!my_strncasecmp(buf - (mlist->n), mlist->casepatrn,
                                 mlist->n - 2)) {
               ACTION_FOR_MATCH;
@@ -644,7 +649,7 @@ static int Verification_CT4_7(VERIFI_ARGUMENT) {
 
         DFC_PATTERN *mlist = dfc->dfcMatchList[pid];
         if (buf - starting_point >= mlist->n - 2) {
-          if (mlist->nocase) {
+          if (mlist->is_case_insensitive) {
             if (!my_strncasecmp(buf - (mlist->n - 2), mlist->casepatrn,
                                 mlist->n - 4)) {
               ACTION_FOR_MATCH;
@@ -695,7 +700,7 @@ static int Verification_CT8_plus(VERIFI_ARGUMENT) {
         int comparison_requirement =
             min_pattern_interval * (mlist->n - 8) / pattern_interval + 2;
         if (buf - starting_point >= comparison_requirement) {
-          if (mlist->nocase) {
+          if (mlist->is_case_insensitive) {
             if (!my_strncasecmp(buf - comparison_requirement, mlist->casepatrn,
                                 mlist->n)) {
               ACTION_FOR_MATCH;
@@ -911,7 +916,7 @@ static void *DFC_MALLOC(int n, dfcMemoryType type) {
 
 static void Build_pattern(DFC_PATTERN *p, uint8_t *flag, uint8_t *temp, int j,
                           int k) {
-  if (p->nocase) {
+  if (p->is_case_insensitive) {
     if ((p->patrn[j] >= 65 && p->patrn[j] <= 90) ||
         (p->patrn[j] >= 97 && p->patrn[j] <= 122)) {
       if (flag[k] == 0)
@@ -1053,6 +1058,10 @@ static void setupDirectFilters(DFC_STRUCTURE *dfc) {
       setup1BDirectFilter(dfc, plist);
     }
 
+    if (plist->n >= 1 && plist->n <= 3) {
+      addPatternToSmallDirectFilter(dfc, plist);
+    }
+
     /* 1. Initialization for DF1 */
     if (plist->n > 1) {
       setup1BPlusDirectFilter(dfc, plist);
@@ -1080,6 +1089,7 @@ static void setupDirectFilters(DFC_STRUCTURE *dfc) {
           }
         }
 
+        // the last 2 bytes
         uint32_t byteIndex = BINDEX((*(((uint16_t *)temp) + 1)) & DF_MASK);
         uint32_t bitMask = BMASK((*(((uint16_t *)temp) + 1)) & DF_MASK);
 
@@ -1087,6 +1097,7 @@ static void setupDirectFilters(DFC_STRUCTURE *dfc) {
         if (plist->n >= 4 && plist->n < 8) {
           dfc->ADD_DF_4_1[byteIndex] |= bitMask;
 
+          // the first 2 bytes
           uint32_t fragment_16 = (temp[1] << 8) | temp[0];
           uint32_t byteIndex = BINDEX(fragment_16 & DF_MASK);
           uint32_t bitMask = BMASK(fragment_16 & DF_MASK);
@@ -1132,7 +1143,7 @@ static void setup1BDirectFilter(DFC_STRUCTURE *dfc, DFC_PATTERN *plist) {
   uint8_t pattern = plist->casepatrn[0];
   setup1BDirectFilterWithPattern(dfc, pattern);
 
-  if (plist->nocase) {
+  if (plist->is_case_insensitive) {
     setup1BDirectFilterWithPattern(dfc, toggleCharacterCase(pattern));
   }
 }
@@ -1158,11 +1169,7 @@ static void setup1BPlusDirectFilter(DFC_STRUCTURE *dfc, DFC_PATTERN *plist) {
       flag[k] = (alpha_cnt >> j) & 1;
     }
 
-    if (plist->n == 2) {
-      for (int j = plist->n - 2, k = 0; j < plist->n; j++, k++) {
-        Build_pattern(plist, flag, temp, j, k);
-      }
-    } else if (plist->n == 3) {
+    if (plist->n == 2 || plist->n == 3) {
       for (int j = plist->n - 2, k = 0; j < plist->n; j++, k++) {
         Build_pattern(plist, flag, temp, j, k);
       }
@@ -1191,6 +1198,76 @@ static void setup1BPlusDirectFilter(DFC_STRUCTURE *dfc, DFC_PATTERN *plist) {
   } while (alpha_cnt < 4);
 }
 
+static void add1BPatternToSmallDirectFilter(DFC_STRUCTURE *dfc,
+                                            uint8_t pattern) {
+  for (int j = 0; j < 256; j++) {
+    uint16_t fragment_16 = (j << 8) | pattern;
+    uint32_t byteIndex = (uint32_t)BINDEX(fragment_16 & DF_MASK);
+    uint32_t bitMask = BMASK(fragment_16 & DF_MASK);
+
+    dfc->directFilterSmall[byteIndex] |= bitMask;
+  }
+}
+static void createPermutations(uint8_t *pattern, int patternLength,
+                               int permutationCount, uint8_t *permutations) {
+  uint8_t *shouldToggleCase = (uint8_t *)malloc(patternLength);
+  for (int i = 0; i < permutationCount; ++i) {
+    for (int j = patternLength - 1, k = 0; j >= 0; --j, ++k) {
+      shouldToggleCase[k] = (i >> j) & 1;
+    }
+
+    for (int j = 0; j < patternLength; ++j) {
+      if (shouldToggleCase[j]) {
+        permutations[i * patternLength + j] = toggleCharacterCase(pattern[j]);
+      } else {
+        permutations[i * patternLength + j] = pattern[j];
+      }
+    }
+  }
+
+  free(shouldToggleCase);
+}
+
+static void maskPatternIntoDirectFilter(uint8_t *df, uint8_t *pattern) {
+  uint16_t fragment_16 = (pattern[0] << 8) | pattern[1];
+  uint32_t byteIndex = (uint32_t)BINDEX(fragment_16 & DF_MASK);
+  uint32_t bitMask = BMASK(fragment_16 & DF_MASK);
+
+  df[byteIndex] |= bitMask;
+}
+
+static void addLongerPatternToSmallDirectFilter(DFC_STRUCTURE *dfc,
+                                                DFC_PATTERN *pattern) {
+  uint8_t *lastCharactersOfPattern = pattern->casepatrn + ((pattern->n - 2));
+  if (pattern->is_case_insensitive) {
+    uint8_t patternPermutations[4 * 2];
+
+    createPermutations(lastCharactersOfPattern, 2, 4, patternPermutations);
+
+    for (int i = 0; i < 4; ++i) {
+      for (int j = 0; j < 2; ++j) {
+        maskPatternIntoDirectFilter(dfc->directFilterSmall,
+                                    patternPermutations + (i * 4));
+      }
+    }
+  } else {
+    maskPatternIntoDirectFilter(dfc->directFilterSmall,
+                                lastCharactersOfPattern);
+  }
+}
+
+static void addPatternToSmallDirectFilter(DFC_STRUCTURE *dfc,
+                                          DFC_PATTERN *pattern) {
+  assert(pattern->n >= 1);
+  assert(pattern->n <= 3);
+
+  if (pattern->n == 1) {
+    add1BPatternToSmallDirectFilter(dfc, pattern->casepatrn[0]);
+  } else {
+    addLongerPatternToSmallDirectFilter(dfc, pattern);
+  }
+}
+
 static void initializeDirectFilterMemory(DFC_STRUCTURE *dfc) {
   memset(dfc->CompactTable1, 0, sizeof(CT_Type_1) * CT1_TABLE_SIZE);
 
@@ -1206,6 +1283,14 @@ static void initializeDirectFilterMemory(DFC_STRUCTURE *dfc) {
 
   for (int i = 0; i < 256; i++) {
     dfc->cDF0[i] = 0;
+  }
+
+  initializeSmallDirectFilterMemory(dfc);
+}
+
+static void initializeSmallDirectFilterMemory(DFC_STRUCTURE *dfc) {
+  for (int i = 0; i < DIRECT_FILTER_SIZE_SMALL; ++i) {
+    dfc->directFilterSmall[i] = 0;
   }
 }
 
@@ -1246,7 +1331,7 @@ static void setupCompactTables(DFC_STRUCTURE *dfc) {
         }
       }
 
-      if (plist->nocase) {
+      if (plist->is_case_insensitive) {
         pattern = toggleCharacterCase(pattern);
 
         if (dfc->CompactTable1[pattern].cnt == 0) {

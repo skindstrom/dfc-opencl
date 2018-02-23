@@ -22,4 +22,9 @@
 #define DTYPE uint16_t
 #define BTYPE register uint16_t
 
+#define DIRECT_FILTER_SIZE_SMALL DF_SIZE_REAL
+#define MAX_PID_PER_BUCKET 20
+#define MAX_BUCKETS_FOR_INDEX 20
+#define COMPACT_TABLE_SIZE_SMALL 0x1000
+
 #endif
