@@ -44,7 +44,8 @@ static void setup1BDirectFilterWithPattern(DFC_STRUCTURE *dfc, uint8_t pattern);
 static void setup1BPlusDirectFilter(DFC_STRUCTURE *dfc, DFC_PATTERN *plist);
 static void addPatternToSmallDirectFilter(DFC_STRUCTURE *dfc,
                                           DFC_PATTERN *pattern);
-
+static void addPatternToLargeDirectFilter(DFC_STRUCTURE *dfc,
+                                          DFC_PATTERN *pattern);
 static void createPermutations(uint8_t *pattern, int patternLength,
                                int permutationCount, uint8_t *permutations);
 static void initializeCompactTableMemory(DFC_STRUCTURE *dfc);
@@ -146,8 +147,8 @@ void DFC_FreeStructure(DFC_STRUCTURE *dfc) {
  * \param dfc    Pointer to the DFC structure
  * \param pat    Pointer to the pattern
  * \param n      Pattern length
- * \param is_case_insensitive Flag for case-sensitivity (0 means case-sensitive,
- * 1 means the opposite) \param sid    External id
+ * \param is_case_insensitive Flag for case-sensitivity (0 means
+ * case-sensitive, 1 means the opposite) \param sid    External id
  *
  * \retval   0 On success to add new pattern.
  * \retval   1 On success to add sid.
@@ -568,7 +569,8 @@ void DFC_PrintInfo(DFC_STRUCTURE *dfc) {
     printf("|   - CT8 Memory (MB) : %.2f\n",
            (float)dfc_memory_ct8 / (1024 * 1024));
   printf(
-      "+-----------------------------------------------------------------------"
+      "+---------------------------------------------------------------------"
+      "--"
       "---------------\n\n");
 
   return;
@@ -772,9 +774,9 @@ int DFC_Search(SEARCH_ARGUMENT) {
     }
   }
 
-  /* It is needed to check last 1 byte from payload, because above every 2 bytes
-   * are used. That means that the last case when there is only 1 byte left is
-   * not handled. */
+  /* It is needed to check last 1 byte from payload, because above every 2
+   * bytes are used. That means that the last case when there is only 1 byte
+   * left is not handled. */
   if (dfc->cDF0[buf[buflen - 1]]) {
     int i;
     for (i = 0; i < dfc->CompactTable1[buf[buflen - 1]].cnt; i++) {
@@ -1060,6 +1062,8 @@ static void setupDirectFilters(DFC_STRUCTURE *dfc) {
 
     if (plist->n >= 1 && plist->n <= 3) {
       addPatternToSmallDirectFilter(dfc, plist);
+    } else {
+      addPatternToLargeDirectFilter(dfc, plist);
     }
 
     /* 1. Initialization for DF1 */
@@ -1237,24 +1241,33 @@ static void add1BPatternToSmallDirectFilter(DFC_STRUCTURE *dfc,
   }
 }
 
+static void addPatternToDirectFilter(uint8_t *directFilter,
+                                     bool isCaseInsensitive, uint8_t *pattern,
+                                     int patternLength) {
+  if (isCaseInsensitive) {
+    int permutationCount = 2 << patternLength;
+    uint8_t *patternPermutations =
+        (uint8_t *)malloc(permutationCount * patternLength);
+
+    createPermutations(pattern, patternLength, permutationCount,
+                       patternPermutations);
+
+    for (int i = 0; i < permutationCount; ++i) {
+      maskPatternIntoDirectFilter(directFilter,
+                                  patternPermutations + (i * patternLength));
+    }
+
+    free(patternPermutations);
+  } else {
+    maskPatternIntoDirectFilter(directFilter, pattern);
+  }
+}
+
 static void addLongerPatternToSmallDirectFilter(DFC_STRUCTURE *dfc,
                                                 DFC_PATTERN *pattern) {
   uint8_t *lastCharactersOfPattern = pattern->casepatrn + ((pattern->n - 2));
-  if (pattern->is_case_insensitive) {
-    uint8_t patternPermutations[4 * 2];
-
-    createPermutations(lastCharactersOfPattern, 2, 4, patternPermutations);
-
-    for (int i = 0; i < 4; ++i) {
-      for (int j = 0; j < 2; ++j) {
-        maskPatternIntoDirectFilter(dfc->directFilterSmall,
-                                    patternPermutations + (i * 4));
-      }
-    }
-  } else {
-    maskPatternIntoDirectFilter(dfc->directFilterSmall,
-                                lastCharactersOfPattern);
-  }
+  addPatternToDirectFilter(dfc->directFilterSmall, pattern->is_case_insensitive,
+                           lastCharactersOfPattern, 2);
 }
 
 static void addPatternToSmallDirectFilter(DFC_STRUCTURE *dfc,
@@ -1267,6 +1280,15 @@ static void addPatternToSmallDirectFilter(DFC_STRUCTURE *dfc,
   } else {
     addLongerPatternToSmallDirectFilter(dfc, pattern);
   }
+}
+
+static void addPatternToLargeDirectFilter(DFC_STRUCTURE *dfc,
+                                          DFC_PATTERN *pattern) {
+  assert(pattern->n > 3);
+
+  uint8_t *lastCharactersOfPattern = pattern->casepatrn + ((pattern->n - 2));
+  addPatternToDirectFilter(dfc->directFilterLarge, pattern->is_case_insensitive,
+                           lastCharactersOfPattern, 2);
 }
 
 static void initializeDirectFilterMemory(DFC_STRUCTURE *dfc) {

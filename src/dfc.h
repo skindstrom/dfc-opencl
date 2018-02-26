@@ -101,6 +101,8 @@ typedef struct {
   uint8_t directFilterSmall[DF_SIZE_REAL];
   CompactTableSmall compactTableSmall[COMPACT_TABLE_SIZE_SMALL];
 
+  uint8_t directFilterLarge[DF_SIZE_REAL];
+
   /* Direct Filter (DF1) for all patterns */
   uint8_t DirectFilter1[DF_SIZE_REAL];
   uint8_t cDF0[256];
