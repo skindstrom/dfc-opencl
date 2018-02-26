@@ -27,13 +27,14 @@ typedef struct pid_list_ {
   uint16_t cnt;
 } CT_Type_1;
 
-typedef struct CompactTableSmallBucket_ {
-  uint32_t pattern;
-  PID_TYPE pids[MAX_PID_PER_BUCKET];
-} CompactTableSmallBucket;
+typedef struct CompactTableSmallEntry_ {
+  uint16_t pattern;
+  uint16_t pidCount;
+  PID_TYPE pids[MAX_PID_PER_ENTRY];
+} CompactTableSmallEntry;
 
 typedef struct CompactTableSmall_ {
-  CompactTableSmallBucket buckets[MAX_BUCKETS_FOR_INDEX];
+  CompactTableSmallEntry entries[MAX_ENTRIES_PER_BUCKET];
 } CompactTableSmall;
 
 typedef struct CT_Type_2_2B_Array_ {

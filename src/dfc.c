@@ -1198,16 +1198,6 @@ static void setup1BPlusDirectFilter(DFC_STRUCTURE *dfc, DFC_PATTERN *plist) {
   } while (alpha_cnt < 4);
 }
 
-static void add1BPatternToSmallDirectFilter(DFC_STRUCTURE *dfc,
-                                            uint8_t pattern) {
-  for (int j = 0; j < 256; j++) {
-    uint16_t fragment_16 = (j << 8) | pattern;
-    uint32_t byteIndex = (uint32_t)BINDEX(fragment_16 & DF_MASK);
-    uint32_t bitMask = BMASK(fragment_16 & DF_MASK);
-
-    dfc->directFilterSmall[byteIndex] |= bitMask;
-  }
-}
 static void createPermutations(uint8_t *pattern, int patternLength,
                                int permutationCount, uint8_t *permutations) {
   uint8_t *shouldToggleCase = (uint8_t *)malloc(patternLength);
@@ -1234,6 +1224,17 @@ static void maskPatternIntoDirectFilter(uint8_t *df, uint8_t *pattern) {
   uint32_t bitMask = BMASK(fragment_16 & DF_MASK);
 
   df[byteIndex] |= bitMask;
+}
+
+static void add1BPatternToSmallDirectFilter(DFC_STRUCTURE *dfc,
+                                            uint8_t pattern) {
+  uint8_t newPattern[2];
+  newPattern[1] = pattern;
+  for (int j = 0; j < 256; j++) {
+    newPattern[0] = j;
+
+    maskPatternIntoDirectFilter(dfc->directFilterSmall, newPattern);
+  }
 }
 
 static void addLongerPatternToSmallDirectFilter(DFC_STRUCTURE *dfc,
@@ -1305,6 +1306,68 @@ static void initializeCompactTableMemory(DFC_STRUCTURE *dfc) {
   memset(dfc->CompactTable8, 0, sizeof(CT_Type_2_8B) * CT8_TABLE_SIZE);
 }
 
+static void pushPatternToSmallCompactTable(DFC_STRUCTURE *dfc, uint16_t pattern,
+                                           PID_TYPE pid) {
+  // Hardcore hash function
+  uint16_t hash = pattern & (COMPACT_TABLE_SIZE_SMALL - 1);
+  CompactTableSmallEntry *entry = dfc->compactTableSmall[hash].entries;
+
+  while (entry->pidCount && entry->pattern != pattern) {
+    entry += sizeof(CompactTableSmallEntry);
+  }
+
+  if (entry->pidCount == MAX_PID_PER_ENTRY) {
+    fprintf(stderr,
+            "Too many patterns with the same hash in the small compact table. "
+            "Please increase MAX_PID_PER_ENTRY or update the hash function");
+    exit(TOO_MANY_PID_IN_SMALL_CT);
+  }
+
+  entry->pattern = pattern;
+  entry->pids[entry->pidCount] = pid;
+  ++entry->pidCount;
+}
+
+static void add1BPatternToSmallCompactTable(DFC_STRUCTURE *dfc,
+                                            DFC_PATTERN *pattern) {
+  uint8_t newPattern[2];
+  newPattern[1] = pattern->casepatrn[0];
+  for (int j = 0; j < 256; j++) {
+    newPattern[0] = j;
+    pushPatternToSmallCompactTable(dfc, *(uint16_t *)newPattern, pattern->iid);
+  }
+}
+
+static void addLongerPatternToSmallCompactTable(DFC_STRUCTURE *dfc,
+                                                DFC_PATTERN *pattern) {
+  uint8_t *lastCharactersOfPattern = pattern->casepatrn + ((pattern->n - 2));
+  if (pattern->is_case_insensitive) {
+    uint8_t patternPermutations[4 * 2];
+
+    createPermutations(lastCharactersOfPattern, 2, 4, patternPermutations);
+
+    for (int i = 0; i < 4; ++i) {
+      pushPatternToSmallCompactTable(dfc, (uint16_t)patternPermutations[i * 2],
+                                     pattern->iid);
+    }
+  } else {
+    pushPatternToSmallCompactTable(dfc, *(uint16_t *)lastCharactersOfPattern,
+                                   pattern->iid);
+  }
+}
+
+static void addPatternToSmallCompactTable(DFC_STRUCTURE *dfc,
+                                          DFC_PATTERN *pattern) {
+  assert(pattern->n >= 1);
+  assert(pattern->n <= 3);
+
+  if (pattern->n == 1) {
+    add1BPatternToSmallCompactTable(dfc, pattern);
+  } else {
+    addLongerPatternToSmallCompactTable(dfc, pattern);
+  }
+}
+
 static void setupCompactTables(DFC_STRUCTURE *dfc) {
   initializeCompactTableMemory(dfc);
 
@@ -1312,6 +1375,10 @@ static void setupCompactTables(DFC_STRUCTURE *dfc) {
 
   for (DFC_PATTERN *plist = dfc->dfcPatterns; plist != NULL;
        plist = plist->next) {
+    if (plist->n >= 1 && plist->n <= 3) {
+      addPatternToSmallCompactTable(dfc, plist);
+    }
+
     if (plist->n == 1) {
       uint8_t pattern = plist->casepatrn[0];
 
