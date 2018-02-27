@@ -28,8 +28,8 @@ typedef struct pid_list_ {
 } CT_Type_1;
 
 typedef struct CompactTableSmallEntry_ {
-  uint16_t pattern;
-  uint16_t pidCount;
+  uint8_t pattern;
+  uint8_t pidCount;
   PID_TYPE pids[MAX_PID_PER_ENTRY];
 } CompactTableSmallEntry;
 

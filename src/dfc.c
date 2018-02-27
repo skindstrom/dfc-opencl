@@ -1060,7 +1060,8 @@ static void setupDirectFilters(DFC_STRUCTURE *dfc) {
       setup1BDirectFilter(dfc, plist);
     }
 
-    if (plist->n >= 1 && plist->n <= 3) {
+    if (plist->n >= SMALL_DF_MIN_PATTERN_SIZE &&
+        plist->n <= SMALL_DF_MAX_PATTERN_SIZE) {
       addPatternToSmallDirectFilter(dfc, plist);
     } else {
       addPatternToLargeDirectFilter(dfc, plist);
@@ -1272,8 +1273,8 @@ static void addLongerPatternToSmallDirectFilter(DFC_STRUCTURE *dfc,
 
 static void addPatternToSmallDirectFilter(DFC_STRUCTURE *dfc,
                                           DFC_PATTERN *pattern) {
-  assert(pattern->n >= 1);
-  assert(pattern->n <= 3);
+  assert(pattern->n >= SMALL_DF_MIN_PATTERN_SIZE);
+  assert(pattern->n <= SMALL_DF_MAX_PATTERN_SIZE);
 
   if (pattern->n == 1) {
     add1BPatternToSmallDirectFilter(dfc, pattern->casepatrn[0]);
@@ -1328,65 +1329,54 @@ static void initializeCompactTableMemory(DFC_STRUCTURE *dfc) {
   memset(dfc->CompactTable8, 0, sizeof(CT_Type_2_8B) * CT8_TABLE_SIZE);
 }
 
-static void pushPatternToSmallCompactTable(DFC_STRUCTURE *dfc, uint16_t pattern,
-                                           PID_TYPE pid) {
-  // Hardcore hash function
-  uint16_t hash = pattern & (COMPACT_TABLE_SIZE_SMALL - 1);
-  CompactTableSmallEntry *entry = dfc->compactTableSmall[hash].entries;
-
-  while (entry->pidCount && entry->pattern != pattern) {
+static void getEmptyOrEqualSmallCompactTableEntry(
+    uint8_t pattern, CompactTableSmallEntry *entry) {
+  int entryCount = 0;
+  while (entry->pidCount && entry->pattern != pattern &&
+         entryCount < MAX_ENTRIES_PER_BUCKET) {
     entry += sizeof(CompactTableSmallEntry);
+    ++entryCount;
+  }
+
+  if (entryCount == MAX_ENTRIES_PER_BUCKET) {
+    fprintf(stderr,
+            "Too many entries with the same hash in the small compact table."
+            "Please increase MAX_ENTRIES_PER_BUCKET or update the hash "
+            "function");
+    exit(TOO_MANY_ENTRIES_IN_SMALL_CT);
   }
 
   if (entry->pidCount == MAX_PID_PER_ENTRY) {
     fprintf(stderr,
-            "Too many patterns with the same hash in the small compact table. "
-            "Please increase MAX_PID_PER_ENTRY or update the hash function");
+            "Too many equal patterns in the small compact hash table."
+            "Please increase MAX_PID_PER_ENTRY, MAX_ENTRIES_PER_BUCKET or "
+            "update the hash function");
     exit(TOO_MANY_PID_IN_SMALL_CT);
   }
+}
+
+static void pushPatternToSmallCompactTable(DFC_STRUCTURE *dfc, uint8_t pattern,
+                                           PID_TYPE pid) {
+  CompactTableSmallEntry *entry = dfc->compactTableSmall[pattern].entries;
+
+  getEmptyOrEqualSmallCompactTableEntry(pattern, entry);
 
   entry->pattern = pattern;
   entry->pids[entry->pidCount] = pid;
   ++entry->pidCount;
 }
 
-static void add1BPatternToSmallCompactTable(DFC_STRUCTURE *dfc,
-                                            DFC_PATTERN *pattern) {
-  uint8_t newPattern[2];
-  newPattern[1] = pattern->casepatrn[0];
-  for (int j = 0; j < 256; j++) {
-    newPattern[0] = j;
-    pushPatternToSmallCompactTable(dfc, *(uint16_t *)newPattern, pattern->iid);
-  }
-}
-
-static void addLongerPatternToSmallCompactTable(DFC_STRUCTURE *dfc,
-                                                DFC_PATTERN *pattern) {
-  uint8_t *lastCharactersOfPattern = pattern->casepatrn + ((pattern->n - 2));
-  if (pattern->is_case_insensitive) {
-    uint8_t patternPermutations[4 * 2];
-
-    createPermutations(lastCharactersOfPattern, 2, 4, patternPermutations);
-
-    for (int i = 0; i < 4; ++i) {
-      pushPatternToSmallCompactTable(dfc, (uint16_t)patternPermutations[i * 2],
-                                     pattern->iid);
-    }
-  } else {
-    pushPatternToSmallCompactTable(dfc, *(uint16_t *)lastCharactersOfPattern,
-                                   pattern->iid);
-  }
-}
-
 static void addPatternToSmallCompactTable(DFC_STRUCTURE *dfc,
                                           DFC_PATTERN *pattern) {
-  assert(pattern->n >= 1);
-  assert(pattern->n <= 3);
+  assert(pattern->n >= SMALL_DF_MIN_PATTERN_SIZE);
+  assert(pattern->n <= SMALL_DF_MAX_PATTERN_SIZE);
 
-  if (pattern->n == 1) {
-    add1BPatternToSmallCompactTable(dfc, pattern);
-  } else {
-    addLongerPatternToSmallCompactTable(dfc, pattern);
+  uint8_t lastCharacterOfPattern = pattern->casepatrn[pattern->n - 1];
+  pushPatternToSmallCompactTable(dfc, lastCharacterOfPattern, pattern->iid);
+
+  if (pattern->is_case_insensitive) {
+    pushPatternToSmallCompactTable(
+        dfc, toggleCharacterCase(lastCharacterOfPattern), pattern->iid);
   }
 }
 
@@ -1397,7 +1387,8 @@ static void setupCompactTables(DFC_STRUCTURE *dfc) {
 
   for (DFC_PATTERN *plist = dfc->dfcPatterns; plist != NULL;
        plist = plist->next) {
-    if (plist->n >= 1 && plist->n <= 3) {
+    if (plist->n >= SMALL_DF_MIN_PATTERN_SIZE &&
+        plist->n <= SMALL_DF_MAX_PATTERN_SIZE) {
       addPatternToSmallCompactTable(dfc, plist);
     }
 
