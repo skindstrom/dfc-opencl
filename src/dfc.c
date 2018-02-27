@@ -790,6 +790,51 @@ int DFC_Search(SEARCH_ARGUMENT) {
   return matches;
 }
 
+static bool doesPatternMatch(uint8_t *start, uint8_t *pattern, int length,
+                             bool isCaseInsensitive) {
+  if (isCaseInsensitive) {
+    return !my_strncasecmp(start, pattern, length);
+  }
+  return !my_strncmp(start, pattern, length);
+}
+
+static int verifySmall(DFC_STRUCTURE *dfc, uint8_t *input,
+                       int remainingCharacters) {
+  uint8_t hash = input[0];
+  CompactTableSmallEntry *entry = &dfc->compactTableSmall[hash];
+
+  int matches = 0;
+  for (int i = 0; i < entry->pidCount; ++i) {
+    PID_TYPE pid = entry->pids[i];
+
+    DFC_PATTERN *pattern = dfc->dfcMatchList[pid];
+    int patternLength = pattern->n;
+    if (remainingCharacters + 1 >= patternLength) {
+      uint8_t *start = patternLength > 2 ? input - 1 : input;
+      matches += doesPatternMatch(start, pattern->casepatrn, patternLength,
+                                  pattern->is_case_insensitive);
+    }
+  }
+
+  return matches;
+}
+
+int DFC_Search_New(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
+  int matches = 0;
+
+  for (int i = 0; i < inputLength; ++i) {
+    uint16_t data = *(uint16_t *)(input + i);
+    uint16_t byteIndex = BINDEX(data & DF_MASK);
+    uint16_t bitMask = BMASK(data & DF_MASK);
+
+    if (dfc->directFilterSmall[byteIndex] & bitMask) {
+      matches += verifySmall(dfc, input + i, inputLength - i);
+    }
+  }
+
+  return matches;
+}
+
 static void *DFC_REALLOC(void *p, uint16_t n, dfcDataType type,
                          dfcMemoryType type2) {
   switch (type) {
@@ -936,8 +981,9 @@ static void Build_pattern(DFC_PATTERN *p, uint8_t *flag, uint8_t *temp, int j,
 
 /**
  * \internal
- * \brief Creates a hash of the pattern.  We use it for the hashing process
- *        during the initial pattern insertion time, to cull duplicate sigs.
+ * \brief Creates a hash of the pattern.  We use it for the hashing
+ * process during the initial pattern insertion time, to cull duplicate
+ * sigs.
  *
  * \param pat    Pointer to the pattern.
  * \param patlen Pattern length.
@@ -953,8 +999,8 @@ static inline uint32_t DFC_InitHashRaw(uint8_t *pat, uint16_t patlen) {
 
 /**
  * \internal
- * \brief Looks up a pattern.  We use it for the hashing process during the
- *        the initial pattern insertion time, to cull duplicate sigs.
+ * \brief Looks up a pattern.  We use it for the hashing process during
+ * the the initial pattern insertion time, to cull duplicate sigs.
  *
  * \param ctx    Pointer to the DFC structure.
  * \param pat    Pointer to the pattern.
@@ -1224,9 +1270,9 @@ static void createPermutations(uint8_t *pattern, int patternLength,
 }
 
 static void maskPatternIntoDirectFilter(uint8_t *df, uint8_t *pattern) {
-  uint16_t fragment_16 = (pattern[0] << 8) | pattern[1];
-  uint32_t byteIndex = (uint32_t)BINDEX(fragment_16 & DF_MASK);
-  uint32_t bitMask = BMASK(fragment_16 & DF_MASK);
+  uint16_t fragment_16 = (pattern[1] << 8) | pattern[0];
+  uint16_t byteIndex = BINDEX(fragment_16 & DF_MASK);
+  uint16_t bitMask = BMASK(fragment_16 & DF_MASK);
 
   df[byteIndex] |= bitMask;
 }
@@ -1234,9 +1280,9 @@ static void maskPatternIntoDirectFilter(uint8_t *df, uint8_t *pattern) {
 static void add1BPatternToSmallDirectFilter(DFC_STRUCTURE *dfc,
                                             uint8_t pattern) {
   uint8_t newPattern[2];
-  newPattern[1] = pattern;
+  newPattern[0] = pattern;
   for (int j = 0; j < 256; j++) {
-    newPattern[0] = j;
+    newPattern[1] = j;
 
     maskPatternIntoDirectFilter(dfc->directFilterSmall, newPattern);
   }
@@ -1328,23 +1374,9 @@ static void initializeCompactTableMemory(DFC_STRUCTURE *dfc) {
   dfc_memory_ct8 += sizeof(CT_Type_2_8B) * CT8_TABLE_SIZE;
   memset(dfc->CompactTable8, 0, sizeof(CT_Type_2_8B) * CT8_TABLE_SIZE);
 }
-
-static void getEmptyOrEqualSmallCompactTableEntry(
-    uint8_t pattern, CompactTableSmallEntry *entry) {
-  int entryCount = 0;
-  while (entry->pidCount && entry->pattern != pattern &&
-         entryCount < MAX_ENTRIES_PER_BUCKET) {
-    entry += sizeof(CompactTableSmallEntry);
-    ++entryCount;
-  }
-
-  if (entryCount == MAX_ENTRIES_PER_BUCKET) {
-    fprintf(stderr,
-            "Too many entries with the same hash in the small compact table."
-            "Please increase MAX_ENTRIES_PER_BUCKET or update the hash "
-            "function");
-    exit(TOO_MANY_ENTRIES_IN_SMALL_CT_EXIT_CODE);
-  }
+static void pushPatternToSmallCompactTable(DFC_STRUCTURE *dfc, uint8_t pattern,
+                                           PID_TYPE pid) {
+  CompactTableSmallEntry *entry = &dfc->compactTableSmall[pattern];
 
   if (entry->pidCount == MAX_PID_PER_ENTRY) {
     fprintf(stderr,
@@ -1353,13 +1385,6 @@ static void getEmptyOrEqualSmallCompactTableEntry(
             "update the hash function");
     exit(TOO_MANY_PID_IN_SMALL_CT_EXIT_CODE);
   }
-}
-
-static void pushPatternToSmallCompactTable(DFC_STRUCTURE *dfc, uint8_t pattern,
-                                           PID_TYPE pid) {
-  CompactTableSmallEntry *entry = dfc->compactTableSmall[pattern].entries;
-
-  getEmptyOrEqualSmallCompactTableEntry(pattern, entry);
 
   entry->pattern = pattern;
   entry->pids[entry->pidCount] = pid;
@@ -1371,12 +1396,13 @@ static void addPatternToSmallCompactTable(DFC_STRUCTURE *dfc,
   assert(pattern->n >= SMALL_DF_MIN_PATTERN_SIZE);
   assert(pattern->n <= SMALL_DF_MAX_PATTERN_SIZE);
 
-  uint8_t lastCharacterOfPattern = pattern->casepatrn[pattern->n - 1];
-  pushPatternToSmallCompactTable(dfc, lastCharacterOfPattern, pattern->iid);
+  uint8_t character = pattern->n == 1 ? pattern->casepatrn[0]
+                                      : pattern->casepatrn[pattern->n - 2];
+  pushPatternToSmallCompactTable(dfc, character, pattern->iid);
 
   if (pattern->is_case_insensitive) {
-    pushPatternToSmallCompactTable(
-        dfc, toggleCharacterCase(lastCharacterOfPattern), pattern->iid);
+    pushPatternToSmallCompactTable(dfc, toggleCharacterCase(character),
+                                   pattern->iid);
   }
 }
 

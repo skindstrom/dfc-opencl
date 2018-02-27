@@ -109,7 +109,7 @@ typedef struct {
   int numPatterns;
 
   uint8_t directFilterSmall[DF_SIZE_REAL];
-  CompactTableSmall compactTableSmall[COMPACT_TABLE_SIZE_SMALL];
+  CompactTableSmallEntry compactTableSmall[COMPACT_TABLE_SIZE_SMALL];
 
   uint8_t directFilterLarge[DF_SIZE_REAL];
   CompactTableLarge compactTableLarge[COMPACT_TABLE_SIZE_LARGE];
@@ -146,6 +146,7 @@ int DFC_AddPattern(DFC_STRUCTURE *dfc, unsigned char *pat, int n,
 int DFC_Compile(DFC_STRUCTURE *dfc);
 
 int DFC_Search(SEARCH_ARGUMENT);
+int DFC_Search_New(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength);
 void DFC_PrintInfo(DFC_STRUCTURE *dfc);
 void DFC_FreeStructure(DFC_STRUCTURE *dfc);
 

@@ -307,3 +307,45 @@ TEST_CASE("Many patterns work") {
    */
   REQUIRE(matchCount == 7);
 }
+
+TEST_CASE("New 1B pattern works") {
+  PID_TYPE pid = 0;
+  auto input = "Attack";
+
+  DFC_STRUCTURE* dfc = DFC_New();
+  addCaseSensitivePattern(dfc, "A", pid);
+  addCaseInSensitivePattern(dfc, "k", pid + 1);
+  DFC_Compile(dfc);
+  auto matchCount = DFC_Search_New(dfc, (unsigned char*)input, strlen(input));
+  DFC_FreeStructure(dfc);
+
+  REQUIRE(matchCount == 2);
+}
+
+TEST_CASE("New 2B pattern works") {
+  PID_TYPE pid = 0;
+  auto input = "Attack";
+
+  DFC_STRUCTURE* dfc = DFC_New();
+  addCaseSensitivePattern(dfc, "At", pid);
+  addCaseInSensitivePattern(dfc, "ck", pid + 1);
+  DFC_Compile(dfc);
+  auto matchCount = DFC_Search_New(dfc, (unsigned char*)input, strlen(input));
+  DFC_FreeStructure(dfc);
+
+  REQUIRE(matchCount == 2);
+}
+
+TEST_CASE("New 3B pattern works") {
+  PID_TYPE pid = 0;
+  auto input = "Attack";
+
+  DFC_STRUCTURE* dfc = DFC_New();
+  addCaseSensitivePattern(dfc, "Att", pid);
+  addCaseInSensitivePattern(dfc, "ack", pid + 1);
+  DFC_Compile(dfc);
+  auto matchCount = DFC_Search_New(dfc, (unsigned char*)input, strlen(input));
+  DFC_FreeStructure(dfc);
+
+  REQUIRE(matchCount == 2);
+}
