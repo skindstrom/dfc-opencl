@@ -1285,7 +1285,7 @@ static void addPatternToSmallDirectFilter(DFC_STRUCTURE *dfc,
 
 static void addPatternToLargeDirectFilter(DFC_STRUCTURE *dfc,
                                           DFC_PATTERN *pattern) {
-  assert(pattern->n > 3);
+  assert(pattern->n > SMALL_DF_MAX_PATTERN_SIZE);
 
   uint8_t *lastCharactersOfPattern = pattern->casepatrn + ((pattern->n - 2));
   addPatternToDirectFilter(dfc->directFilterLarge, pattern->is_case_insensitive,
@@ -1343,7 +1343,7 @@ static void getEmptyOrEqualSmallCompactTableEntry(
             "Too many entries with the same hash in the small compact table."
             "Please increase MAX_ENTRIES_PER_BUCKET or update the hash "
             "function");
-    exit(TOO_MANY_ENTRIES_IN_SMALL_CT);
+    exit(TOO_MANY_ENTRIES_IN_SMALL_CT_EXIT_CODE);
   }
 
   if (entry->pidCount == MAX_PID_PER_ENTRY) {
@@ -1351,7 +1351,7 @@ static void getEmptyOrEqualSmallCompactTableEntry(
             "Too many equal patterns in the small compact hash table."
             "Please increase MAX_PID_PER_ENTRY, MAX_ENTRIES_PER_BUCKET or "
             "update the hash function");
-    exit(TOO_MANY_PID_IN_SMALL_CT);
+    exit(TOO_MANY_PID_IN_SMALL_CT_EXIT_CODE);
   }
 }
 
@@ -1380,6 +1380,74 @@ static void addPatternToSmallCompactTable(DFC_STRUCTURE *dfc,
   }
 }
 
+static void getEmptyOrEqualLargeCompactTableEntry(
+    uint32_t pattern, CompactTableLargeEntry *entry) {
+  int entryCount = 0;
+  while (entry->pidCount && entry->pattern != pattern &&
+         entryCount < MAX_ENTRIES_PER_BUCKET) {
+    entry += sizeof(CompactTableLargeEntry);
+    ++entryCount;
+  }
+
+  if (entryCount == MAX_ENTRIES_PER_BUCKET) {
+    fprintf(stderr,
+            "Too many entries with the same hash in the large compact table."
+            "Please increase MAX_ENTRIES_PER_BUCKET or update the hash "
+            "function");
+    exit(TOO_MANY_ENTRIES_IN_LARGE_CT_EXIT_CODE);
+  }
+
+  if (entry->pidCount == MAX_PID_PER_ENTRY) {
+    fprintf(stderr,
+            "Too many equal patterns in the large compact hash table."
+            "Please increase MAX_PID_PER_ENTRY, MAX_ENTRIES_PER_BUCKET or "
+            "update the hash function");
+    exit(TOO_MANY_PID_IN_LARGE_CT_EXIT_CODE);
+  }
+}
+
+static void pushPatternToLargeCompactTable(DFC_STRUCTURE *dfc, uint32_t pattern,
+                                           PID_TYPE pid) {
+  uint32_t hash =
+      pattern & COMPACT_TABLE_SIZE_LARGE;  // TODO: use some actual hash
+  CompactTableLargeEntry *entry = dfc->compactTableLarge[hash].entries;
+
+  getEmptyOrEqualLargeCompactTableEntry(pattern, entry);
+
+  entry->pattern = pattern;
+  entry->pids[entry->pidCount] = pid;
+  ++entry->pidCount;
+}
+
+static void addPatternToLargeCompactTable(DFC_STRUCTURE *dfc,
+                                          DFC_PATTERN *pattern) {
+  int patternLength = SMALL_DF_MAX_PATTERN_SIZE + 1;
+  assert(pattern->n >= patternLength);
+
+  uint8_t *lastCharactersOfPattern =
+      pattern->casepatrn + (pattern->n - patternLength);
+
+  if (pattern->is_case_insensitive) {
+    int permutationCount = 2 << patternLength;
+    uint8_t *patternPermutations =
+        (uint8_t *)malloc(permutationCount * patternLength);
+
+    createPermutations(lastCharactersOfPattern, patternLength, permutationCount,
+                       patternPermutations);
+
+    for (int i = 0; i < permutationCount; ++i) {
+      pushPatternToLargeCompactTable(
+          dfc, *(uint32_t *)(patternPermutations + (i * patternLength)),
+          pattern->iid);
+    }
+
+    free(patternPermutations);
+  } else {
+    pushPatternToLargeCompactTable(dfc, *(uint32_t *)lastCharactersOfPattern,
+                                   pattern->iid);
+  }
+}
+
 static void setupCompactTables(DFC_STRUCTURE *dfc) {
   initializeCompactTableMemory(dfc);
 
@@ -1390,6 +1458,8 @@ static void setupCompactTables(DFC_STRUCTURE *dfc) {
     if (plist->n >= SMALL_DF_MIN_PATTERN_SIZE &&
         plist->n <= SMALL_DF_MAX_PATTERN_SIZE) {
       addPatternToSmallCompactTable(dfc, plist);
+    } else {
+      addPatternToLargeCompactTable(dfc, plist);
     }
 
     if (plist->n == 1) {

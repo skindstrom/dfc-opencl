@@ -37,6 +37,16 @@ typedef struct CompactTableSmall_ {
   CompactTableSmallEntry entries[MAX_ENTRIES_PER_BUCKET];
 } CompactTableSmall;
 
+typedef struct CompactTableLargeEntry_ {
+  uint32_t pattern;
+  uint8_t pidCount;
+  PID_TYPE pids[MAX_PID_PER_ENTRY];
+} CompactTableLargeEntry;
+
+typedef struct CompactTableLarge_ {
+  CompactTableLargeEntry entries[MAX_ENTRIES_PER_BUCKET];
+} CompactTableLarge;
+
 typedef struct CT_Type_2_2B_Array_ {
   uint16_t pat;      // 2B pattern
   PID_CNT_TYPE cnt;  // Number of PIDs
@@ -102,6 +112,7 @@ typedef struct {
   CompactTableSmall compactTableSmall[COMPACT_TABLE_SIZE_SMALL];
 
   uint8_t directFilterLarge[DF_SIZE_REAL];
+  CompactTableLarge compactTableLarge[COMPACT_TABLE_SIZE_LARGE];
 
   /* Direct Filter (DF1) for all patterns */
   uint8_t DirectFilter1[DF_SIZE_REAL];
