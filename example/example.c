@@ -42,24 +42,11 @@ int main(void) {
 
   // 4. [DFC] Search
   printf("* Result:\n");
-  int res = DFC_Search(dfc, (unsigned char *)buf, strlen(buf), Print_Result);
+  int res = DFC_Search(dfc, (unsigned char *)buf, strlen(buf));
   printf("\n* Total match count: %d\n", res);
 
   // 5. [DFC] Free DFC structure
   DFC_FreeStructure(dfc);
 
   return 0;
-}
-
-void Print_Result(unsigned char *pattern, uint32_t *id_list,
-                  uint32_t list_size) {
-  unsigned i;
-  printf(" [Matched!] Pattern: %s, IDs:", pattern);
-
-  for (i = 0; i < list_size; i++) {
-    printf("%u", id_list[i]);
-    if (i != list_size - 1) printf(", ");
-  }
-
-  printf("\n");
 }

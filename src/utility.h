@@ -29,19 +29,11 @@ typedef enum _dfcMemoryType {
   DFC_MEMORY_TYPE__NONE = 0,
   DFC_MEMORY_TYPE__DFC,
   DFC_MEMORY_TYPE__PATTERN,
-  DFC_MEMORY_TYPE__CT1,
-  DFC_MEMORY_TYPE__CT2,
-  DFC_MEMORY_TYPE__CT3,
-  DFC_MEMORY_TYPE__CT4,
-  DFC_MEMORY_TYPE__CT8
 } dfcMemoryType;
 
 typedef enum _dfcDataType {
   DFC_NONE = 0,
   DFC_PID_TYPE,
-  DFC_CT_Type_2_Array,
-  DFC_CT_Type_2_2B_Array,
-  DFC_CT_Type_2_8B_Array
 } dfcDataType;
 
 float my_sqrtf(float input, float x) {
