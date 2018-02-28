@@ -809,10 +809,41 @@ static int verifySmall(DFC_STRUCTURE *dfc, uint8_t *input,
 
     DFC_PATTERN *pattern = dfc->dfcMatchList[pid];
     int patternLength = pattern->n;
-    if (remainingCharacters + 1 >= patternLength) {
+    if (remainingCharacters >= patternLength) {
       uint8_t *start = patternLength > 2 ? input - 1 : input;
       matches += doesPatternMatch(start, pattern->casepatrn, patternLength,
                                   pattern->is_case_insensitive);
+    }
+  }
+
+  return matches;
+}
+
+// TODO: improve
+static uint32_t hashForLargeCompactTable(uint32_t input) {
+  return input & (COMPACT_TABLE_SIZE_LARGE - 1);
+}
+
+static int verifyLarge(DFC_STRUCTURE *dfc, uint8_t *input, int currentPos,
+                       int inputLength) {
+  uint32_t bytePattern = *(uint32_t *)(input - 2);
+  uint32_t hash = hashForLargeCompactTable(bytePattern);
+  CompactTableLargeEntry *entry = dfc->compactTableLarge[hash].entries;
+
+  int matches = 0;
+  for (; entry->pidCount; entry += sizeof(CompactTableLargeEntry)) {
+    if (entry->pattern == bytePattern) {
+      for (int i = 0; i < entry->pidCount; ++i) {
+        PID_TYPE pid = entry->pids[i];
+
+        DFC_PATTERN *pattern = dfc->dfcMatchList[pid];
+        int patternLength = pattern->n;
+        if (currentPos >= patternLength - 2 && inputLength - currentPos > 1) {
+          uint8_t *start = input - (patternLength - 2);
+          matches += doesPatternMatch(start, pattern->casepatrn, patternLength,
+                                      pattern->is_case_insensitive);
+        }
+      }
     }
   }
 
@@ -828,7 +859,11 @@ int DFC_Search_New(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
     uint16_t bitMask = BMASK(data & DF_MASK);
 
     if (dfc->directFilterSmall[byteIndex] & bitMask) {
-      matches += verifySmall(dfc, input + i, inputLength - i);
+      matches += verifySmall(dfc, input + i, inputLength - i + 1);
+    }
+
+    if (dfc->directFilterLarge[byteIndex] & bitMask) {
+      matches += verifyLarge(dfc, input + i, i, inputLength);
     }
   }
 
@@ -1292,7 +1327,7 @@ static void addPatternToDirectFilter(uint8_t *directFilter,
                                      bool isCaseInsensitive, uint8_t *pattern,
                                      int patternLength) {
   if (isCaseInsensitive) {
-    int permutationCount = 2 << patternLength;
+    int permutationCount = 2 << (patternLength - 1);
     uint8_t *patternPermutations =
         (uint8_t *)malloc(permutationCount * patternLength);
 
@@ -1407,11 +1442,11 @@ static void addPatternToSmallCompactTable(DFC_STRUCTURE *dfc,
 }
 
 static void getEmptyOrEqualLargeCompactTableEntry(
-    uint32_t pattern, CompactTableLargeEntry *entry) {
+    uint32_t pattern, CompactTableLargeEntry **entry) {
   int entryCount = 0;
-  while (entry->pidCount && entry->pattern != pattern &&
+  while ((*entry)->pidCount && (*entry)->pattern != pattern &&
          entryCount < MAX_ENTRIES_PER_BUCKET) {
-    entry += sizeof(CompactTableLargeEntry);
+    *entry += sizeof(CompactTableLargeEntry);
     ++entryCount;
   }
 
@@ -1423,7 +1458,7 @@ static void getEmptyOrEqualLargeCompactTableEntry(
     exit(TOO_MANY_ENTRIES_IN_LARGE_CT_EXIT_CODE);
   }
 
-  if (entry->pidCount == MAX_PID_PER_ENTRY) {
+  if ((*entry)->pidCount == MAX_PID_PER_ENTRY) {
     fprintf(stderr,
             "Too many equal patterns in the large compact hash table."
             "Please increase MAX_PID_PER_ENTRY, MAX_ENTRIES_PER_BUCKET or "
@@ -1432,17 +1467,28 @@ static void getEmptyOrEqualLargeCompactTableEntry(
   }
 }
 
+static bool hasPid(CompactTableLargeEntry *entry, PID_TYPE pid) {
+  for (int i = 0; i < entry->pidCount; ++i) {
+    if (entry->pids[i] == pid) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 static void pushPatternToLargeCompactTable(DFC_STRUCTURE *dfc, uint32_t pattern,
                                            PID_TYPE pid) {
-  uint32_t hash =
-      pattern & COMPACT_TABLE_SIZE_LARGE;  // TODO: use some actual hash
+  uint32_t hash = hashForLargeCompactTable(pattern);
   CompactTableLargeEntry *entry = dfc->compactTableLarge[hash].entries;
 
-  getEmptyOrEqualLargeCompactTableEntry(pattern, entry);
+  getEmptyOrEqualLargeCompactTableEntry(pattern, &entry);
 
-  entry->pattern = pattern;
-  entry->pids[entry->pidCount] = pid;
-  ++entry->pidCount;
+  if (!hasPid(entry, pid)) {
+    entry->pattern = pattern;
+    entry->pids[entry->pidCount] = pid;
+    ++entry->pidCount;
+  }
 }
 
 static void addPatternToLargeCompactTable(DFC_STRUCTURE *dfc,
@@ -1454,7 +1500,7 @@ static void addPatternToLargeCompactTable(DFC_STRUCTURE *dfc,
       pattern->casepatrn + (pattern->n - patternLength);
 
   if (pattern->is_case_insensitive) {
-    int permutationCount = 2 << patternLength;
+    int permutationCount = 2 << (patternLength - 1);
     uint8_t *patternPermutations =
         (uint8_t *)malloc(permutationCount * patternLength);
 

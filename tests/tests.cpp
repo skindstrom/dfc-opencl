@@ -237,11 +237,11 @@ TEST_CASE("6B pattern works") {
 
 TEST_CASE("7B pattern works") {
   PID_TYPE pid = 0;
-  auto input = "Attack and Crash";
+  auto input = "Attacks and Crash";
 
   DFC_STRUCTURE* dfc = DFC_New();
-  addCaseSensitivePattern(dfc, "Attack ", pid);
-  addCaseInSensitivePattern(dfc, "d Crash", pid + 1);
+  addCaseSensitivePattern(dfc, "Attacks", pid);
+  addCaseInSensitivePattern(dfc, "d CRASH", pid + 1);
   DFC_Compile(dfc);
   auto matchCount = DFC_Search(dfc, (unsigned char*)input, strlen(input),
                                [](auto, auto, auto) {});
@@ -252,10 +252,10 @@ TEST_CASE("7B pattern works") {
 
 TEST_CASE("8B pattern works") {
   PID_TYPE pid = 0;
-  auto input = "Attack and Crash";
+  auto input = "Attackers and Crash";
 
   DFC_STRUCTURE* dfc = DFC_New();
-  addCaseSensitivePattern(dfc, "Attack a", pid);
+  addCaseSensitivePattern(dfc, "Attacker", pid);
   addCaseInSensitivePattern(dfc, "nd CRASH", pid + 1);
   DFC_Compile(dfc);
   auto matchCount = DFC_Search(dfc, (unsigned char*)input, strlen(input),
@@ -308,6 +308,130 @@ TEST_CASE("Many patterns work") {
   REQUIRE(matchCount == 7);
 }
 
+TEST_CASE("New Matches if input and pattern is equal") {
+  PID_TYPE pid = 0;
+  auto input = "attack";
+
+  DFC_STRUCTURE* dfc = DFC_New();
+  addCaseSensitivePattern(dfc, input, pid);
+  DFC_Compile(dfc);
+  auto matchCount = DFC_Search_New(dfc, (unsigned char*)input, strlen(input));
+  DFC_FreeStructure(dfc);
+
+  REQUIRE(matchCount == 1);
+}
+
+TEST_CASE("New No matches if pattern is not equal") {
+  PID_TYPE pid = 0;
+  auto input = "safe";
+  auto pattern = "attack";
+
+  DFC_STRUCTURE* dfc = DFC_New();
+  addCaseSensitivePattern(dfc, pattern, pid);
+  DFC_Compile(dfc);
+  auto matchCount = DFC_Search_New(dfc, (unsigned char*)input, strlen(input));
+  DFC_FreeStructure(dfc);
+
+  REQUIRE(matchCount == 0);
+}
+
+TEST_CASE("New Matches multiple patterns") {
+  PID_TYPE pid = 0;
+  auto input = "attack";
+
+  DFC_STRUCTURE* dfc = DFC_New();
+  addCaseSensitivePattern(dfc, "at", pid);
+  addCaseSensitivePattern(dfc, "ck", pid + 1);
+  DFC_Compile(dfc);
+  auto matchCount = DFC_Search_New(dfc, (unsigned char*)input, strlen(input));
+  DFC_FreeStructure(dfc);
+
+  REQUIRE(matchCount == 2);
+}
+
+TEST_CASE("New Does not match part of pattern") {
+  PID_TYPE pid = 0;
+  auto input = "attack";
+
+  DFC_STRUCTURE* dfc = DFC_New();
+  addCaseSensitivePattern(dfc, "attack123", pid);
+  DFC_Compile(dfc);
+  auto matchCount = DFC_Search_New(dfc, (unsigned char*)input, strlen(input));
+  DFC_FreeStructure(dfc);
+
+  REQUIRE(matchCount == 0);
+}
+
+TEST_CASE(
+    "New Multiple equal patterns counts as single even if different pid") {
+  PID_TYPE pid = 0;
+  auto input = "attack";
+
+  DFC_STRUCTURE* dfc = DFC_New();
+  addCaseSensitivePattern(dfc, "attack", pid);
+  addCaseSensitivePattern(dfc, "attack", pid + 1);
+  DFC_Compile(dfc);
+  auto matchCount = DFC_Search_New(dfc, (unsigned char*)input, strlen(input));
+  DFC_FreeStructure(dfc);
+
+  REQUIRE(matchCount == 1);
+}
+
+TEST_CASE("New Does not match if case sensitive") {
+  PID_TYPE pid = 0;
+  auto input = "attack";
+
+  DFC_STRUCTURE* dfc = DFC_New();
+  addCaseSensitivePattern(dfc, "Attack", pid);
+  DFC_Compile(dfc);
+  auto matchCount = DFC_Search_New(dfc, (unsigned char*)input, strlen(input));
+  DFC_FreeStructure(dfc);
+
+  REQUIRE(matchCount == 0);
+}
+
+TEST_CASE("New Does match if case insensitive") {
+  PID_TYPE pid = 0;
+  auto input = "attack";
+
+  DFC_STRUCTURE* dfc = DFC_New();
+  addCaseInSensitivePattern(dfc, "Attack", pid);
+  DFC_Compile(dfc);
+  auto matchCount = DFC_Search_New(dfc, (unsigned char*)input, strlen(input));
+  DFC_FreeStructure(dfc);
+
+  REQUIRE(matchCount == 1);
+}
+
+TEST_CASE("New Can match both case sensitive and insensitive") {
+  PID_TYPE pid = 0;
+  auto input = "attack";
+
+  DFC_STRUCTURE* dfc = DFC_New();
+  addCaseSensitivePattern(dfc, "at", pid);
+  addCaseInSensitivePattern(dfc, "Tk", pid + 1);
+  DFC_Compile(dfc);
+  auto matchCount = DFC_Search_New(dfc, (unsigned char*)input, strlen(input));
+  DFC_FreeStructure(dfc);
+
+  REQUIRE(matchCount == 1);
+}
+
+TEST_CASE(
+    "New Equal case sensitive and insensitive pattern counts separately") {
+  PID_TYPE pid = 0;
+  auto input = "attack";
+
+  DFC_STRUCTURE* dfc = DFC_New();
+  addCaseSensitivePattern(dfc, "at", pid);
+  addCaseInSensitivePattern(dfc, "At", pid + 1);
+  DFC_Compile(dfc);
+  auto matchCount = DFC_Search_New(dfc, (unsigned char*)input, strlen(input));
+  DFC_FreeStructure(dfc);
+
+  REQUIRE(matchCount == 2);
+}
+
 TEST_CASE("New 1B pattern works") {
   PID_TYPE pid = 0;
   auto input = "Attack";
@@ -348,4 +472,114 @@ TEST_CASE("New 3B pattern works") {
   DFC_FreeStructure(dfc);
 
   REQUIRE(matchCount == 2);
+}
+TEST_CASE("New 4B pattern works") {
+  PID_TYPE pid = 0;
+  auto input = "Attack";
+
+  DFC_STRUCTURE* dfc = DFC_New();
+  addCaseSensitivePattern(dfc, "Atta", pid);
+  addCaseInSensitivePattern(dfc, "tack", pid + 1);
+  DFC_Compile(dfc);
+  auto matchCount = DFC_Search_New(dfc, (unsigned char*)input, strlen(input));
+  DFC_FreeStructure(dfc);
+
+  REQUIRE(matchCount == 2);
+}
+
+TEST_CASE("New 5B pattern works") {
+  PID_TYPE pid = 0;
+  auto input = "Attack";
+
+  DFC_STRUCTURE* dfc = DFC_New();
+  addCaseSensitivePattern(dfc, "Attac", pid);
+  addCaseInSensitivePattern(dfc, "ttack", pid + 1);
+  DFC_Compile(dfc);
+  auto matchCount = DFC_Search_New(dfc, (unsigned char*)input, strlen(input));
+  DFC_FreeStructure(dfc);
+
+  REQUIRE(matchCount == 2);
+}
+
+TEST_CASE("New 6B pattern works") {
+  PID_TYPE pid = 0;
+  auto input = "Attack";
+
+  DFC_STRUCTURE* dfc = DFC_New();
+  addCaseSensitivePattern(dfc, "Attack", pid);
+  addCaseInSensitivePattern(dfc, "attack", pid + 1);
+  DFC_Compile(dfc);
+  auto matchCount = DFC_Search_New(dfc, (unsigned char*)input, strlen(input));
+  DFC_FreeStructure(dfc);
+
+  REQUIRE(matchCount == 2);
+}
+
+TEST_CASE("New 7B pattern works") {
+  PID_TYPE pid = 0;
+  auto input = "Attacks and Crash";
+
+  DFC_STRUCTURE* dfc = DFC_New();
+  addCaseSensitivePattern(dfc, "Attacks", pid);
+  addCaseInSensitivePattern(dfc, "d CRASH", pid + 1);
+  DFC_Compile(dfc);
+  auto matchCount = DFC_Search_New(dfc, (unsigned char*)input, strlen(input));
+  DFC_FreeStructure(dfc);
+
+  REQUIRE(matchCount == 2);
+}
+
+TEST_CASE("New 8B pattern works") {
+  PID_TYPE pid = 0;
+  auto input = "Attackers and Crash";
+
+  DFC_STRUCTURE* dfc = DFC_New();
+  addCaseSensitivePattern(dfc, "Attacker", pid);
+  addCaseInSensitivePattern(dfc, "nd CRASH", pid + 1);
+  DFC_Compile(dfc);
+  auto matchCount = DFC_Search_New(dfc, (unsigned char*)input, strlen(input));
+  DFC_FreeStructure(dfc);
+
+  REQUIRE(matchCount == 2);
+}
+
+TEST_CASE("New Long pattern works") {
+  PID_TYPE pid = 0;
+  auto input = "This is a very long input";
+
+  DFC_STRUCTURE* dfc = DFC_New();
+  addCaseSensitivePattern(dfc, "This is a very long", pid);
+  addCaseInSensitivePattern(dfc, "is a VERY long input", pid + 1);
+  DFC_Compile(dfc);
+  auto matchCount = DFC_Search_New(dfc, (unsigned char*)input, strlen(input));
+  DFC_FreeStructure(dfc);
+
+  REQUIRE(matchCount == 2);
+}
+
+TEST_CASE("New Many patterns work") {
+  // passwords from some old password leak
+  // https://github.com/danielmiessler/SecLists/blob/aad07fff50ca37af2926de4d07ff670bf3416fbc/Passwords/elitehacker.txt
+  std::vector<std::string> patterns{
+#include "elitehacker.txt"
+  };
+
+  DFC_STRUCTURE* dfc = DFC_New();
+  for (PID_TYPE i = 0; i < patterns.size(); ++i) {
+    addCaseSensitivePattern(dfc, patterns[i], i);
+  }
+
+  DFC_Compile(dfc);
+
+  // 4 random passwords
+  auto input = "blue twf skar23 hunter2 1spyder";
+  auto matchCount = DFC_Search_New(dfc, (unsigned char*)input, strlen(input));
+  DFC_FreeStructure(dfc);
+
+  /*
+   * I didn't actually calculate,
+   * but rather ran the initial version to get a count.
+   * Of course, this assumes the initial version was correct.
+   */
+  REQUIRE(matchCount == 7);
 }
