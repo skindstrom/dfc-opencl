@@ -5,7 +5,6 @@
 
 #include "dfc.h"
 #include "assert.h"
-#include "feature-flags.h"
 #include "utility.h"
 
 static unsigned char xlatcase[256];
