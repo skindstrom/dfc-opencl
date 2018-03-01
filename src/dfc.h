@@ -54,10 +54,21 @@ typedef struct _dfc_pattern {
 
 } DFC_PATTERN;
 
+typedef struct _dfc_fixed_pattern {
+  int pattern_length;
+  int is_case_insensitive;
+
+  uint8_t upper_case_pattern[MAX_PATTERN_LENGTH];
+  uint8_t original_pattern[MAX_PATTERN_LENGTH];
+
+  int external_id_count;
+  PID_TYPE external_ids[MAX_EQUAL_PATTERNS];
+} DFC_FIXED_PATTERN;
+
 typedef struct {
   DFC_PATTERN **init_hash;  // To cull duplicate patterns
   DFC_PATTERN *dfcPatterns;
-  DFC_PATTERN **dfcMatchList;
+  DFC_FIXED_PATTERN *dfcMatchList;
 
   int numPatterns;
 

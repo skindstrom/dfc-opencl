@@ -189,12 +189,12 @@ static int verifySmall(DFC_STRUCTURE *dfc, uint8_t *input,
   for (int i = 0; i < entry->pidCount; ++i) {
     PID_TYPE pid = entry->pids[i];
 
-    DFC_PATTERN *pattern = dfc->dfcMatchList[pid];
-    int patternLength = pattern->n;
+    DFC_FIXED_PATTERN *pattern = &dfc->dfcMatchList[pid];
+    int patternLength = pattern->pattern_length;
     if (remainingCharacters >= patternLength) {
       uint8_t *start = patternLength > 2 ? input - 1 : input;
-      matches += doesPatternMatch(start, pattern->casepatrn, patternLength,
-                                  pattern->is_case_insensitive);
+      matches += doesPatternMatch(start, pattern->original_pattern,
+                                  patternLength, pattern->is_case_insensitive);
     }
   }
 
@@ -218,12 +218,13 @@ static int verifyLarge(DFC_STRUCTURE *dfc, uint8_t *input, int currentPos,
       for (int i = 0; i < entry->pidCount; ++i) {
         PID_TYPE pid = entry->pids[i];
 
-        DFC_PATTERN *pattern = dfc->dfcMatchList[pid];
-        int patternLength = pattern->n;
+        DFC_FIXED_PATTERN *pattern = &dfc->dfcMatchList[pid];
+        int patternLength = pattern->pattern_length;
         if (currentPos >= patternLength - 2 && inputLength - currentPos > 1) {
           uint8_t *start = input - (patternLength - 2);
-          matches += doesPatternMatch(start, pattern->casepatrn, patternLength,
-                                      pattern->is_case_insensitive);
+          matches +=
+              doesPatternMatch(start, pattern->original_pattern, patternLength,
+                               pattern->is_case_insensitive);
         }
       }
     }
@@ -340,6 +341,41 @@ static inline int DFC_InitHashAdd(DFC_STRUCTURE *ctx, DFC_PATTERN *p) {
   return 0;
 }
 
+static DFC_FIXED_PATTERN createFixed(DFC_PATTERN *original) {
+  if (original->n >= MAX_PATTERN_LENGTH) {
+    fprintf(stderr,
+            "Pattern \"%s\" is too long. Please remove it or increase "
+            "MAX_PATTERN_LENGTH. (Currently %d)\n",
+            original->casepatrn, MAX_PATTERN_LENGTH);
+    exit(PATTERN_TOO_LARGE_EXIT_CODE);
+  }
+  if (original->sids_size >= MAX_EQUAL_PATTERNS) {
+    fprintf(stderr,
+            "Too many patterns that are equal, but with different ID. Please "
+            "either manually cull duplicates or increase MAX_EQUAL_PATTERNS. "
+            "(Currently %d)\n",
+            MAX_EQUAL_PATTERNS);
+    exit(TOO_MANY_EQUAL_PATTERNS);
+  }
+
+  DFC_FIXED_PATTERN new;
+
+  new.pattern_length = original->n;
+  new.is_case_insensitive = original->is_case_insensitive;
+
+  for (int i = 0; i < original->n; ++i) {
+    new.upper_case_pattern[i] = original->patrn[i];
+    new.original_pattern[i] = original->casepatrn[i];
+  }
+
+  new.external_id_count = original->sids_size;
+  for (uint32_t i = 0; i < original->sids_size; ++i) {
+    new.external_ids[i] = original->sids[i];
+  }
+
+  return new;
+}
+
 static void setupMatchList(DFC_STRUCTURE *dfc) {
   int begin_node_flag = 1;
   for (int i = 0; i < INIT_HASH_SIZE; i++) {
@@ -363,16 +399,13 @@ static void setupMatchList(DFC_STRUCTURE *dfc) {
   free(dfc->init_hash);
   dfc->init_hash = NULL;
 
-  dfc->dfcMatchList =
-      (DFC_PATTERN **)DFC_MALLOC(sizeof(DFC_PATTERN *) * dfc->numPatterns);
+  dfc->dfcMatchList = (DFC_FIXED_PATTERN *)DFC_MALLOC(
+      sizeof(DFC_FIXED_PATTERN) * dfc->numPatterns);
   MEMASSERT_DFC(dfc->dfcMatchList, "setupMatchList");
 
   for (DFC_PATTERN *plist = dfc->dfcPatterns; plist != NULL;
        plist = plist->next) {
-    if (dfc->dfcMatchList[plist->iid] != NULL) {
-      fprintf(stderr, "Internal ID ERROR : %u\n", plist->iid);
-    }
-    dfc->dfcMatchList[plist->iid] = plist;
+    dfc->dfcMatchList[plist->iid] = createFixed(plist);
   }
 }
 
