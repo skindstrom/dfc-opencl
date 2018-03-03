@@ -6,9 +6,7 @@
 #define DFC_H
 
 #include <ctype.h>
-#include <emmintrin.h>
 #include <inttypes.h>
-#include <nmmintrin.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>

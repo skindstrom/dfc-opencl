@@ -6,6 +6,7 @@
 #include "dfc.h"
 #include "assert.h"
 #include "utility.h"
+#include "search.h"
 
 static unsigned char xlatcase[256];
 
@@ -172,85 +173,9 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
   return 0;
 }
 
-static bool doesPatternMatch(uint8_t *start, uint8_t *pattern, int length,
-                             bool isCaseInsensitive) {
-  if (isCaseInsensitive) {
-    return !my_strncasecmp(start, pattern, length);
-  }
-  return !my_strncmp(start, pattern, length);
-}
-
-static int verifySmall(DFC_STRUCTURE *dfc, uint8_t *input,
-                       int remainingCharacters) {
-  uint8_t hash = input[0];
-  CompactTableSmallEntry *entry = &dfc->compactTableSmall[hash];
-
-  int matches = 0;
-  for (int i = 0; i < entry->pidCount; ++i) {
-    PID_TYPE pid = entry->pids[i];
-
-    DFC_FIXED_PATTERN *pattern = &dfc->dfcMatchList[pid];
-    int patternLength = pattern->pattern_length;
-    if (remainingCharacters >= patternLength) {
-      uint8_t *start = patternLength > 2 ? input - 1 : input;
-      matches += doesPatternMatch(start, pattern->original_pattern,
-                                  patternLength, pattern->is_case_insensitive);
-    }
-  }
-
-  return matches;
-}
-
-// TODO: improve
-static uint32_t hashForLargeCompactTable(uint32_t input) {
-  return input & (COMPACT_TABLE_SIZE_LARGE - 1);
-}
-
-static int verifyLarge(DFC_STRUCTURE *dfc, uint8_t *input, int currentPos,
-                       int inputLength) {
-  uint32_t bytePattern = *(uint32_t *)(input - 2);
-  uint32_t hash = hashForLargeCompactTable(bytePattern);
-  CompactTableLargeEntry *entry = dfc->compactTableLarge[hash].entries;
-
-  int matches = 0;
-  for (; entry->pidCount; entry += sizeof(CompactTableLargeEntry)) {
-    if (entry->pattern == bytePattern) {
-      for (int i = 0; i < entry->pidCount; ++i) {
-        PID_TYPE pid = entry->pids[i];
-
-        DFC_FIXED_PATTERN *pattern = &dfc->dfcMatchList[pid];
-        int patternLength = pattern->pattern_length;
-        if (currentPos >= patternLength - 2 && inputLength - currentPos > 1) {
-          uint8_t *start = input - (patternLength - 2);
-          matches +=
-              doesPatternMatch(start, pattern->original_pattern, patternLength,
-                               pattern->is_case_insensitive);
-        }
-      }
-    }
-  }
-
-  return matches;
-}
 
 int DFC_Search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
-  int matches = 0;
-
-  for (int i = 0; i < inputLength; ++i) {
-    uint16_t data = *(uint16_t *)(input + i);
-    uint16_t byteIndex = BINDEX(data & DF_MASK);
-    uint16_t bitMask = BMASK(data & DF_MASK);
-
-    if (dfc->directFilterSmall[byteIndex] & bitMask) {
-      matches += verifySmall(dfc, input + i, inputLength - i + 1);
-    }
-
-    if (dfc->directFilterLarge[byteIndex] & bitMask) {
-      matches += verifyLarge(dfc, input + i, i, inputLength);
-    }
-  }
-
-  return matches;
+  return search(dfc, input, inputLength);
 }
 
 static void *DFC_REALLOC(void *p, uint16_t n, dfcDataType type) {
@@ -355,7 +280,7 @@ static DFC_FIXED_PATTERN createFixed(DFC_PATTERN *original) {
             "either manually cull duplicates or increase MAX_EQUAL_PATTERNS. "
             "(Currently %d)\n",
             MAX_EQUAL_PATTERNS);
-    exit(TOO_MANY_EQUAL_PATTERNS);
+    exit(TOO_MANY_EQUAL_PATTERNS_EXIT_CODE);
   }
 
   DFC_FIXED_PATTERN new;
@@ -383,8 +308,7 @@ static void setupMatchList(DFC_STRUCTURE *dfc) {
     int first_node_flag = 1;
     while (node != NULL) {
       if (begin_node_flag) {
-        begin_node_flag = 0;
-        dfc->dfcPatterns = node;
+        begin_node_flag = 0;dfc->dfcPatterns = node;
       } else {
         if (first_node_flag) {
           first_node_flag = 0;

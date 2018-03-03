@@ -57,20 +57,10 @@ void ConvertCaseEx(unsigned char *d, unsigned char *s, int m,
   for (i = 0; i < m; i++) d[i] = xlatcase[s[i]];
 }
 
-int my_strncmp(unsigned char *a, unsigned char *b, int n) {
-  int i;
-  for (i = 0; i < n; i++) {
-    if (a[i] != b[i]) return -1;
-  }
-  return 0;
+// TODO: improve
+uint32_t hashForLargeCompactTable(uint32_t input) {
+  return input & (COMPACT_TABLE_SIZE_LARGE - 1);
 }
 
-int my_strncasecmp(unsigned char *a, unsigned char *b, int n) {
-  int i;
-  for (i = 0; i < n; i++) {
-    if (tolower(a[i]) != tolower(b[i])) return -1;
-  }
-  return 0;
-}
 
 #endif
