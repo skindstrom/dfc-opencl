@@ -57,26 +57,26 @@ static int verifySmall(CompactTableSmallEntry *ct, DFC_FIXED_PATTERN *patterns,
   return matches;
 }
 
-static int verifyLarge(DFC_STRUCTURE *dfc, uint8_t *input, int currentPos,
-                       int inputLength) {
+#define GET_ENTRY_LARGE_CT(hash, x) \
+  ((ct + hash)->entries + sizeof(CompactTableLargeEntry) * x)
+static int verifyLarge(CompactTableLarge *ct, DFC_FIXED_PATTERN *patterns,
+                       uint8_t *input, int currentPos, int inputLength) {
   uint32_t bytePattern = *(input + 1) << 24 | *(input + 0) << 16 |
                          *(input - 1) << 8 | *(input - 2);
   uint32_t hash = hashForLargeCompactTable(bytePattern);
-  CompactTableLargeEntry *entry = dfc->compactTableLarge[hash].entries;
 
   int matches = 0;
-  for (; entry->pidCount; entry += sizeof(CompactTableLargeEntry)) {
-    if (entry->pattern == bytePattern) {
-      for (int i = 0; i < entry->pidCount; ++i) {
-        PID_TYPE pid = entry->pids[i];
+  uint8_t multiplier = 0;
+  for (; GET_ENTRY_LARGE_CT(hash, multiplier)->pidCount; ++multiplier) {
+    if (GET_ENTRY_LARGE_CT(hash, multiplier)->pattern == bytePattern) {
+      for (int i = 0; i < GET_ENTRY_LARGE_CT(hash, multiplier)->pidCount; ++i) {
+        PID_TYPE pid = GET_ENTRY_LARGE_CT(hash, multiplier)->pids[i];
 
-        DFC_FIXED_PATTERN *pattern = &dfc->dfcMatchList[pid];
-        int patternLength = pattern->pattern_length;
+        int patternLength = (patterns + pid)->pattern_length;
         if (currentPos >= patternLength - 2 && inputLength - currentPos > 1) {
-          uint8_t *start = input - (patternLength - 2);
-          matches +=
-              doesPatternMatch(start, pattern->original_pattern, patternLength,
-                               pattern->is_case_insensitive);
+          matches += doesPatternMatch(
+              input - (patternLength - 2), (patterns + pid)->original_pattern,
+              patternLength, (patterns + pid)->is_case_insensitive);
         }
       }
     }
@@ -99,7 +99,8 @@ int search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
     }
 
     if (dfc->directFilterLarge[byteIndex] & bitMask) {
-      matches += verifyLarge(dfc, input + i, i, inputLength);
+      matches += verifyLarge(dfc->compactTableLarge, dfc->dfcMatchList,
+                             input + i, i, inputLength);
     }
   }
 

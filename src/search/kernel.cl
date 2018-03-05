@@ -68,7 +68,7 @@ int my_strncmp(__global unsigned char *a, __global unsigned char *b, int n) {
 
 uchar tolower(uchar c) {
   if (c >= 65 && c <= 90) {
-    return c + 22;
+    return c + 32;
   }
   return c;
 }
@@ -150,15 +150,15 @@ __kernel void search(int inputLength, __global uchar *input,
 
   if (i >= inputLength) return;
 
-  ushort data = *(input + i + 1) << 8 | *(input + i);
-  ushort byteIndex = (ushort)BINDEX(data & DF_MASK);
-  ushort bitMask = (ushort)BMASK(data & DF_MASK);
+  short data = *(input + i + 1) << 8 | *(input + i);
+  short byteIndex = BINDEX(data & DF_MASK);
+  short bitMask = BMASK(data & DF_MASK);
 
-  if (dfSmall[(int)byteIndex] & bitMask) {
+  if (dfSmall[byteIndex] & bitMask) {
     matches += verifySmall(ctSmall, patterns, input + i, inputLength - i + 1);
   }
 
-  if (dfLarge[(int)byteIndex] & bitMask) {
+  if (dfLarge[byteIndex] & bitMask) {
     matches += verifyLarge(ctLarge, patterns, input + i, i, inputLength);
   }
 
