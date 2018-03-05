@@ -2,6 +2,8 @@
 #define DFC_UTILITY_H
 
 #include <ctype.h>
+#include <stdint.h>
+#include "constants.h"
 
 #define BINDEX(x) ((x) >> 3)
 #define BMASK(x) (1 << ((x)&0x7))
@@ -61,6 +63,5 @@ void ConvertCaseEx(unsigned char *d, unsigned char *s, int m,
 uint32_t hashForLargeCompactTable(uint32_t input) {
   return input & (COMPACT_TABLE_SIZE_LARGE - 1);
 }
-
 
 #endif

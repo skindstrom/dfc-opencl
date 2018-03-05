@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 3.1)
 project(OpenCL-DFC)
 
-set( CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -Wall -Wpedantic -Wextra -Werror" )
+set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -Wall -Wpedantic -Wextra -Werror")
 set(CMAKE_CXX_STANDARD 14)
 
 set(EXT_PROJECTS_DIR external)

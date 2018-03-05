@@ -1,9 +1,11 @@
 #ifndef DFC_SEARCH_CPU_H
 #define DFC_SEARCH_CPU_H
 
-#include "stdint.h"
-#include "ctype.h"
+#include <ctype.h>
+#include <stdint.h>
+
 #include "dfc.h"
+#include "utility.h"
 
 static int my_strncmp(unsigned char *a, unsigned char *b, int n) {
   int i;
@@ -21,8 +23,8 @@ static int my_strncasecmp(unsigned char *a, unsigned char *b, int n) {
   return 0;
 }
 
-static bool doesPatternMatch(uint8_t *start, uint8_t *pattern,
-                                    int length, bool isCaseInsensitive) {
+static bool doesPatternMatch(uint8_t *start, uint8_t *pattern, int length,
+                             bool isCaseInsensitive) {
   if (isCaseInsensitive) {
     return !my_strncasecmp(start, pattern, length);
   }
@@ -30,7 +32,7 @@ static bool doesPatternMatch(uint8_t *start, uint8_t *pattern,
 }
 
 static int verifySmall(DFC_STRUCTURE *dfc, uint8_t *input,
-                              int remainingCharacters) {
+                       int remainingCharacters) {
   uint8_t hash = input[0];
   CompactTableSmallEntry *entry = &dfc->compactTableSmall[hash];
 
@@ -50,8 +52,8 @@ static int verifySmall(DFC_STRUCTURE *dfc, uint8_t *input,
   return matches;
 }
 
-static int verifyLarge(DFC_STRUCTURE *dfc, uint8_t *input,
-                              int currentPos, int inputLength) {
+static int verifyLarge(DFC_STRUCTURE *dfc, uint8_t *input, int currentPos,
+                       int inputLength) {
   uint32_t bytePattern = *(uint32_t *)(input - 2);
   uint32_t hash = hashForLargeCompactTable(bytePattern);
   CompactTableLargeEntry *entry = dfc->compactTableLarge[hash].entries;
@@ -81,7 +83,7 @@ int search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
   int matches = 0;
 
   for (int i = 0; i < inputLength; ++i) {
-    uint16_t data = *(uint16_t *)(input + i);
+    uint16_t data = *(input + i + 1) << 8 | *(input + i);
     uint16_t byteIndex = BINDEX(data & DF_MASK);
     uint16_t bitMask = BMASK(data & DF_MASK);
 

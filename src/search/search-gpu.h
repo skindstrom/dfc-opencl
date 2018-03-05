@@ -53,8 +53,8 @@ cl_context getContext(cl_device_id device) {
 }
 
 cl_program loadAndCreateProgram(cl_context context) {
-  /* Load the source code containing the kernel*/
-  FILE *fp = fopen("./kernel.cl", "r");
+  // Currently expecting the PWD to be "build"
+  FILE *fp = fopen("../src/search/kernel.cl", "r");
   if (!fp) {
     fprintf(stderr, "Failed to load kernel.\n");
     exit(COULD_NOT_LOAD_KERNEL);
@@ -85,17 +85,28 @@ cl_program loadAndCreateProgram(cl_context context) {
 
 void buildProgram(cl_program *program, cl_device_id device) {
   cl_int status =
-      clBuildProgram(*program, 1, &device, "cl-std=CL1.2", NULL, NULL);
+      clBuildProgram(*program, 1, &device, "-cl-std=CL1.2", NULL, NULL);
 
   if (status != CL_SUCCESS) {
-    fprintf(stderr, "Could not compile program for reason %i", status);
+    size_t log_size;
+    clGetProgramBuildInfo(*program, device, CL_PROGRAM_BUILD_LOG, 0, NULL,
+                          &log_size);
+
+    char *log = (char *)malloc(log_size);
+    clGetProgramBuildInfo(*program, device, CL_PROGRAM_BUILD_LOG, log_size, log,
+                          NULL);
+
+    fprintf(stderr, "Could not compile program for reason %i\n", status);
+    fprintf(stderr, "%s\n", log);
+
+    free(log);
     exit(OPENCL_COULD_NOT_BUILD_PROGRAM);
   }
 }
 
 cl_kernel createKernel(cl_program *program) {
   cl_int status;
-  cl_kernel kernel = clCreateKernel(*program, "DFC_Search_GPU", &status);
+  cl_kernel kernel = clCreateKernel(*program, "search", &status);
 
   if (status != CL_SUCCESS) {
     fprintf(stderr, "Could not create kernel for reason %i", status);
@@ -120,14 +131,12 @@ int search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
                      sizeof(DFC_FIXED_PATTERN) * dfc->numPatterns, NULL, NULL);
   cl_mem dfSmall = clCreateBuffer(context, CL_MEM_READ_ONLY,
                                   sizeof(dfc->directFilterSmall), NULL, NULL);
-  cl_mem ctSmall;
-  clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(dfc->compactTableSmall),
-                 NULL, NULL);
+  cl_mem ctSmall = clCreateBuffer(context, CL_MEM_READ_ONLY,
+                                  sizeof(dfc->compactTableSmall), NULL, NULL);
   cl_mem dfLarge = clCreateBuffer(context, CL_MEM_READ_ONLY,
                                   sizeof(dfc->directFilterLarge), NULL, NULL);
-  cl_mem ctLarge;
-  clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(dfc->compactTableLarge),
-                 NULL, NULL);
+  cl_mem ctLarge = clCreateBuffer(context, CL_MEM_READ_ONLY,
+                                  sizeof(dfc->compactTableLarge), NULL, NULL);
   cl_mem result =
       clCreateBuffer(context, CL_MEM_READ_WRITE, inputLength, NULL, NULL);
 
@@ -153,18 +162,22 @@ int search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
                        sizeof(dfc->compactTableLarge), dfc->compactTableLarge,
                        0, NULL, NULL);
 
-  clSetKernelArg(kernel, 0, sizeof(cl_mem), &kernelInput);
-  clSetKernelArg(kernel, 1, sizeof(cl_mem), &patterns);
-  clSetKernelArg(kernel, 2, sizeof(cl_mem), &dfSmall);
-  clSetKernelArg(kernel, 3, sizeof(cl_mem), &ctSmall);
-  clSetKernelArg(kernel, 4, sizeof(cl_mem), &dfLarge);
-  clSetKernelArg(kernel, 5, sizeof(cl_mem), &ctLarge);
-  clSetKernelArg(kernel, 6, sizeof(cl_mem), &result);
+  clSetKernelArg(kernel, 0, sizeof(int), &inputLength);
+  clSetKernelArg(kernel, 1, sizeof(cl_mem), &kernelInput);
+  clSetKernelArg(kernel, 2, sizeof(cl_mem), &patterns);
+  clSetKernelArg(kernel, 3, sizeof(cl_mem), &dfSmall);
+  clSetKernelArg(kernel, 4, sizeof(cl_mem), &ctSmall);
+  clSetKernelArg(kernel, 5, sizeof(cl_mem), &dfLarge);
+  clSetKernelArg(kernel, 6, sizeof(cl_mem), &ctLarge);
+  clSetKernelArg(kernel, 7, sizeof(cl_mem), &result);
   clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &globalGroupSize,
                          &localGroupSize, 0, NULL, NULL);
 
   uint8_t *output = malloc(inputLength);
-  clEnqueueReadBuffer(queue, result, CL_BLOCKING, 0, sizeof(result), output, 0,
+  for (int i = 0; i < inputLength; ++i) {
+    output[i] = 0;
+  }
+  clEnqueueReadBuffer(queue, result, CL_BLOCKING, 0, inputLength, output, 0,
                       NULL, NULL);
 
   int matches = 0;

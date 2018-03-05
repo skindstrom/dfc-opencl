@@ -5,8 +5,8 @@
 
 #include "dfc.h"
 #include "assert.h"
-#include "utility.h"
 #include "search.h"
+#include "utility.h"
 
 static unsigned char xlatcase[256];
 
@@ -173,7 +173,6 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
   return 0;
 }
 
-
 int DFC_Search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
   return search(dfc, input, inputLength);
 }
@@ -308,7 +307,8 @@ static void setupMatchList(DFC_STRUCTURE *dfc) {
     int first_node_flag = 1;
     while (node != NULL) {
       if (begin_node_flag) {
-        begin_node_flag = 0;dfc->dfcPatterns = node;
+        begin_node_flag = 0;
+        dfc->dfcPatterns = node;
       } else {
         if (first_node_flag) {
           first_node_flag = 0;
