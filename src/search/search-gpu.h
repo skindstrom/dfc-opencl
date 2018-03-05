@@ -141,7 +141,8 @@ int search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
       clCreateBuffer(context, CL_MEM_READ_WRITE, inputLength, NULL, NULL);
 
   const size_t localGroupSize = 64;
-  const size_t globalGroupSize = ceil((float)inputLength / localGroupSize);
+  const size_t globalGroupSize =
+      ceil((float)inputLength / localGroupSize) * localGroupSize;
 
   cl_command_queue queue = clCreateCommandQueue(context, device, 0, NULL);
   clEnqueueWriteBuffer(queue, kernelInput, CL_BLOCKING, 0, inputLength, input,
@@ -170,8 +171,13 @@ int search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
   clSetKernelArg(kernel, 5, sizeof(cl_mem), &dfLarge);
   clSetKernelArg(kernel, 6, sizeof(cl_mem), &ctLarge);
   clSetKernelArg(kernel, 7, sizeof(cl_mem), &result);
-  clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &globalGroupSize,
-                         &localGroupSize, 0, NULL, NULL);
+
+  int status = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &globalGroupSize,
+                                      &localGroupSize, 0, NULL, NULL);
+  if (status != CL_SUCCESS) {
+    fprintf(stderr, "Could not start kernel");
+    exit(1);
+  }
 
   uint8_t *output = malloc(inputLength);
   for (int i = 0; i < inputLength; ++i) {

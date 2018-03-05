@@ -113,8 +113,8 @@ static int verifySmall(__global CompactTableSmallEntry *ct,
 static int verifyLarge(__global CompactTableLarge *ct,
                        __global DFC_FIXED_PATTERN *patterns,
                        __global uchar *input, int currentPos, int inputLength) {
-  uint bytePattern =
-      *(input + 3) << 24 | *(input + 2) << 16 | *(input + 1) << 8 | *(input);
+  uint bytePattern = *(input + 1) << 24 | *(input + 0) << 16 |
+                     *(input - 1) << 8 | *(input - 2);
   uint hash = hashForLargeCompactTable(bytePattern);
 
   int matches = 0;
@@ -146,7 +146,9 @@ __kernel void search(int inputLength, __global uchar *input,
                      __global uchar *result) {
   uchar matches = 0;
 
-  int i = get_global_id(0) * 64 + get_local_id(0);
+  uint i = get_group_id(0) * get_local_size(0) + get_local_id(0);
+
+  if (i >= inputLength) return;
 
   ushort data = *(input + i + 1) << 8 | *(input + i);
   ushort byteIndex = (ushort)BINDEX(data & DF_MASK);
@@ -160,5 +162,5 @@ __kernel void search(int inputLength, __global uchar *input,
     matches += verifyLarge(ctLarge, patterns, input + i, i, inputLength);
   }
 
-  result[i] = i;
+  result[i] = matches;
 }
