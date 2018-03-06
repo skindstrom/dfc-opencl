@@ -124,9 +124,9 @@ static int verifyLarge(__global CompactTableLarge *ct,
         PID_TYPE pid = GET_ENTRY_LARGE_CT(hash, multiplier)->pids[i];
 
         int patternLength = (patterns + pid)->pattern_length;
-        if (currentPos >= patternLength - 2 && inputLength - currentPos > 1) {
+        if (currentPos >= patternLength - 4 && inputLength - currentPos > 3) {
           matches += doesPatternMatch(
-              input - (patternLength - 2), (patterns + pid)->original_pattern,
+              input - (patternLength - 4), (patterns + pid)->original_pattern,
               patternLength, (patterns + pid)->is_case_insensitive);
         }
       }
@@ -136,13 +136,10 @@ static int verifyLarge(__global CompactTableLarge *ct,
   return matches;
 }
 
-ushort directFilterHash(uint val) {
-   return (val) & DF_MASK;
-}
+ushort directFilterHash(uint val) { return (val * 8387) & DF_MASK; }
 
 bool isInHashDf(__global uchar *df, __global uchar *input) {
-  uint data =
-      *(input + 1) << 24 | *(input) << 16 | *(input - 1) << 8 | *(input - 2);
+  uint data = input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
   ushort byteIndex = directFilterHash(data);
   ushort bitMask = BMASK(data & DF_MASK);
 
@@ -170,8 +167,10 @@ __kernel void search(int inputLength, __global uchar *input,
     matches += verifySmall(ctSmall, patterns, input + i, inputLength - i + 1);
   }
 
-  if ((dfLarge[byteIndex] & bitMask) && isInHashDf(dfLargeHash, input + i)) {
-    matches += verifyLarge(ctLarge, patterns, input + i, i, inputLength);
+  if ((dfLarge[byteIndex] & bitMask) &&
+      isInHashDf(dfLargeHash, input + i - 2)) {
+    matches +=
+        verifyLarge(ctLarge, patterns, input + i - 2, i - 2, inputLength);
   }
 
   result[i] = matches;

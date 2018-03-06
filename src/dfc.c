@@ -438,7 +438,8 @@ static void addPatternToLargeDirectFilter(DFC_STRUCTURE *dfc,
 }
 
 static void maskPatternIntoDirectFilterHash(uint8_t *df, uint8_t *pattern) {
-  uint32_t data = *(uint32_t *)pattern;
+  uint32_t data =
+      pattern[3] << 24 | pattern[2] << 16 | pattern[1] << 8 | pattern[0];
   uint16_t byteIndex = directFilterHash(data);
   uint16_t bitMask = BMASK(data & DF_MASK);
 
@@ -572,15 +573,19 @@ static void addPatternToLargeCompactTable(DFC_STRUCTURE *dfc,
                        patternPermutations);
 
     for (int i = 0; i < permutationCount; ++i) {
-      pushPatternToLargeCompactTable(
-          dfc, *(uint32_t *)(patternPermutations + (i * patternLength)),
-          pattern->iid);
+      uint32_t data = patternPermutations[i * patternLength + 3] << 24 |
+                      patternPermutations[i * patternLength + 2] << 16 |
+                      patternPermutations[i * patternLength + 1] << 8 |
+                      patternPermutations[i * patternLength + 0];
+      pushPatternToLargeCompactTable(dfc, data, pattern->iid);
     }
 
     free(patternPermutations);
   } else {
-    pushPatternToLargeCompactTable(dfc, *(uint32_t *)lastCharactersOfPattern,
-                                   pattern->iid);
+    uint32_t data =
+        lastCharactersOfPattern[3] << 24 | lastCharactersOfPattern[2] << 16 |
+        lastCharactersOfPattern[1] << 8 | lastCharactersOfPattern[0];
+    pushPatternToLargeCompactTable(dfc, data, pattern->iid);
   }
 }
 
