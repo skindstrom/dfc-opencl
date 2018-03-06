@@ -135,6 +135,9 @@ int search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
                                   sizeof(dfc->compactTableSmall), NULL, NULL);
   cl_mem dfLarge = clCreateBuffer(context, CL_MEM_READ_ONLY,
                                   sizeof(dfc->directFilterLarge), NULL, NULL);
+  cl_mem dfLargeHash =
+      clCreateBuffer(context, CL_MEM_READ_ONLY,
+                     sizeof(dfc->directFilterLargeHash), NULL, NULL);
   cl_mem ctLarge = clCreateBuffer(context, CL_MEM_READ_ONLY,
                                   sizeof(dfc->compactTableLarge), NULL, NULL);
   cl_mem result =
@@ -159,6 +162,9 @@ int search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
   clEnqueueWriteBuffer(queue, dfLarge, CL_BLOCKING, 0,
                        sizeof(dfc->directFilterLarge), dfc->directFilterLarge,
                        0, NULL, NULL);
+  clEnqueueWriteBuffer(queue, dfLargeHash, CL_BLOCKING, 0,
+                       sizeof(dfc->directFilterLargeHash),
+                       dfc->directFilterLargeHash, 0, NULL, NULL);
   clEnqueueWriteBuffer(queue, ctLarge, CL_BLOCKING, 0,
                        sizeof(dfc->compactTableLarge), dfc->compactTableLarge,
                        0, NULL, NULL);
@@ -169,13 +175,14 @@ int search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
   clSetKernelArg(kernel, 3, sizeof(cl_mem), &dfSmall);
   clSetKernelArg(kernel, 4, sizeof(cl_mem), &ctSmall);
   clSetKernelArg(kernel, 5, sizeof(cl_mem), &dfLarge);
-  clSetKernelArg(kernel, 6, sizeof(cl_mem), &ctLarge);
-  clSetKernelArg(kernel, 7, sizeof(cl_mem), &result);
+  clSetKernelArg(kernel, 6, sizeof(cl_mem), &dfLargeHash);
+  clSetKernelArg(kernel, 7, sizeof(cl_mem), &ctLarge);
+  clSetKernelArg(kernel, 8, sizeof(cl_mem), &result);
 
   int status = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &globalGroupSize,
                                       &localGroupSize, 0, NULL, NULL);
   if (status != CL_SUCCESS) {
-    fprintf(stderr, "Could not start kernel");
+    fprintf(stderr, "Could not start kernel: %d\n", status);
     exit(1);
   }
 
@@ -183,8 +190,13 @@ int search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
   for (int i = 0; i < inputLength; ++i) {
     output[i] = 0;
   }
-  clEnqueueReadBuffer(queue, result, CL_BLOCKING, 0, inputLength, output, 0,
-                      NULL, NULL);
+  status = clEnqueueReadBuffer(queue, result, CL_BLOCKING, 0, inputLength,
+                               output, 0, NULL, NULL);
+
+  if (status != CL_SUCCESS) {
+    fprintf(stderr, "Could not read result: %d\n", status);
+    exit(1);
+  }
 
   int matches = 0;
   for (int i = 0; i < inputLength; ++i) {

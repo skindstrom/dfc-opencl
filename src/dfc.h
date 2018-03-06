@@ -74,6 +74,8 @@ typedef struct {
   CompactTableSmallEntry compactTableSmall[COMPACT_TABLE_SIZE_SMALL];
 
   uint8_t directFilterLarge[DF_SIZE_REAL];
+  // Indexed by hashing more bytes of the input
+  uint8_t directFilterLargeHash[DF_SIZE_REAL];
   CompactTableLarge compactTableLarge[COMPACT_TABLE_SIZE_LARGE];
 } DFC_STRUCTURE;
 

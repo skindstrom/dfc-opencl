@@ -23,6 +23,8 @@ static void addPatternToSmallDirectFilter(DFC_STRUCTURE *dfc,
                                           DFC_PATTERN *pattern);
 static void addPatternToLargeDirectFilter(DFC_STRUCTURE *dfc,
                                           DFC_PATTERN *pattern);
+static void addPatternToLargeDirectFilterHash(DFC_STRUCTURE *dfc,
+                                              DFC_PATTERN *pattern);
 static void createPermutations(uint8_t *pattern, int patternLength,
                                int permutationCount, uint8_t *permutations);
 static void setupCompactTables(DFC_STRUCTURE *dfc);
@@ -341,6 +343,7 @@ static void setupDirectFilters(DFC_STRUCTURE *dfc) {
       addPatternToSmallDirectFilter(dfc, plist);
     } else {
       addPatternToLargeDirectFilter(dfc, plist);
+      addPatternToLargeDirectFilterHash(dfc, plist);
     }
   }
 }
@@ -432,6 +435,42 @@ static void addPatternToLargeDirectFilter(DFC_STRUCTURE *dfc,
   uint8_t *lastCharactersOfPattern = pattern->casepatrn + ((pattern->n - 2));
   addPatternToDirectFilter(dfc->directFilterLarge, pattern->is_case_insensitive,
                            lastCharactersOfPattern, 2);
+}
+
+static void maskPatternIntoDirectFilterHash(uint8_t *df, uint8_t *pattern) {
+  uint32_t data = *(uint32_t *)pattern;
+  uint16_t byteIndex = directFilterHash(data);
+  uint16_t bitMask = BMASK(data & DF_MASK);
+
+  df[byteIndex] |= bitMask;
+}
+
+static void addPatternToLargeDirectFilterHash(DFC_STRUCTURE *dfc,
+                                              DFC_PATTERN *pattern) {
+  int patternLength = 4;
+  assert(pattern->n >= patternLength);
+
+  uint8_t *lastCharactersOfPattern =
+      pattern->casepatrn + ((pattern->n - patternLength));
+  if (pattern->is_case_insensitive) {
+    int permutationCount = 2 << (patternLength - 1);
+    uint8_t *patternPermutations =
+        (uint8_t *)malloc(permutationCount * patternLength);
+
+    createPermutations(lastCharactersOfPattern, patternLength, permutationCount,
+                       patternPermutations);
+
+    for (int i = 0; i < permutationCount; ++i) {
+      maskPatternIntoDirectFilterHash(
+          dfc->directFilterLargeHash,
+          patternPermutations + (i * patternLength));
+    }
+
+    free(patternPermutations);
+  } else {
+    maskPatternIntoDirectFilterHash(dfc->directFilterLargeHash,
+                                    lastCharactersOfPattern);
+  }
 }
 
 static void pushPatternToSmallCompactTable(DFC_STRUCTURE *dfc, uint8_t pattern,

@@ -85,6 +85,15 @@ static int verifyLarge(CompactTableLarge *ct, DFC_FIXED_PATTERN *patterns,
   return matches;
 }
 
+static bool isInHashDf(uint8_t *df, uint8_t *input) {
+  uint32_t data =
+      *(input + 1) << 24 | *(input) << 16 | *(input - 1) << 8 | *(input - 2);
+  uint16_t byteIndex = directFilterHash(data);
+  uint16_t bitMask = BMASK(data & DF_MASK);
+
+  return df[byteIndex] & bitMask;
+}
+
 int search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
   int matches = 0;
 
@@ -98,7 +107,8 @@ int search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
                              input + i, inputLength - i + 1);
     }
 
-    if (dfc->directFilterLarge[byteIndex] & bitMask) {
+    if ((dfc->directFilterLarge[byteIndex] & bitMask) &&
+        isInHashDf(dfc->directFilterLargeHash, input + i)) {
       matches += verifyLarge(dfc->compactTableLarge, dfc->dfcMatchList,
                              input + i, i, inputLength);
     }

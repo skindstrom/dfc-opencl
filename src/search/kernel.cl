@@ -53,9 +53,8 @@ typedef struct _dfc_fixed_pattern {
   PID_TYPE external_ids[MAX_EQUAL_PATTERNS];
 } DFC_FIXED_PATTERN;
 
-// TODO: improve
 uint hashForLargeCompactTable(uint input) {
-  return input & (COMPACT_TABLE_SIZE_LARGE - 1);
+  return (input * 8389) & (COMPACT_TABLE_SIZE_LARGE - 1);
 }
 
 int my_strncmp(__global unsigned char *a, __global unsigned char *b, int n) {
@@ -137,11 +136,24 @@ static int verifyLarge(__global CompactTableLarge *ct,
   return matches;
 }
 
+ushort directFilterHash(uint val) {
+   return (val) & DF_MASK;
+}
+
+bool isInHashDf(__global uchar *df, __global uchar *input) {
+  uint data =
+      *(input + 1) << 24 | *(input) << 16 | *(input - 1) << 8 | *(input - 2);
+  ushort byteIndex = directFilterHash(data);
+  ushort bitMask = BMASK(data & DF_MASK);
+
+  return df[byteIndex] & bitMask;
+}
+
 __kernel void search(int inputLength, __global uchar *input,
                      __global DFC_FIXED_PATTERN *patterns,
                      __global uchar *dfSmall,
                      __global CompactTableSmallEntry *ctSmall,
-                     __global uchar *dfLarge,
+                     __global uchar *dfLarge, __global uchar *dfLargeHash,
                      __global CompactTableLarge *ctLarge,
                      __global uchar *result) {
   uchar matches = 0;
@@ -158,7 +170,7 @@ __kernel void search(int inputLength, __global uchar *input,
     matches += verifySmall(ctSmall, patterns, input + i, inputLength - i + 1);
   }
 
-  if (dfLarge[byteIndex] & bitMask) {
+  if ((dfLarge[byteIndex] & bitMask) && isInHashDf(dfLargeHash, input + i)) {
     matches += verifyLarge(ctLarge, patterns, input + i, i, inputLength);
   }
 

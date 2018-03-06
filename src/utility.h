@@ -59,9 +59,12 @@ void ConvertCaseEx(unsigned char *d, unsigned char *s, int m,
   for (i = 0; i < m; i++) d[i] = xlatcase[s[i]];
 }
 
-// TODO: improve
 uint32_t hashForLargeCompactTable(uint32_t input) {
-  return input & (COMPACT_TABLE_SIZE_LARGE - 1);
+  return (input * 8389) & (COMPACT_TABLE_SIZE_LARGE - 1);
+}
+
+uint16_t directFilterHash(uint32_t val) {
+  return (val * 8387) & DF_MASK;
 }
 
 #endif
