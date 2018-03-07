@@ -112,8 +112,7 @@ static int verifySmall(__global CompactTableSmallEntry *ct,
 static int verifyLarge(__global CompactTableLarge *ct,
                        __global DFC_FIXED_PATTERN *patterns,
                        __global uchar *input, int currentPos, int inputLength) {
-  uint bytePattern = *(input + 1) << 24 | *(input + 0) << 16 |
-                     *(input - 1) << 8 | *(input - 2);
+  uint bytePattern = input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
   uint hash = hashForLargeCompactTable(bytePattern);
 
   int matches = 0;
@@ -136,21 +135,11 @@ static int verifyLarge(__global CompactTableLarge *ct,
   return matches;
 }
 
-ushort directFilterHash(uint val) { return (val * 8387) & DF_MASK; }
-
-bool isInHashDf(__global uchar *df, __global uchar *input) {
-  uint data = input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
-  ushort byteIndex = directFilterHash(data);
-  ushort bitMask = BMASK(data & DF_MASK);
-
-  return df[byteIndex] & bitMask;
-}
-
 __kernel void search(int inputLength, __global uchar *input,
                      __global DFC_FIXED_PATTERN *patterns,
                      __global uchar *dfSmall,
                      __global CompactTableSmallEntry *ctSmall,
-                     __global uchar *dfLarge, __global uchar *dfLargeHash,
+                     __global uchar *dfLarge,
                      __global CompactTableLarge *ctLarge,
                      __global uchar *result) {
   uchar matches = 0;
@@ -167,8 +156,7 @@ __kernel void search(int inputLength, __global uchar *input,
     matches += verifySmall(ctSmall, patterns, input + i, inputLength - i + 1);
   }
 
-  if ((dfLarge[byteIndex] & bitMask) &&
-      isInHashDf(dfLargeHash, input + i - 2)) {
+  if ((dfLarge[byteIndex] & bitMask)) {
     matches +=
         verifyLarge(ctLarge, patterns, input + i - 2, i - 2, inputLength);
   }
