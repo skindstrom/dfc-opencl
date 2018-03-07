@@ -10,11 +10,6 @@
 
 #define DF_MASK (DF_SIZE - 1)
 
-#define CT2_TABLE_SIZE_MASK (CT2_TABLE_SIZE - 1)
-#define CT3_TABLE_SIZE_MASK (CT3_TABLE_SIZE - 1)
-#define CT4_TABLE_SIZE_MASK (CT4_TABLE_SIZE - 1)
-#define CT8_TABLE_SIZE_MASK (CT8_TABLE_SIZE - 1)
-
 #ifndef likely
 #define likely(expr) __builtin_expect(!!(expr), 1)
 #endif
@@ -63,6 +58,8 @@ uint32_t hashForLargeCompactTable(uint32_t input) {
   return (input * 8389) & (COMPACT_TABLE_SIZE_LARGE - 1);
 }
 
-uint16_t directFilterHash(uint32_t val) { return (val * 8387) & DF_MASK; }
+uint16_t directFilterHash(int32_t val) {
+  return BINDEX((val * 8387) & DF_MASK);
+}
 
 #endif

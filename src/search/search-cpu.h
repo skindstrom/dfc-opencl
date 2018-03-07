@@ -94,6 +94,12 @@ static bool isInHashDf(uint8_t *df, uint8_t *input) {
 }
 
 int search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
+  for (int i = 0; i < DF_SIZE; ++i) {
+    uint32_t tmp = dfc->directFilterLargeHash[i];
+    tmp = 123;
+    (void)(tmp);
+  }
+
   int matches = 0;
 
   for (int i = 0; i < inputLength; ++i) {
