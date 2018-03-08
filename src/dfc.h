@@ -84,7 +84,9 @@ int DFC_AddPattern(DFC_STRUCTURE *dfc, unsigned char *pat, int n,
                    int is_case_insensitive, PID_TYPE sid);
 int DFC_Compile(DFC_STRUCTURE *dfc);
 
-int DFC_Search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength);
+typedef void (*MatchFunction)(DFC_FIXED_PATTERN *pattern);
+int DFC_Search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength,
+               MatchFunction onMatch);
 void DFC_PrintInfo(DFC_STRUCTURE *dfc);
 void DFC_FreeStructure(DFC_STRUCTURE *dfc);
 

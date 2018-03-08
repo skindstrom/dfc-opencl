@@ -5,7 +5,9 @@
 
 #include "dfc.h"
 
-void Print_Result(unsigned char *, uint32_t *, uint32_t);
+void Print_Result(DFC_FIXED_PATTERN *pattern) {
+  puts((const char*)pattern->original_pattern);
+}
 
 int main(void) {
   char *buf =
@@ -42,7 +44,7 @@ int main(void) {
 
   // 4. [DFC] Search
   printf("* Result:\n");
-  int res = DFC_Search(dfc, (unsigned char *)buf, strlen(buf));
+  int res = DFC_Search(dfc, (unsigned char *)buf, strlen(buf), Print_Result);
   printf("\n* Total match count: %d\n", res);
 
   // 5. [DFC] Free DFC structure

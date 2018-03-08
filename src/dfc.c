@@ -175,8 +175,23 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
   return 0;
 }
 
-int DFC_Search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
-  return search(dfc, input, inputLength);
+int DFC_Search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength,
+                     MatchFunction onMatch) {
+  uint8_t *matchesPerPattern = malloc(dfc->numPatterns);
+  for (int i = 0; i < dfc->numPatterns; ++i) {
+    matchesPerPattern[i] = 0;
+  }
+
+  search(dfc, input, inputLength, matchesPerPattern);
+  int matchCount = 0;
+  for (int i = 0; i < dfc->numPatterns; ++i) {
+    matchCount += matchesPerPattern[i];
+    if (matchesPerPattern[i] > 0 && onMatch != NULL) {
+      onMatch(&dfc->dfcMatchList[i]);
+    }
+  }
+
+  return matchCount;
 }
 
 static void *DFC_REALLOC(void *p, uint16_t n, dfcDataType type) {
@@ -288,6 +303,15 @@ static DFC_FIXED_PATTERN createFixed(DFC_PATTERN *original) {
 
   new.pattern_length = original->n;
   new.is_case_insensitive = original->is_case_insensitive;
+
+  for (int i = 0; i < MAX_PATTERN_LENGTH; ++i) {
+    new.upper_case_pattern[i] = 0;
+    new.original_pattern[i] = 0;
+  }
+
+  for (int i = 0; i < MAX_EQUAL_PATTERNS; ++i) {
+    new.external_ids[i] = 0;
+  }
 
   for (int i = 0; i < original->n; ++i) {
     new.upper_case_pattern[i] = original->patrn[i];
