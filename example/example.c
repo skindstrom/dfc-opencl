@@ -6,7 +6,7 @@
 #include "dfc.h"
 
 void Print_Result(DFC_FIXED_PATTERN *pattern) {
-  puts((const char*)pattern->original_pattern);
+  puts((const char *)pattern->original_pattern);
 }
 
 int main(void) {

@@ -116,7 +116,8 @@ cl_kernel createKernel(cl_program *program) {
   return kernel;
 }
 
-int search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
+void search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength,
+            uint8_t *matchesPerPattern) {
   cl_platform_id platform = getPlatform();
   cl_device_id device = getDevice(platform);
   cl_context context = getContext(device);
@@ -218,8 +219,6 @@ int search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
   clReleaseCommandQueue(queue);
   clReleaseContext(context);
   free(output);
-
-  return matches;
 }
 
 #endif

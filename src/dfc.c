@@ -176,7 +176,7 @@ int DFC_Compile(DFC_STRUCTURE *dfc) {
 }
 
 int DFC_Search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength,
-                     MatchFunction onMatch) {
+               MatchFunction onMatch) {
   uint8_t *matchesPerPattern = malloc(dfc->numPatterns);
   for (int i = 0; i < dfc->numPatterns; ++i) {
     matchesPerPattern[i] = 0;
