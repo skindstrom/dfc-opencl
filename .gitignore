@@ -2,3 +2,4 @@ tags
 .vscode
 build
 *.gch
+*.iptables
