@@ -294,11 +294,26 @@ This caused problems on the device in about 30% of cases when
 executing the test using the password file.
 The password was "1340lu" and failed against "blue"
 */
- TEST_CASE("Bounds checking is performed to not access outside of input") {
+ TEST_CASE("Bounds checking done for short patterns") {
    PID_TYPE pid = 0;
 
    auto input = "lu";
    auto pattern = "alu";
+
+   DFC_STRUCTURE* dfc = DFC_New();
+   addCaseSensitivePattern(dfc, pattern, pid);
+   DFC_Compile(dfc);
+   auto matchCount = DFC_Search(dfc, (unsigned char*)input, strlen(input));
+   DFC_FreeStructure(dfc);
+
+   REQUIRE(matchCount == 0);
+ }
+
+ TEST_CASE("Bounds checking done for long patterns") {
+   PID_TYPE pid = 0;
+
+   auto input = "lu";
+   auto pattern = "longlu";
 
    DFC_STRUCTURE* dfc = DFC_New();
    addCaseSensitivePattern(dfc, pattern, pid);
