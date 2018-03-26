@@ -147,25 +147,26 @@ int search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
   const size_t globalGroupSize =
       ceil((float)inputLength / localGroupSize) * localGroupSize;
 
+  const int blocking = 1;
   cl_command_queue queue = clCreateCommandQueue(context, device, 0, NULL);
-  clEnqueueWriteBuffer(queue, kernelInput, CL_BLOCKING, 0, inputLength, input,
+  clEnqueueWriteBuffer(queue, kernelInput, blocking, 0, inputLength, input,
                        0, NULL, NULL);
-  clEnqueueWriteBuffer(queue, patterns, CL_BLOCKING, 0,
+  clEnqueueWriteBuffer(queue, patterns, blocking, 0,
                        sizeof(DFC_FIXED_PATTERN) * dfc->numPatterns,
                        dfc->dfcMatchList, 0, NULL, NULL);
-  clEnqueueWriteBuffer(queue, dfSmall, CL_BLOCKING, 0,
+  clEnqueueWriteBuffer(queue, dfSmall, blocking, 0,
                        sizeof(dfc->directFilterSmall), dfc->directFilterSmall,
                        0, NULL, NULL);
-  clEnqueueWriteBuffer(queue, ctSmall, CL_BLOCKING, 0,
+  clEnqueueWriteBuffer(queue, ctSmall, blocking, 0,
                        sizeof(dfc->compactTableSmall), dfc->compactTableSmall,
                        0, NULL, NULL);
-  clEnqueueWriteBuffer(queue, dfLarge, CL_BLOCKING, 0,
+  clEnqueueWriteBuffer(queue, dfLarge, blocking, 0,
                        sizeof(dfc->directFilterLarge), dfc->directFilterLarge,
                        0, NULL, NULL);
-  clEnqueueWriteBuffer(queue, dfLargeHash, CL_BLOCKING, 0,
+  clEnqueueWriteBuffer(queue, dfLargeHash, blocking, 0,
                        sizeof(dfc->directFilterLargeHash),
                        dfc->directFilterLargeHash, 0, NULL, NULL);
-  clEnqueueWriteBuffer(queue, ctLarge, CL_BLOCKING, 0,
+  clEnqueueWriteBuffer(queue, ctLarge, blocking, 0,
                        sizeof(dfc->compactTableLarge), dfc->compactTableLarge,
                        0, NULL, NULL);
 
@@ -190,7 +191,7 @@ int search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
   for (int i = 0; i < inputLength; ++i) {
     output[i] = 0;
   }
-  status = clEnqueueReadBuffer(queue, result, CL_BLOCKING, 0, inputLength,
+  status = clEnqueueReadBuffer(queue, result, blocking, 0, inputLength,
                                output, 0, NULL, NULL);
 
   if (status != CL_SUCCESS) {

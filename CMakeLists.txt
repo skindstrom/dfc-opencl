@@ -10,7 +10,17 @@ set(OpenCL_VERSION 120)
 find_package(OpenCL)
 
 if(NOT ${OpenCL_FOUND})
-  message( FATAL_ERROR "OpenCL not found" )
+  set (LOCAL_OpenCL "${CMAKE_SOURCE_DIR}/../Mali_OpenCL_SDK")
+  if (EXISTS ${LOCAL_OpenCL})
+    message( "Found local version of OpenCL")
+    set(OpenCL_INCLUDE_DIRS "${LOCAL_OpenCL}/include")
+    # Needs a system-wide opencl library installed
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -L/usr/lib/arm-linux-gnueabihf/")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -L/usr/lib/arm-linux-gnueabihf/")
+    set(OpenCL_LIBRARIES "OpenCL")
+  else()
+    message( FATAL_ERROR "OpenCL not found" )
+  endif()
 endif()
 
 add_definitions(-DCL_USE_DEPRECATED_OPENCL_1_2_APIS)
