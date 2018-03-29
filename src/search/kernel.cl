@@ -91,16 +91,22 @@ bool doesPatternMatch(__global uchar *start, __global uchar *pattern,
 
 int verifySmall(__global CompactTableSmallEntry *ct,
                 __global DFC_FIXED_PATTERN *patterns, __global uchar *input,
-                int remainingCharacters) {
+                int currentPos,
+                int inputLength) {
   uchar hash = input[0];
   int matches = 0;
   for (int i = 0; i < (ct + hash)->pidCount; ++i) {
     PID_TYPE pid = (ct + hash)->pids[i];
 
     int patternLength = (patterns + pid)->pattern_length;
-    if (remainingCharacters >= patternLength) {
+    if (patternLength == 3) {
+      --input;
+      --currentPos;
+    }
+
+    if (currentPos >= 0 && inputLength - currentPos >= patternLength) {
       matches +=
-          doesPatternMatch(patternLength > 2 ? input - 1 : input,
+          doesPatternMatch(input,
                            (patterns + pid)->original_pattern, patternLength,
                            (patterns + pid)->is_case_insensitive);
     }
@@ -163,7 +169,7 @@ __kernel void search(int inputLength, __global uchar *input,
   short bitMask = BMASK(data & DF_MASK);
 
   if (dfSmall[byteIndex] & bitMask) {
-    matches += verifySmall(ctSmall, patterns, input + i, inputLength - i + 1);
+    matches += verifySmall(ctSmall, patterns, input + i, i, inputLength);
   }
 
   if ((dfLarge[byteIndex] & bitMask) &&

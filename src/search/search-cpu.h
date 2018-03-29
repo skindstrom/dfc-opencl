@@ -51,7 +51,7 @@ static int verifySmall(CompactTableSmallEntry *ct, DFC_FIXED_PATTERN *patterns,
       --currentPos;
     }
 
-    if (currentPos > 0 && inputLength - currentPos >= patternLength) {
+    if (currentPos >= 0 && inputLength - currentPos >= patternLength) {
       matches +=
           doesPatternMatch(input,
                            (patterns + pid)->original_pattern, patternLength,
