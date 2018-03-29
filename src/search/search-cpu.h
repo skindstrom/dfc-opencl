@@ -39,16 +39,21 @@ static bool doesPatternMatch(uint8_t *start, uint8_t *pattern, int length,
 }
 
 static int verifySmall(CompactTableSmallEntry *ct, DFC_FIXED_PATTERN *patterns,
-                       uint8_t *input, int remainingCharacters) {
+                       uint8_t *input, int currentPos, int inputLength) {
   uint8_t hash = input[0];
   int matches = 0;
   for (int i = 0; i < (ct + hash)->pidCount; ++i) {
     PID_TYPE pid = (ct + hash)->pids[i];
 
     int patternLength = (patterns + pid)->pattern_length;
-    if (remainingCharacters >= patternLength) {
+    if (patternLength == 3) {
+      --input;
+      --currentPos;
+    }
+
+    if (currentPos > 0 && inputLength - currentPos >= patternLength) {
       matches +=
-          doesPatternMatch(patternLength > 2 ? input - 1 : input,
+          doesPatternMatch(input,
                            (patterns + pid)->original_pattern, patternLength,
                            (patterns + pid)->is_case_insensitive);
     }
@@ -94,12 +99,6 @@ static bool isInHashDf(uint8_t *df, uint8_t *input) {
 }
 
 int search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
-  for (int i = 0; i < DF_SIZE; ++i) {
-    uint32_t tmp = dfc->directFilterLargeHash[i];
-    tmp = 123;
-    (void)(tmp);
-  }
-
   int matches = 0;
 
   for (int i = 0; i < inputLength; ++i) {
@@ -109,7 +108,7 @@ int search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
 
     if (dfc->directFilterSmall[byteIndex] & bitMask) {
       matches += verifySmall(dfc->compactTableSmall, dfc->dfcMatchList,
-                             input + i, inputLength - i + 1);
+                             input + i, i, inputLength);
     }
 
     if ((dfc->directFilterLarge[byteIndex] & bitMask) &&
