@@ -323,3 +323,30 @@ The password was "1340lu" and failed against "blue"
 
    REQUIRE(matchCount == 0);
  }
+
+TEST_CASE("A pattern may match whole string") {
+  PID_TYPE pid = 0;
+  auto input = "Attack";
+
+  DFC_STRUCTURE* dfc = DFC_New();
+  addCaseSensitivePattern(dfc, "Attack", pid);
+  DFC_Compile(dfc);
+  auto matchCount = DFC_Search(dfc, (unsigned char*)input, strlen(input));
+  DFC_FreeStructure(dfc);
+
+  REQUIRE(matchCount == 1);
+}
+
+TEST_CASE("Two patterns with equal last 4 characters both get matched") {
+  PID_TYPE pid = 0;
+  auto input = "Attack";
+
+  DFC_STRUCTURE* dfc = DFC_New();
+  addCaseSensitivePattern(dfc, "Attack", pid);
+  addCaseSensitivePattern(dfc, "ttack", pid);
+  DFC_Compile(dfc);
+  auto matchCount = DFC_Search(dfc, (unsigned char*)input, strlen(input));
+  DFC_FreeStructure(dfc);
+
+  REQUIRE(matchCount == 2);
+}
