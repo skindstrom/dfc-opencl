@@ -1,6 +1,33 @@
 # DFC
 High performance string matching algorithm
 
+# Requirements
+- CMake (3.1 or greater)
+- OpenCL (1.2 or greater)
+- C compiler
+- C++ compiler (C++11 or greater)
+- git
+
+# Building
+```sh
+mkdir build
+cd build
+cmake ..
+make
+```
+
+# Example
+In the build folder:
+```sh
+./example/example
+```
+
+# Testing
+In the build folder:
+```sh
+./tests/tests
+```
+
 # License
 
 <code>CC BY-NC-SA</code> <a href="https://github.com/idleberg/Creative-Commons-Markdown/blob/spaces/4.0/by-nc-sa.markdown">Attribution-NonCommercial-ShareAlike</a>

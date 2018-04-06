@@ -1,2 +1,0 @@
-To port DFC to applications, you are required only to modify "dfc_framework.h".
-You DON'T need to change "dfc.c" or "dfc.h".

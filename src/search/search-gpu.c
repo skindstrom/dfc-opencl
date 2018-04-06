@@ -1,17 +1,18 @@
 #ifndef DFC_SEARCH_CPU_H
 #define DFC_SEARCH_CPU_H
 
+
+#include "math.h"
+#include "stdio.h"
+#include "stdlib.h"
+
 #ifdef __APPLE__
 #include <OpenCL/opencl.h>
 #else
 #include <CL/cl.h>
 #endif
 
-#include "constants.h"
-#include "dfc.h"
-#include "math.h"
-#include "stdio.h"
-#include "stdlib.h"
+#include "search.h"
 
 const int BLOCKING = 1;
 
@@ -34,7 +35,6 @@ typedef struct {
   cl_program program;
   cl_kernel kernel;
 } DfcOpenClEnvironment;
-
 
 cl_platform_id getPlatform() {
   cl_platform_id id;
@@ -147,17 +147,17 @@ DfcOpenClEnvironment setupEnvironment() {
   cl_kernel kernel = createKernel(&program);
 
   DfcOpenClEnvironment env = {
-    .platform = platform,
-    .device = device,
-    .context = context,
-    .program = program,
-    .kernel = kernel,
+      .platform = platform,
+      .device = device,
+      .context = context,
+      .program = program,
+      .kernel = kernel,
   };
 
   return env;
 }
 
-void releaseEnvironment(DfcOpenClEnvironment* environment) {
+void releaseEnvironment(DfcOpenClEnvironment *environment) {
   clReleaseKernel(environment->kernel);
   clReleaseProgram(environment->program);
   clReleaseContext(environment->context);
@@ -167,7 +167,8 @@ cl_command_queue createCommandQueue(DfcOpenClEnvironment *env) {
   return clCreateCommandQueue(env->context, env->device, 0, NULL);
 }
 
-DfcOpenClMemory createMemory(DfcOpenClEnvironment* environment, DFC_STRUCTURE *dfc, int inputLength) {
+DfcOpenClMemory createMemory(DfcOpenClEnvironment *environment,
+                             DFC_STRUCTURE *dfc, int inputLength) {
   cl_context context = environment->context;
   cl_mem kernelInput =
       clCreateBuffer(context, CL_MEM_READ_ONLY, inputLength, NULL, NULL);
@@ -188,24 +189,23 @@ DfcOpenClMemory createMemory(DfcOpenClEnvironment* environment, DFC_STRUCTURE *d
   cl_mem result =
       clCreateBuffer(context, CL_MEM_READ_WRITE, inputLength, NULL, NULL);
 
-  DfcOpenClMemory memory = {
-    .input = kernelInput,
-    .patterns = patterns,
-    .dfSmall = dfSmall,
-    .ctSmall = ctSmall,
-    .dfLarge = dfLarge,
-    .dfLargeHash = dfLargeHash,
-    .ctLarge = ctLarge,
-    .result = result
-  };
-  
+  DfcOpenClMemory memory = {.input = kernelInput,
+                            .patterns = patterns,
+                            .dfSmall = dfSmall,
+                            .ctSmall = ctSmall,
+                            .dfLarge = dfLarge,
+                            .dfLargeHash = dfLargeHash,
+                            .ctLarge = ctLarge,
+                            .result = result};
+
   return memory;
 }
 
-void writeMemory(DfcOpenClMemory *memory, cl_command_queue queue, DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
+void writeMemory(DfcOpenClMemory *memory, cl_command_queue queue,
+                 DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
   memory->inputLength = inputLength;
-  clEnqueueWriteBuffer(queue, memory->input, BLOCKING, 0, inputLength, input,
-                       0, NULL, NULL);
+  clEnqueueWriteBuffer(queue, memory->input, BLOCKING, 0, inputLength, input, 0,
+                       NULL, NULL);
   clEnqueueWriteBuffer(queue, memory->patterns, BLOCKING, 0,
                        sizeof(DFC_FIXED_PATTERN) * dfc->numPatterns,
                        dfc->dfcMatchList, 0, NULL, NULL);
@@ -249,7 +249,8 @@ void setKernelArgs(cl_kernel kernel, DfcOpenClMemory *mem) {
   clSetKernelArg(kernel, 8, sizeof(cl_mem), &mem->result);
 }
 
-void startKernelForQueue(cl_kernel kernel, cl_command_queue queue, int inputLength) {
+void startKernelForQueue(cl_kernel kernel, cl_command_queue queue,
+                         int inputLength) {
   const size_t localGroupSize = WORK_GROUP_SIZE;
   const size_t globalGroupSize =
       ceil((float)inputLength / localGroupSize) * localGroupSize;
@@ -267,8 +268,8 @@ int readResult(DfcOpenClMemory *mem, cl_command_queue queue) {
   for (int i = 0; i < mem->inputLength; ++i) {
     output[i] = 0;
   }
-  int status = clEnqueueReadBuffer(queue, mem->result, BLOCKING, 0, mem->inputLength,
-                               output, 0, NULL, NULL);
+  int status = clEnqueueReadBuffer(queue, mem->result, BLOCKING, 0,
+                                   mem->inputLength, output, 0, NULL, NULL);
 
   if (status != CL_SUCCESS) {
     free(output);

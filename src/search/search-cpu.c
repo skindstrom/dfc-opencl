@@ -4,7 +4,7 @@
 #include <ctype.h>
 #include <stdint.h>
 
-#include "dfc.h"
+#include "search.h"
 #include "utility.h"
 
 static int my_strncmp(unsigned char *a, unsigned char *b, int n) {
@@ -52,10 +52,9 @@ static int verifySmall(CompactTableSmallEntry *ct, DFC_FIXED_PATTERN *patterns,
     }
 
     if (currentPos >= 0 && inputLength - currentPos >= patternLength) {
-      matches +=
-          doesPatternMatch(input,
-                           (patterns + pid)->original_pattern, patternLength,
-                           (patterns + pid)->is_case_insensitive);
+      matches += doesPatternMatch(input, (patterns + pid)->original_pattern,
+                                  patternLength,
+                                  (patterns + pid)->is_case_insensitive);
     }
   }
 
@@ -86,11 +85,12 @@ static int verifyLarge(CompactTableLarge *ct, DFC_FIXED_PATTERN *patterns,
 
         int patternLength = (patterns + pid)->pattern_length;
         int startOfRelativeInput = currentPos - (patternLength - 4);
-        if (startOfRelativeInput >= 0 && inputLength - startOfRelativeInput >= patternLength) {
-          uint8_t* relativeInput = input - (patternLength - 4);
+        if (startOfRelativeInput >= 0 &&
+            inputLength - startOfRelativeInput >= patternLength) {
+          uint8_t *relativeInput = input - (patternLength - 4);
           matches += doesPatternMatch(
-              relativeInput, (patterns + pid)->original_pattern,
-              patternLength, (patterns + pid)->is_case_insensitive);
+              relativeInput, (patterns + pid)->original_pattern, patternLength,
+              (patterns + pid)->is_case_insensitive);
         }
       }
     }

@@ -1,2 +1,7 @@
 #!/bin/sh
-find src example tests -name '*.c' -or -name '*.h' -or -name '*.cpp' -or -name '*.hpp' -or -name '*.cl' -exec clang-format -i -style=file {} +
+source_files=$(find src | grep '\.c\|\.h\|\.cpp\|\.hpp\|\.cl')
+echo $source_files
+
+while read -r source; do
+  clang-format -i -style=file $source
+done <<< "$source_files"
