@@ -25,6 +25,14 @@ endif()
 
 add_definitions(-DCL_USE_DEPRECATED_OPENCL_1_2_APIS)
 
+#########################################
+# Feature flags
+
+set(DFC_SEARCH_WITH_GPU 1)
+set(DFC_WORK_GROUP_SIZE 32)
+
+#########################################
+
 set(DFC_HEADERS
   ${CMAKE_CURRENT_SOURCE_DIR}/src/dfc.h
   ${CMAKE_CURRENT_SOURCE_DIR}/src/utility.h
@@ -37,6 +45,10 @@ set(DFC_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
 add_library(dfc SHARED ${DFC_HEADERS} ${DFC_SOURCES})
 target_include_directories(dfc PUBLIC ${DFC_INCLUDE_DIR} ${OpenCL_INCLUDE_DIRS})
 target_link_libraries(dfc ${OpenCL_LIBRARIES} -lm)
+target_compile_definitions(dfc PRIVATE
+    SEARCH_WITH_GPU=${DFC_SEARCH_WITH_GPU}
+    WORK_GROUP_SIZE=${DFC_WORK_GROUP_SIZE}
+    )
 
 add_subdirectory(${EXT_PROJECTS_DIR}/catch)
 add_subdirectory(tests)

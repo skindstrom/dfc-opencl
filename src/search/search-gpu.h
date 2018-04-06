@@ -143,7 +143,8 @@ int search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
   cl_mem result =
       clCreateBuffer(context, CL_MEM_READ_WRITE, inputLength, NULL, NULL);
 
-  const size_t localGroupSize = 64;
+  const size_t localGroupSize = WORK_GROUP_SIZE;
+  printf("wg: %u", localGroupSize);
   const size_t globalGroupSize =
       ceil((float)inputLength / localGroupSize) * localGroupSize;
 
