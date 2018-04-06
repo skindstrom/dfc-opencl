@@ -13,6 +13,29 @@
 #include "stdio.h"
 #include "stdlib.h"
 
+const int BLOCKING = 1;
+
+typedef struct {
+  int inputLength;
+  cl_mem input;
+  cl_mem patterns;
+  cl_mem dfSmall;
+  cl_mem ctSmall;
+  cl_mem dfLarge;
+  cl_mem dfLargeHash;
+  cl_mem ctLarge;
+  cl_mem result;
+} DfcOpenClMemory;
+
+typedef struct {
+  cl_platform_id platform;
+  cl_device_id device;
+  cl_context context;
+  cl_program program;
+  cl_kernel kernel;
+} DfcOpenClEnvironment;
+
+
 cl_platform_id getPlatform() {
   cl_platform_id id;
   int amountOfPlatformsToReturn = 1;
@@ -72,7 +95,6 @@ cl_program loadAndCreateProgram(cl_context context) {
   cl_program program = clCreateProgramWithSource(
       context, 1, (const char **)&source_str, &source_size, &status);
 
-  // TODO: not sure if safe to get rid of source before executing program
   free(source_str);
 
   if (status != CL_SUCCESS) {
@@ -116,7 +138,7 @@ cl_kernel createKernel(cl_program *program) {
   return kernel;
 }
 
-int search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
+DfcOpenClEnvironment setupEnvironment() {
   cl_platform_id platform = getPlatform();
   cl_device_id device = getDevice(platform);
   cl_context context = getContext(device);
@@ -124,6 +146,29 @@ int search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
   buildProgram(&program, device);
   cl_kernel kernel = createKernel(&program);
 
+  DfcOpenClEnvironment env = {
+    .platform = platform,
+    .device = device,
+    .context = context,
+    .program = program,
+    .kernel = kernel,
+  };
+
+  return env;
+}
+
+void releaseEnvironment(DfcOpenClEnvironment* environment) {
+  clReleaseKernel(environment->kernel);
+  clReleaseProgram(environment->program);
+  clReleaseContext(environment->context);
+}
+
+cl_command_queue createCommandQueue(DfcOpenClEnvironment *env) {
+  return clCreateCommandQueue(env->context, env->device, 0, NULL);
+}
+
+DfcOpenClMemory createMemory(DfcOpenClEnvironment* environment, DFC_STRUCTURE *dfc, int inputLength) {
+  cl_context context = environment->context;
   cl_mem kernelInput =
       clCreateBuffer(context, CL_MEM_READ_ONLY, inputLength, NULL, NULL);
   cl_mem patterns =
@@ -143,83 +188,120 @@ int search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
   cl_mem result =
       clCreateBuffer(context, CL_MEM_READ_WRITE, inputLength, NULL, NULL);
 
-  const size_t localGroupSize = WORK_GROUP_SIZE;
-  printf("wg: %u", localGroupSize);
-  const size_t globalGroupSize =
-      ceil((float)inputLength / localGroupSize) * localGroupSize;
+  DfcOpenClMemory memory = {
+    .input = kernelInput,
+    .patterns = patterns,
+    .dfSmall = dfSmall,
+    .ctSmall = ctSmall,
+    .dfLarge = dfLarge,
+    .dfLargeHash = dfLargeHash,
+    .ctLarge = ctLarge,
+    .result = result
+  };
+  
+  return memory;
+}
 
-  const int blocking = 1;
-  cl_command_queue queue = clCreateCommandQueue(context, device, 0, NULL);
-  clEnqueueWriteBuffer(queue, kernelInput, blocking, 0, inputLength, input,
+void writeMemory(DfcOpenClMemory *memory, cl_command_queue queue, DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
+  memory->inputLength = inputLength;
+  clEnqueueWriteBuffer(queue, memory->input, BLOCKING, 0, inputLength, input,
                        0, NULL, NULL);
-  clEnqueueWriteBuffer(queue, patterns, blocking, 0,
+  clEnqueueWriteBuffer(queue, memory->patterns, BLOCKING, 0,
                        sizeof(DFC_FIXED_PATTERN) * dfc->numPatterns,
                        dfc->dfcMatchList, 0, NULL, NULL);
-  clEnqueueWriteBuffer(queue, dfSmall, blocking, 0,
+  clEnqueueWriteBuffer(queue, memory->dfSmall, BLOCKING, 0,
                        sizeof(dfc->directFilterSmall), dfc->directFilterSmall,
                        0, NULL, NULL);
-  clEnqueueWriteBuffer(queue, ctSmall, blocking, 0,
+  clEnqueueWriteBuffer(queue, memory->ctSmall, BLOCKING, 0,
                        sizeof(dfc->compactTableSmall), dfc->compactTableSmall,
                        0, NULL, NULL);
-  clEnqueueWriteBuffer(queue, dfLarge, blocking, 0,
+  clEnqueueWriteBuffer(queue, memory->dfLarge, BLOCKING, 0,
                        sizeof(dfc->directFilterLarge), dfc->directFilterLarge,
                        0, NULL, NULL);
-  clEnqueueWriteBuffer(queue, dfLargeHash, blocking, 0,
+  clEnqueueWriteBuffer(queue, memory->dfLargeHash, BLOCKING, 0,
                        sizeof(dfc->directFilterLargeHash),
                        dfc->directFilterLargeHash, 0, NULL, NULL);
-  clEnqueueWriteBuffer(queue, ctLarge, blocking, 0,
+  clEnqueueWriteBuffer(queue, memory->ctLarge, BLOCKING, 0,
                        sizeof(dfc->compactTableLarge), dfc->compactTableLarge,
                        0, NULL, NULL);
+}
 
-  clSetKernelArg(kernel, 0, sizeof(int), &inputLength);
-  clSetKernelArg(kernel, 1, sizeof(cl_mem), &kernelInput);
-  clSetKernelArg(kernel, 2, sizeof(cl_mem), &patterns);
-  clSetKernelArg(kernel, 3, sizeof(cl_mem), &dfSmall);
-  clSetKernelArg(kernel, 4, sizeof(cl_mem), &ctSmall);
-  clSetKernelArg(kernel, 5, sizeof(cl_mem), &dfLarge);
-  clSetKernelArg(kernel, 6, sizeof(cl_mem), &dfLargeHash);
-  clSetKernelArg(kernel, 7, sizeof(cl_mem), &ctLarge);
-  clSetKernelArg(kernel, 8, sizeof(cl_mem), &result);
+void freeMemory(DfcOpenClMemory *mem) {
+  clReleaseMemObject(mem->input);
+  clReleaseMemObject(mem->patterns);
+  clReleaseMemObject(mem->dfSmall);
+  clReleaseMemObject(mem->ctSmall);
+  clReleaseMemObject(mem->dfLarge);
+  clReleaseMemObject(mem->dfLargeHash);
+  clReleaseMemObject(mem->ctLarge);
+  clReleaseMemObject(mem->result);
+}
+
+void setKernelArgs(cl_kernel kernel, DfcOpenClMemory *mem) {
+  clSetKernelArg(kernel, 0, sizeof(int), &mem->inputLength);
+  clSetKernelArg(kernel, 1, sizeof(cl_mem), &mem->input);
+  clSetKernelArg(kernel, 2, sizeof(cl_mem), &mem->patterns);
+  clSetKernelArg(kernel, 3, sizeof(cl_mem), &mem->dfSmall);
+  clSetKernelArg(kernel, 4, sizeof(cl_mem), &mem->ctSmall);
+  clSetKernelArg(kernel, 5, sizeof(cl_mem), &mem->dfLarge);
+  clSetKernelArg(kernel, 6, sizeof(cl_mem), &mem->dfLargeHash);
+  clSetKernelArg(kernel, 7, sizeof(cl_mem), &mem->ctLarge);
+  clSetKernelArg(kernel, 8, sizeof(cl_mem), &mem->result);
+}
+
+void startKernelForQueue(cl_kernel kernel, cl_command_queue queue, int inputLength) {
+  const size_t localGroupSize = WORK_GROUP_SIZE;
+  const size_t globalGroupSize =
+      ceil((float)inputLength / localGroupSize) * localGroupSize;
 
   int status = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &globalGroupSize,
                                       &localGroupSize, 0, NULL, NULL);
   if (status != CL_SUCCESS) {
     fprintf(stderr, "Could not start kernel: %d\n", status);
-    exit(1);
+    exit(OPENCL_COULD_NOT_START_KERNEL);
   }
+}
 
-  uint8_t *output = malloc(inputLength);
-  for (int i = 0; i < inputLength; ++i) {
+int readResult(DfcOpenClMemory *mem, cl_command_queue queue) {
+  uint8_t *output = malloc(mem->inputLength);
+  for (int i = 0; i < mem->inputLength; ++i) {
     output[i] = 0;
   }
-  status = clEnqueueReadBuffer(queue, result, blocking, 0, inputLength,
+  int status = clEnqueueReadBuffer(queue, mem->result, BLOCKING, 0, mem->inputLength,
                                output, 0, NULL, NULL);
 
   if (status != CL_SUCCESS) {
+    free(output);
     fprintf(stderr, "Could not read result: %d\n", status);
-    exit(1);
+    exit(OPENCL_COULD_NOT_READ_RESULTS);
   }
 
   int matches = 0;
-  for (int i = 0; i < inputLength; ++i) {
+  for (int i = 0; i < mem->inputLength; ++i) {
     matches += output[i];
   }
 
+  free(output);
+
+  return matches;
+}
+
+int search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
+  DfcOpenClEnvironment env = setupEnvironment();
+  cl_command_queue queue = createCommandQueue(&env);
+  DfcOpenClMemory mem = createMemory(&env, dfc, inputLength);
+  writeMemory(&mem, queue, dfc, input, inputLength);
+
+  setKernelArgs(env.kernel, &mem);
+  startKernelForQueue(env.kernel, queue, inputLength);
+
+  int matches = readResult(&mem, queue);
+
   clFlush(queue);
   clFinish(queue);
-  clReleaseKernel(kernel);
-  clReleaseProgram(program);
-  clReleaseMemObject(kernelInput);
-  clReleaseMemObject(patterns);
-  clReleaseMemObject(dfSmall);
-  clReleaseMemObject(ctSmall);
-  clReleaseMemObject(dfLarge);
-  clReleaseMemObject(dfLargeHash);
-  clReleaseMemObject(ctLarge);
-  clReleaseMemObject(result);
+  freeMemory(&mem);
   clReleaseCommandQueue(queue);
-  clReleaseContext(context);
-  free(output);
+  releaseEnvironment(&env);
 
   return matches;
 }

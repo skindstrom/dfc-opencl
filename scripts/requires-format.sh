@@ -1,7 +1,7 @@
 #!/bin/sh
 function is_valid_staged() {
   staged=$(git diff --name-only --diff-filter=d HEAD)
-  source_files=$(echo $staged | grep '\.c\|\.h\|\.cpp\|\.hpp')
+  source_files=$(echo $staged | grep '\.c\|\.h\|\.cpp\|\.hpp\|\.cl')
   while read -r source; do
     if require_format $source
     then
