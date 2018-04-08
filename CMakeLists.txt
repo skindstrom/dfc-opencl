@@ -33,6 +33,8 @@ add_definitions(-DCL_USE_DEPRECATED_OPENCL_1_2_APIS)
 
 set(DFC_SEARCH_WITH_GPU 1)
 set(DFC_WORK_GROUP_SIZE 32)
+# the amount positions in the input that gets checked per thread
+set(DFC_CHECK_COUNT_PER_THREAD 10)
 
 #########################################
 
@@ -67,6 +69,7 @@ target_compile_definitions(dfc PRIVATE
     SEARCH_WITH_GPU=${DFC_SEARCH_WITH_GPU}
     WORK_GROUP_SIZE=${DFC_WORK_GROUP_SIZE}
     MAP_MEMORY=${DFC_MAP_MEMORY}
+    CHECK_COUNT_PER_THREAD=${DFC_CHECK_COUNT_PER_THREAD}
     )
 
 add_subdirectory(${EXT_PROJECTS_DIR}/catch)

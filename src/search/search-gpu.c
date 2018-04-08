@@ -1,7 +1,6 @@
 #ifndef DFC_SEARCH_CPU_H
 #define DFC_SEARCH_CPU_H
 
-
 #include "math.h"
 #include "stdio.h"
 #include "stdlib.h"
@@ -106,8 +105,10 @@ cl_program loadAndCreateProgram(cl_context context) {
 }
 
 void buildProgram(cl_program *program, cl_device_id device) {
-  cl_int status =
-      clBuildProgram(*program, 1, &device, "-cl-std=CL1.2", NULL, NULL);
+  char arguments[50];
+  sprintf(arguments, "-cl-std=CL1.2 -D CHECK_COUNT_PER_THREAD=%d",
+          CHECK_COUNT_PER_THREAD);
+  cl_int status = clBuildProgram(*program, 1, &device, arguments, NULL, NULL);
 
   if (status != CL_SUCCESS) {
     size_t log_size;
@@ -249,11 +250,20 @@ void setKernelArgs(cl_kernel kernel, DfcOpenClMemory *mem) {
   clSetKernelArg(kernel, 8, sizeof(cl_mem), &mem->result);
 }
 
+size_t getGlobalGroupSize(size_t localGroupSize, int inputLength) {
+  const float threadCount = ceil(((float)inputLength) / CHECK_COUNT_PER_THREAD);
+
+  const size_t globalGroupSize =
+      ceil(threadCount / localGroupSize) * localGroupSize;
+
+  return globalGroupSize;
+}
+
 void startKernelForQueue(cl_kernel kernel, cl_command_queue queue,
                          int inputLength) {
   const size_t localGroupSize = WORK_GROUP_SIZE;
   const size_t globalGroupSize =
-      ceil((float)inputLength / localGroupSize) * localGroupSize;
+      getGlobalGroupSize(localGroupSize, inputLength);
 
   int status = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &globalGroupSize,
                                       &localGroupSize, 0, NULL, NULL);
