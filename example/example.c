@@ -8,8 +8,10 @@
 void Print_Result(unsigned char *, uint32_t *, uint32_t);
 
 int main(void) {
-  char *buf =
-      "This input includes an attack pattern. It might CRASH your machine.";
+  char *buf = DFC_NewInput(200);
+  strcpy(buf,
+         "This input includes an attack pattern. It might CRASH your machine.");
+
   char *pat1 = "attack";
   char *pat2 = "crash";
   char *pat3 = "Piolink";

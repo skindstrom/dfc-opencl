@@ -84,6 +84,7 @@ typedef struct {
   CompactTableLarge compactTableLarge[COMPACT_TABLE_SIZE_LARGE];
 } DFC_STRUCTURE;
 
+char *DFC_NewInput(int size);
 DFC_STRUCTURE *DFC_New();
 DFC_PATTERN_INIT *DFC_PATTERN_INIT_New();
 DFC_PATTERNS *DFC_PATTERNS_New(int numPatterns);

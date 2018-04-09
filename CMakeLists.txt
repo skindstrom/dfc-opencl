@@ -34,6 +34,7 @@ add_definitions(-DCL_USE_DEPRECATED_OPENCL_1_2_APIS)
 set(DFC_SEARCH_WITH_GPU 1)
 set(DFC_WORK_GROUP_SIZE 32)
 # the amount positions in the input that gets checked per thread
+# higher value = more work per thread = less threads
 set(DFC_CHECK_COUNT_PER_THREAD 10)
 
 #########################################

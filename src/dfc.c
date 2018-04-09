@@ -31,6 +31,8 @@ static void setupCompactTables(DFC_STRUCTURE *dfc, DFC_PATTERN_INIT *patterns);
 
 static uint8_t toggleCharacterCase(uint8_t);
 
+char *DFC_NewInput(int size) { return malloc(size); }
+
 DFC_STRUCTURE *DFC_New(void) {
   DFC_STRUCTURE *p;
 

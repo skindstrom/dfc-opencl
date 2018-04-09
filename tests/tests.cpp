@@ -16,7 +16,8 @@ void addCaseInSensitivePattern(DFC_PATTERN_INIT* patternInit,
 
 TEST_CASE("Matches if input and pattern is equal") {
   PID_TYPE pid = 0;
-  auto input = "attack";
+  char* input = DFC_NewInput(100);
+  strcpy(input, "attack");
 
   DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
   addCaseSensitivePattern(patternInit, input, pid);
@@ -39,7 +40,8 @@ TEST_CASE("Matches if input and pattern is equal") {
 
 TEST_CASE("No matches if pattern is not equal") {
   PID_TYPE pid = 0;
-  auto input = "safe";
+  char* input = DFC_NewInput(100);
+  strcpy(input, "safe");
   auto pattern = "attack";
 
   DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
@@ -62,7 +64,8 @@ TEST_CASE("No matches if pattern is not equal") {
 
 TEST_CASE("Matches multiple patternInit") {
   PID_TYPE pid = 0;
-  auto input = "attack";
+  char* input = DFC_NewInput(100);
+  strcpy(input, "attack");
 
   DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
   addCaseSensitivePattern(patternInit, "at", pid);
@@ -85,7 +88,8 @@ TEST_CASE("Matches multiple patternInit") {
 
 TEST_CASE("Does not match part of pattern") {
   PID_TYPE pid = 0;
-  auto input = "attack";
+  char* input = DFC_NewInput(100);
+  strcpy(input, "attack");
 
   DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
   addCaseSensitivePattern(patternInit, "attack123", pid);
@@ -107,7 +111,8 @@ TEST_CASE("Does not match part of pattern") {
 
 TEST_CASE("Multiple equal patternInit counts as single even if different pid") {
   PID_TYPE pid = 0;
-  auto input = "attack";
+  char* input = DFC_NewInput(100);
+  strcpy(input, "attack");
 
   DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
   addCaseSensitivePattern(patternInit, "attack", pid);
@@ -130,7 +135,8 @@ TEST_CASE("Multiple equal patternInit counts as single even if different pid") {
 
 TEST_CASE("Does not match if case sensitive") {
   PID_TYPE pid = 0;
-  auto input = "attack";
+  char* input = DFC_NewInput(100);
+  strcpy(input, "attack");
 
   DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
   addCaseSensitivePattern(patternInit, "Attack", pid);
@@ -152,7 +158,8 @@ TEST_CASE("Does not match if case sensitive") {
 
 TEST_CASE("Does match if case insensitive") {
   PID_TYPE pid = 0;
-  auto input = "attack";
+  char* input = DFC_NewInput(100);
+  strcpy(input, "attack");
 
   DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
   addCaseInSensitivePattern(patternInit, "Attack", pid);
@@ -174,7 +181,8 @@ TEST_CASE("Does match if case insensitive") {
 
 TEST_CASE("Can match both case sensitive and insensitive") {
   PID_TYPE pid = 0;
-  auto input = "attack";
+  char* input = DFC_NewInput(100);
+  strcpy(input, "attack");
 
   DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
   addCaseSensitivePattern(patternInit, "at", pid);
@@ -197,7 +205,8 @@ TEST_CASE("Can match both case sensitive and insensitive") {
 
 TEST_CASE("Equal case sensitive and insensitive pattern counts separately") {
   PID_TYPE pid = 0;
-  auto input = "attack";
+  char* input = DFC_NewInput(100);
+  strcpy(input, "attack");
 
   DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
   addCaseSensitivePattern(patternInit, "at", pid);
@@ -220,7 +229,8 @@ TEST_CASE("Equal case sensitive and insensitive pattern counts separately") {
 
 TEST_CASE("1B pattern works") {
   PID_TYPE pid = 0;
-  auto input = "Attack";
+  char* input = DFC_NewInput(100);
+  strcpy(input, "Attack");
 
   DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
   addCaseSensitivePattern(patternInit, "A", pid);
@@ -243,7 +253,8 @@ TEST_CASE("1B pattern works") {
 
 TEST_CASE("2B pattern works") {
   PID_TYPE pid = 0;
-  auto input = "Attack";
+  char* input = DFC_NewInput(100);
+  strcpy(input, "Attack");
 
   DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
   addCaseSensitivePattern(patternInit, "At", pid);
@@ -266,7 +277,8 @@ TEST_CASE("2B pattern works") {
 
 TEST_CASE("3B pattern works") {
   PID_TYPE pid = 0;
-  auto input = "Attack";
+  char* input = DFC_NewInput(100);
+  strcpy(input, "Attack");
 
   DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
   addCaseSensitivePattern(patternInit, "Att", pid);
@@ -288,7 +300,8 @@ TEST_CASE("3B pattern works") {
 }
 TEST_CASE("4B pattern works") {
   PID_TYPE pid = 0;
-  auto input = "Attack";
+  char* input = DFC_NewInput(100);
+  strcpy(input, "Attack");
 
   DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
   addCaseSensitivePattern(patternInit, "Atta", pid);
@@ -311,7 +324,8 @@ TEST_CASE("4B pattern works") {
 
 TEST_CASE("5B pattern works") {
   PID_TYPE pid = 0;
-  auto input = "Attack";
+  char* input = DFC_NewInput(100);
+  strcpy(input, "Attack");
 
   DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
   addCaseSensitivePattern(patternInit, "Attac", pid);
@@ -334,7 +348,8 @@ TEST_CASE("5B pattern works") {
 
 TEST_CASE("6B pattern works") {
   PID_TYPE pid = 0;
-  auto input = "Attack";
+  char* input = DFC_NewInput(100);
+  strcpy(input, "Attack");
 
   DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
   addCaseSensitivePattern(patternInit, "Attack", pid);
@@ -357,7 +372,8 @@ TEST_CASE("6B pattern works") {
 
 TEST_CASE("7B pattern works") {
   PID_TYPE pid = 0;
-  auto input = "Attacks and Crash";
+  char* input = DFC_NewInput(100);
+  strcpy(input, "Attacks and Crash");
 
   DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
   addCaseSensitivePattern(patternInit, "Attacks", pid);
@@ -380,7 +396,8 @@ TEST_CASE("7B pattern works") {
 
 TEST_CASE("8B pattern works") {
   PID_TYPE pid = 0;
-  auto input = "Attackers and Crash";
+  char* input = DFC_NewInput(100);
+  strcpy(input, "Attackers and Crash");
 
   DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
   addCaseSensitivePattern(patternInit, "Attacker", pid);
@@ -403,7 +420,8 @@ TEST_CASE("8B pattern works") {
 
 TEST_CASE("Long pattern works") {
   PID_TYPE pid = 0;
-  auto input = "This is a very long input";
+  char* input = DFC_NewInput(100);
+  strcpy(input, "This is a very long input");
 
   DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
   addCaseSensitivePattern(patternInit, "This is a very long", pid);
@@ -442,8 +460,10 @@ TEST_CASE("Many patternInit work") {
   DFC_STRUCTURE* dfc = DFC_New();
   DFC_Compile(dfc, patternInit);
 
+  char* input = DFC_NewInput(100);
   // 4 random passwords
-  auto input = "blue twf skar23 hunter2 1spyder";
+  strcpy(input, "blue twf skar23 hunter2 1spyder");
+
   auto matchCount =
       DFC_Search(dfc, dfcPatterns, (unsigned char*)input, strlen(input));
 
@@ -466,7 +486,8 @@ The password was "1340lu" and failed against "blue"
 TEST_CASE("Bounds checking done for short patternInit") {
   PID_TYPE pid = 0;
 
-  auto input = "lu";
+  char* input = DFC_NewInput(100);
+  strcpy(input, "lu");
   auto pattern = "alu";
 
   DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
@@ -490,7 +511,8 @@ TEST_CASE("Bounds checking done for short patternInit") {
 TEST_CASE("Bounds checking done for long patternInit") {
   PID_TYPE pid = 0;
 
-  auto input = "lu";
+  char* input = DFC_NewInput(100);
+  strcpy(input, "lu");
   auto pattern = "longlu";
 
   DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
@@ -513,7 +535,8 @@ TEST_CASE("Bounds checking done for long patternInit") {
 
 TEST_CASE("A pattern may match whole string") {
   PID_TYPE pid = 0;
-  auto input = "Attack";
+  char* input = DFC_NewInput(100);
+  strcpy(input, "Attack");
 
   DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
   addCaseSensitivePattern(patternInit, "Attack", pid);
@@ -535,7 +558,8 @@ TEST_CASE("A pattern may match whole string") {
 
 TEST_CASE("Two patternInit with equal last 4 characters both get matched") {
   PID_TYPE pid = 0;
-  auto input = "Attack";
+  char* input = DFC_NewInput(100);
+  strcpy(input, "Attack");
 
   DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
   addCaseSensitivePattern(patternInit, "Attack", pid);
