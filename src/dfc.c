@@ -16,7 +16,7 @@ static inline DFC_PATTERN *DFC_InitHashLookup(DFC_PATTERN_INIT *ctx,
                                               uint8_t *pat, uint16_t patlen);
 static inline int DFC_InitHashAdd(DFC_PATTERN_INIT *ctx, DFC_PATTERN *p);
 
-static void setupMatchList(DFC_STRUCTURE *dfc, DFC_PATTERN_INIT *patterns);
+static void setupMatchList(DFC_PATTERN_INIT *init, DFC_PATTERNS *patterns);
 
 static void setupDirectFilters(DFC_STRUCTURE *dfc, DFC_PATTERN_INIT *patterns);
 static void addPatternToSmallDirectFilter(DFC_STRUCTURE *dfc,
@@ -38,6 +38,15 @@ DFC_STRUCTURE *DFC_New(void) {
   MEMASSERT_DFC(p, "DFC_New");
 
   return p;
+}
+
+DFC_PATTERNS *DFC_PATTERNS_New(int numPatterns) {
+  DFC_PATTERNS *patterns = malloc(sizeof(DFC_PATTERNS));
+
+  patterns->numPatterns = numPatterns;
+  patterns->dfcMatchList = DFC_MALLOC(sizeof(DFC_FIXED_PATTERN) * numPatterns);
+
+  return patterns;
 }
 
 DFC_PATTERN_INIT *DFC_PATTERN_INIT_New(void) {
@@ -86,12 +95,10 @@ void DFC_FreePatternsInit(DFC_PATTERN_INIT *patterns) {
   free(patterns->init_hash);
 }
 
+void DFC_FreePatterns(DFC_PATTERNS *patterns) { free(patterns->dfcMatchList); }
+
 void DFC_FreeStructure(DFC_STRUCTURE *dfc) {
   if (dfc == NULL) return;
-
-  if (dfc->dfcMatchList != NULL) {
-    free(dfc->dfcMatchList);
-  }
 
   free(dfc);
 }
@@ -151,16 +158,20 @@ void DFC_AddPattern(DFC_PATTERN_INIT *dfc, unsigned char *pat, int n,
   }
 }
 
+void DFC_CompilePatterns(DFC_PATTERN_INIT *init, DFC_PATTERNS *patterns) {
+  setupMatchList(init, patterns);
+}
+
 int DFC_Compile(DFC_STRUCTURE *dfc, DFC_PATTERN_INIT *patterns) {
-  setupMatchList(dfc, patterns);
   setupDirectFilters(dfc, patterns);
   setupCompactTables(dfc, patterns);
 
   return 0;
 }
 
-int DFC_Search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
-  return search(dfc, input, inputLength);
+int DFC_Search(DFC_STRUCTURE *dfc, DFC_PATTERNS *patterns, uint8_t *input,
+               int inputLength) {
+  return search(dfc, patterns, input, inputLength);
 }
 
 static void *DFC_REALLOC(void *p, uint16_t n, dfcDataType type) {
@@ -264,17 +275,17 @@ static DFC_FIXED_PATTERN createFixed(DFC_PATTERN *original) {
   return new;
 }
 
-static void setupMatchList(DFC_STRUCTURE *dfc, DFC_PATTERN_INIT *patterns) {
-  dfc->numPatterns = patterns->numPatterns;
+static void setupMatchList(DFC_PATTERN_INIT *init, DFC_PATTERNS *patterns) {
+  patterns->numPatterns = init->numPatterns;
 
   int begin_node_flag = 1;
   for (int i = 0; i < INIT_HASH_SIZE; i++) {
-    DFC_PATTERN *node = patterns->init_hash[i], *prev_node;
+    DFC_PATTERN *node = init->init_hash[i], *prev_node;
     int first_node_flag = 1;
     while (node != NULL) {
       if (begin_node_flag) {
         begin_node_flag = 0;
-        patterns->dfcPatterns = node;
+        init->dfcPatterns = node;
       } else {
         if (first_node_flag) {
           first_node_flag = 0;
@@ -286,13 +297,13 @@ static void setupMatchList(DFC_STRUCTURE *dfc, DFC_PATTERN_INIT *patterns) {
     }
   }
 
-  dfc->dfcMatchList = (DFC_FIXED_PATTERN *)DFC_MALLOC(
-      sizeof(DFC_FIXED_PATTERN) * patterns->numPatterns);
-  MEMASSERT_DFC(dfc->dfcMatchList, "setupMatchList");
+  patterns->dfcMatchList = (DFC_FIXED_PATTERN *)DFC_MALLOC(
+      sizeof(DFC_FIXED_PATTERN) * init->numPatterns);
+  MEMASSERT_DFC(patterns->dfcMatchList, "setupMatchList");
 
-  for (DFC_PATTERN *plist = patterns->dfcPatterns; plist != NULL;
+  for (DFC_PATTERN *plist = init->dfcPatterns; plist != NULL;
        plist = plist->next) {
-    dfc->dfcMatchList[plist->iid] = createFixed(plist);
+    patterns->dfcMatchList[plist->iid] = createFixed(plist);
   }
 }
 

@@ -3,6 +3,7 @@
 
 #include "dfc.h"
 
-int search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength);
+int search(DFC_STRUCTURE *dfc, DFC_PATTERNS *patterns, uint8_t *input,
+           int inputLength);
 
 #endif

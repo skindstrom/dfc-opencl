@@ -169,13 +169,14 @@ cl_command_queue createCommandQueue(DfcOpenClEnvironment *env) {
 }
 
 DfcOpenClMemory createMemory(DfcOpenClEnvironment *environment,
-                             DFC_STRUCTURE *dfc, int inputLength) {
+                             DFC_STRUCTURE *dfc, DFC_PATTERNS *dfcPatterns,
+                             int inputLength) {
   cl_context context = environment->context;
   cl_mem kernelInput =
       clCreateBuffer(context, CL_MEM_READ_ONLY, inputLength, NULL, NULL);
-  cl_mem patterns =
-      clCreateBuffer(context, CL_MEM_READ_ONLY,
-                     sizeof(DFC_FIXED_PATTERN) * dfc->numPatterns, NULL, NULL);
+  cl_mem patterns = clCreateBuffer(
+      context, CL_MEM_READ_ONLY,
+      sizeof(DFC_FIXED_PATTERN) * dfcPatterns->numPatterns, NULL, NULL);
   cl_mem dfSmall = clCreateBuffer(context, CL_MEM_READ_ONLY,
                                   sizeof(dfc->directFilterSmall), NULL, NULL);
   cl_mem ctSmall = clCreateBuffer(context, CL_MEM_READ_ONLY,
@@ -203,13 +204,14 @@ DfcOpenClMemory createMemory(DfcOpenClEnvironment *environment,
 }
 
 void writeMemory(DfcOpenClMemory *memory, cl_command_queue queue,
-                 DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
+                 DFC_STRUCTURE *dfc, DFC_PATTERNS *dfcPatterns, uint8_t *input,
+                 int inputLength) {
   memory->inputLength = inputLength;
   clEnqueueWriteBuffer(queue, memory->input, BLOCKING, 0, inputLength, input, 0,
                        NULL, NULL);
   clEnqueueWriteBuffer(queue, memory->patterns, BLOCKING, 0,
-                       sizeof(DFC_FIXED_PATTERN) * dfc->numPatterns,
-                       dfc->dfcMatchList, 0, NULL, NULL);
+                       sizeof(DFC_FIXED_PATTERN) * dfcPatterns->numPatterns,
+                       dfcPatterns->dfcMatchList, 0, NULL, NULL);
   clEnqueueWriteBuffer(queue, memory->dfSmall, BLOCKING, 0,
                        sizeof(dfc->directFilterSmall), dfc->directFilterSmall,
                        0, NULL, NULL);
@@ -297,11 +299,12 @@ int readResult(DfcOpenClMemory *mem, cl_command_queue queue) {
   return matches;
 }
 
-int search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength) {
+int search(DFC_STRUCTURE *dfc, DFC_PATTERNS *patterns, uint8_t *input,
+           int inputLength) {
   DfcOpenClEnvironment env = setupEnvironment();
   cl_command_queue queue = createCommandQueue(&env);
-  DfcOpenClMemory mem = createMemory(&env, dfc, inputLength);
-  writeMemory(&mem, queue, dfc, input, inputLength);
+  DfcOpenClMemory mem = createMemory(&env, dfc, patterns, inputLength);
+  writeMemory(&mem, queue, dfc, patterns, input, inputLength);
 
   setKernelArgs(env.kernel, &mem);
   startKernelForQueue(env.kernel, queue, inputLength);
