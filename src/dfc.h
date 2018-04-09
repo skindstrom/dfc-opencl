@@ -64,11 +64,14 @@ typedef struct _dfc_fixed_pattern {
 } DFC_FIXED_PATTERN;
 
 typedef struct {
+  int numPatterns;
   DFC_PATTERN **init_hash;  // To cull duplicate patterns
   DFC_PATTERN *dfcPatterns;
-  DFC_FIXED_PATTERN *dfcMatchList;
+} DFC_PATTERN_INIT;
 
+typedef struct {
   int numPatterns;
+  DFC_FIXED_PATTERN *dfcMatchList;
 
   uint8_t directFilterSmall[DF_SIZE_REAL];
   CompactTableSmallEntry compactTableSmall[COMPACT_TABLE_SIZE_SMALL];
@@ -79,13 +82,15 @@ typedef struct {
   CompactTableLarge compactTableLarge[COMPACT_TABLE_SIZE_LARGE];
 } DFC_STRUCTURE;
 
-DFC_STRUCTURE *DFC_New(void);
-int DFC_AddPattern(DFC_STRUCTURE *dfc, unsigned char *pat, int n,
-                   int is_case_insensitive, PID_TYPE sid);
-int DFC_Compile(DFC_STRUCTURE *dfc);
+DFC_STRUCTURE *DFC_New();
+DFC_PATTERN_INIT *DFC_PATTERN_INIT_New();
+void DFC_AddPattern(DFC_PATTERN_INIT *dfc, unsigned char *pat, int n,
+                    int is_case_insensitive, PID_TYPE sid);
+int DFC_Compile(DFC_STRUCTURE *dfc, DFC_PATTERN_INIT *patterns);
 
 int DFC_Search(DFC_STRUCTURE *dfc, uint8_t *input, int inputLength);
 void DFC_PrintInfo(DFC_STRUCTURE *dfc);
+void DFC_FreePatternsInit(DFC_PATTERN_INIT *patterns);
 void DFC_FreeStructure(DFC_STRUCTURE *dfc);
 
 #ifdef __cplusplus

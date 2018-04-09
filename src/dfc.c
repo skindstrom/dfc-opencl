@@ -12,13 +12,13 @@ static unsigned char xlatcase[256];
 
 static void *DFC_REALLOC(void *p, uint16_t n, dfcDataType type);
 static void *DFC_MALLOC(int n);
-static inline DFC_PATTERN *DFC_InitHashLookup(DFC_STRUCTURE *ctx, uint8_t *pat,
-                                              uint16_t patlen);
-static inline int DFC_InitHashAdd(DFC_STRUCTURE *ctx, DFC_PATTERN *p);
+static inline DFC_PATTERN *DFC_InitHashLookup(DFC_PATTERN_INIT *ctx,
+                                              uint8_t *pat, uint16_t patlen);
+static inline int DFC_InitHashAdd(DFC_PATTERN_INIT *ctx, DFC_PATTERN *p);
 
-static void setupMatchList(DFC_STRUCTURE *dfc);
+static void setupMatchList(DFC_STRUCTURE *dfc, DFC_PATTERN_INIT *patterns);
 
-static void setupDirectFilters(DFC_STRUCTURE *dfc);
+static void setupDirectFilters(DFC_STRUCTURE *dfc, DFC_PATTERN_INIT *patterns);
 static void addPatternToSmallDirectFilter(DFC_STRUCTURE *dfc,
                                           DFC_PATTERN *pattern);
 static void addPatternToLargeDirectFilter(DFC_STRUCTURE *dfc,
@@ -27,23 +27,28 @@ static void addPatternToLargeDirectFilterHash(DFC_STRUCTURE *dfc,
                                               DFC_PATTERN *pattern);
 static void createPermutations(uint8_t *pattern, int patternLength,
                                int permutationCount, uint8_t *permutations);
-static void setupCompactTables(DFC_STRUCTURE *dfc);
+static void setupCompactTables(DFC_STRUCTURE *dfc, DFC_PATTERN_INIT *patterns);
 
 static uint8_t toggleCharacterCase(uint8_t);
 
-/*
- *  Create a new DFC state machine
- */
 DFC_STRUCTURE *DFC_New(void) {
   DFC_STRUCTURE *p;
-
-  init_xlatcase(xlatcase);
 
   p = (DFC_STRUCTURE *)DFC_MALLOC(sizeof(DFC_STRUCTURE));
   MEMASSERT_DFC(p, "DFC_New");
 
+  return p;
+}
+
+DFC_PATTERN_INIT *DFC_PATTERN_INIT_New(void) {
+  DFC_PATTERN_INIT *p;
+
+  init_xlatcase(xlatcase);
+
+  p = (DFC_PATTERN_INIT *)DFC_MALLOC(sizeof(DFC_PATTERN_INIT));
+  MEMASSERT_DFC(p, "DFC_PATTERN_INIT_New");
+
   if (p) {
-    memset(p, 0, sizeof(DFC_STRUCTURE));
     p->init_hash =
         (DFC_PATTERN **)malloc(sizeof(DFC_PATTERN *) * INIT_HASH_SIZE);
     if (p->init_hash == NULL) {
@@ -67,26 +72,22 @@ static void DFC_FreePattern(DFC_PATTERN *p) {
   return;
 }
 
-static void DFC_FreePatternList(DFC_STRUCTURE *dfc) {
+void DFC_FreePatternsInit(DFC_PATTERN_INIT *patterns) {
   DFC_PATTERN *plist;
   DFC_PATTERN *p_next;
 
-  for (plist = dfc->dfcPatterns; plist != NULL;) {
+  for (plist = patterns->dfcPatterns; plist != NULL;) {
     DFC_FreePattern(plist);
     p_next = plist->next;
     free(plist);
     plist = p_next;
   }
 
-  return;
+  free(patterns->init_hash);
 }
 
 void DFC_FreeStructure(DFC_STRUCTURE *dfc) {
   if (dfc == NULL) return;
-
-  if (dfc->dfcPatterns != NULL) {
-    DFC_FreePatternList(dfc);
-  }
 
   if (dfc->dfcMatchList != NULL) {
     free(dfc->dfcMatchList);
@@ -95,21 +96,8 @@ void DFC_FreeStructure(DFC_STRUCTURE *dfc) {
   free(dfc);
 }
 
-/*
- *  Add a pattern to the list of patterns
- *
- *
- * \param dfc    Pointer to the DFC structure
- * \param pat    Pointer to the pattern
- * \param n      Pattern length
- * \param is_case_insensitive Flag for case-sensitivity (0 means
- * case-sensitive, 1 means the opposite) \param sid    External id
- *
- * \retval   0 On success to add new pattern.
- * \retval   1 On success to add sid.
- */
-int DFC_AddPattern(DFC_STRUCTURE *dfc, unsigned char *pat, int n,
-                   int is_case_insensitive, PID_TYPE sid) {
+void DFC_AddPattern(DFC_PATTERN_INIT *dfc, unsigned char *pat, int n,
+                    int is_case_insensitive, PID_TYPE sid) {
   DFC_PATTERN *plist = DFC_InitHashLookup(dfc, pat, n);
 
   if (plist == NULL) {
@@ -142,8 +130,6 @@ int DFC_AddPattern(DFC_STRUCTURE *dfc, unsigned char *pat, int n,
 
     /* Add this pattern to the list */
     dfc->numPatterns++;
-
-    return 0;
   } else {
     int found = 0;
     uint32_t x = 0;
@@ -162,15 +148,13 @@ int DFC_AddPattern(DFC_STRUCTURE *dfc, unsigned char *pat, int n,
       plist->sids[plist->sids_size] = sid;
       plist->sids_size++;
     }
-
-    return 1;
   }
 }
 
-int DFC_Compile(DFC_STRUCTURE *dfc) {
-  setupMatchList(dfc);
-  setupDirectFilters(dfc);
-  setupCompactTables(dfc);
+int DFC_Compile(DFC_STRUCTURE *dfc, DFC_PATTERN_INIT *patterns) {
+  setupMatchList(dfc, patterns);
+  setupDirectFilters(dfc, patterns);
+  setupCompactTables(dfc, patterns);
 
   return 0;
 }
@@ -196,17 +180,6 @@ static void *DFC_MALLOC(int n) {
   return p;
 }
 
-/**
- * \internal
- * \brief Creates a hash of the pattern.  We use it for the hashing
- * process during the initial pattern insertion time, to cull duplicate
- * sigs.
- *
- * \param pat    Pointer to the pattern.
- * \param patlen Pattern length.
- *
- * \retval hash A 32 bit unsigned hash.
- */
 static inline uint32_t DFC_InitHashRaw(uint8_t *pat, uint16_t patlen) {
   uint32_t hash = patlen * pat[0];
   if (patlen > 1) hash += pat[1];
@@ -214,19 +187,8 @@ static inline uint32_t DFC_InitHashRaw(uint8_t *pat, uint16_t patlen) {
   return (hash % INIT_HASH_SIZE);
 }
 
-/**
- * \internal
- * \brief Looks up a pattern.  We use it for the hashing process during
- * the the initial pattern insertion time, to cull duplicate sigs.
- *
- * \param ctx    Pointer to the DFC structure.
- * \param pat    Pointer to the pattern.
- * \param patlen Pattern length.
- * \param pid    Pattern ID
- *
- */
-static inline DFC_PATTERN *DFC_InitHashLookup(DFC_STRUCTURE *ctx, uint8_t *pat,
-                                              uint16_t patlen) {
+static inline DFC_PATTERN *DFC_InitHashLookup(DFC_PATTERN_INIT *ctx,
+                                              uint8_t *pat, uint16_t patlen) {
   uint32_t hash = DFC_InitHashRaw(pat, patlen);
 
   if (ctx->init_hash == NULL) {
@@ -241,7 +203,7 @@ static inline DFC_PATTERN *DFC_InitHashLookup(DFC_STRUCTURE *ctx, uint8_t *pat,
   return NULL;
 }
 
-static inline int DFC_InitHashAdd(DFC_STRUCTURE *ctx, DFC_PATTERN *p) {
+static inline int DFC_InitHashAdd(DFC_PATTERN_INIT *ctx, DFC_PATTERN *p) {
   uint32_t hash = DFC_InitHashRaw(p->casepatrn, p->n);
 
   if (ctx->init_hash == NULL) {
@@ -302,15 +264,17 @@ static DFC_FIXED_PATTERN createFixed(DFC_PATTERN *original) {
   return new;
 }
 
-static void setupMatchList(DFC_STRUCTURE *dfc) {
+static void setupMatchList(DFC_STRUCTURE *dfc, DFC_PATTERN_INIT *patterns) {
+  dfc->numPatterns = patterns->numPatterns;
+
   int begin_node_flag = 1;
   for (int i = 0; i < INIT_HASH_SIZE; i++) {
-    DFC_PATTERN *node = dfc->init_hash[i], *prev_node;
+    DFC_PATTERN *node = patterns->init_hash[i], *prev_node;
     int first_node_flag = 1;
     while (node != NULL) {
       if (begin_node_flag) {
         begin_node_flag = 0;
-        dfc->dfcPatterns = node;
+        patterns->dfcPatterns = node;
       } else {
         if (first_node_flag) {
           first_node_flag = 0;
@@ -322,21 +286,18 @@ static void setupMatchList(DFC_STRUCTURE *dfc) {
     }
   }
 
-  free(dfc->init_hash);
-  dfc->init_hash = NULL;
-
   dfc->dfcMatchList = (DFC_FIXED_PATTERN *)DFC_MALLOC(
-      sizeof(DFC_FIXED_PATTERN) * dfc->numPatterns);
+      sizeof(DFC_FIXED_PATTERN) * patterns->numPatterns);
   MEMASSERT_DFC(dfc->dfcMatchList, "setupMatchList");
 
-  for (DFC_PATTERN *plist = dfc->dfcPatterns; plist != NULL;
+  for (DFC_PATTERN *plist = patterns->dfcPatterns; plist != NULL;
        plist = plist->next) {
     dfc->dfcMatchList[plist->iid] = createFixed(plist);
   }
 }
 
-static void setupDirectFilters(DFC_STRUCTURE *dfc) {
-  for (DFC_PATTERN *plist = dfc->dfcPatterns; plist != NULL;
+static void setupDirectFilters(DFC_STRUCTURE *dfc, DFC_PATTERN_INIT *patterns) {
+  for (DFC_PATTERN *plist = patterns->dfcPatterns; plist != NULL;
        plist = plist->next) {
     if (plist->n >= SMALL_DF_MIN_PATTERN_SIZE &&
         plist->n <= SMALL_DF_MAX_PATTERN_SIZE) {
@@ -589,8 +550,8 @@ static void addPatternToLargeCompactTable(DFC_STRUCTURE *dfc,
   }
 }
 
-static void setupCompactTables(DFC_STRUCTURE *dfc) {
-  for (DFC_PATTERN *plist = dfc->dfcPatterns; plist != NULL;
+static void setupCompactTables(DFC_STRUCTURE *dfc, DFC_PATTERN_INIT *patterns) {
+  for (DFC_PATTERN *plist = patterns->dfcPatterns; plist != NULL;
        plist = plist->next) {
     if (plist->n >= SMALL_DF_MIN_PATTERN_SIZE &&
         plist->n <= SMALL_DF_MAX_PATTERN_SIZE) {
