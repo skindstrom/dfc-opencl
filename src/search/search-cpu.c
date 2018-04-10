@@ -6,6 +6,7 @@
 
 #include "search.h"
 #include "utility.h"
+#include "shared-functions.h"
 
 static int my_strncmp(unsigned char *a, unsigned char *b, int n) {
   int i;

@@ -105,8 +105,8 @@ cl_program loadAndCreateProgram(cl_context context) {
 }
 
 void buildProgram(cl_program *program, cl_device_id device) {
-  char arguments[50];
-  sprintf(arguments, "-cl-std=CL1.2 -D CHECK_COUNT_PER_THREAD=%d",
+  char arguments[200];
+  sprintf(arguments, "-cl-std=CL1.2 -D CHECK_COUNT_PER_THREAD=%d -D DFC_OPENCL -I ../src",
           CHECK_COUNT_PER_THREAD);
   cl_int status = clBuildProgram(*program, 1, &device, arguments, NULL, NULL);
 

@@ -1,4 +1,5 @@
 #include "utility.h"
+#include "shared.h"
 
 float my_sqrtf(float input, float x) {
   int i;
@@ -19,12 +20,4 @@ void ConvertCaseEx(unsigned char *d, unsigned char *s, int m,
   int i;
 
   for (i = 0; i < m; i++) d[i] = xlatcase[s[i]];
-}
-
-uint32_t hashForLargeCompactTable(uint32_t input) {
-  return (input * 8389) & (COMPACT_TABLE_SIZE_LARGE - 1);
-}
-
-uint16_t directFilterHash(int32_t val) {
-  return BINDEX((val * 8387) & DF_MASK);
 }

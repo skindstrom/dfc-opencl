@@ -3,12 +3,6 @@
 
 #include <ctype.h>
 #include <stdint.h>
-#include "constants.h"
-
-#define BINDEX(x) ((x) >> 3)
-#define BMASK(x) (1 << ((x)&0x7))
-
-#define DF_MASK (DF_SIZE - 1)
 
 #ifndef likely
 #define likely(expr) __builtin_expect(!!(expr), 1)
@@ -39,9 +33,5 @@ void init_xlatcase(unsigned char *out);
 
 void ConvertCaseEx(unsigned char *d, unsigned char *s, int m,
                    unsigned char *xlatcase);
-
-uint32_t hashForLargeCompactTable(uint32_t input);
-
-uint16_t directFilterHash(int32_t val);
 
 #endif

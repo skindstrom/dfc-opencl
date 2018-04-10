@@ -7,6 +7,7 @@
 #include "assert.h"
 #include "search.h"
 #include "utility.h"
+#include "shared-functions.h"
 
 static unsigned char xlatcase[256];
 

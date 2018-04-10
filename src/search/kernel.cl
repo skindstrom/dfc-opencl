@@ -1,58 +1,6 @@
-#define DF_SIZE 0x10000
-#define DF_SIZE_REAL 0x2000
+#include "shared.h"
 
-#define INIT_HASH_SIZE 65536
-
-#define PID_TYPE uint
-
-#define DIRECT_FILTER_SIZE_SMALL DF_SIZE_REAL
-
-#define SMALL_DF_MIN_PATTERN_SIZE 1
-#define SMALL_DF_MAX_PATTERN_SIZE 3
-
-#define MAX_PID_PER_ENTRY 100
-#define MAX_ENTRIES_PER_BUCKET 100
-#define COMPACT_TABLE_SIZE_SMALL 0x100
-#define COMPACT_TABLE_SIZE_LARGE 0x1000
-
-#define MAX_EQUAL_PATTERNS 5
-#define MAX_PATTERN_LENGTH 25
-
-#define BINDEX(x) ((x) >> 3)
-#define BMASK(x) (1 << ((x)&0x7))
-
-#define DF_MASK (DF_SIZE - 1)
-
-#define GET_ENTRY_LARGE_CT(hash, x) \
-  ((ct + hash)->entries + sizeof(CompactTableLargeEntry) * x)
-
-typedef struct CompactTableSmallEntry_ {
-  uchar pattern;
-  uchar pidCount;
-  PID_TYPE pids[MAX_PID_PER_ENTRY];
-} CompactTableSmallEntry;
-
-typedef struct CompactTableLargeEntry_ {
-  uint pattern;
-  uchar pidCount;
-  PID_TYPE pids[MAX_PID_PER_ENTRY];
-} CompactTableLargeEntry;
-
-typedef struct CompactTableLarge_ {
-  CompactTableLargeEntry entries[MAX_ENTRIES_PER_BUCKET];
-} CompactTableLarge;
-
-typedef struct _dfc_fixed_pattern {
-  int pattern_length;
-  int is_case_insensitive;
-
-  uchar upper_case_pattern[MAX_PATTERN_LENGTH];
-  uchar original_pattern[MAX_PATTERN_LENGTH];
-
-  int external_id_count;
-  PID_TYPE external_ids[MAX_EQUAL_PATTERNS];
-} DFC_FIXED_PATTERN;
-
+ushort directFilterHash(uint val) { return BINDEX((val * 8387) & DF_MASK); }
 uint hashForLargeCompactTable(uint input) {
   return (input * 8389) & (COMPACT_TABLE_SIZE_LARGE - 1);
 }
@@ -148,7 +96,6 @@ int verifyLarge(__global CompactTableLarge *ct,
   return matches;
 }
 
-ushort directFilterHash(uint val) { return BINDEX((val * 8387) & DF_MASK); }
 
 bool isInHashDf(__global uchar *df, __global uchar *input) {
   /*
