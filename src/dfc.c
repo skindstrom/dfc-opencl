@@ -6,8 +6,8 @@
 #include "dfc.h"
 #include "assert.h"
 #include "search.h"
-#include "utility.h"
 #include "shared-functions.h"
+#include "utility.h"
 
 static unsigned char xlatcase[256];
 

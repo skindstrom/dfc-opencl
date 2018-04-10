@@ -19,11 +19,7 @@ typedef struct {
   int inputLength;
   cl_mem input;
   cl_mem patterns;
-  cl_mem dfSmall;
-  cl_mem ctSmall;
-  cl_mem dfLarge;
-  cl_mem dfLargeHash;
-  cl_mem ctLarge;
+  cl_mem dfcStructure;
   cl_mem result;
 } DfcOpenClMemory;
 
@@ -106,7 +102,8 @@ cl_program loadAndCreateProgram(cl_context context) {
 
 void buildProgram(cl_program *program, cl_device_id device) {
   char arguments[200];
-  sprintf(arguments, "-cl-std=CL1.2 -D CHECK_COUNT_PER_THREAD=%d -D DFC_OPENCL -I ../src",
+  sprintf(arguments,
+          "-cl-std=CL1.2 -D CHECK_COUNT_PER_THREAD=%d -D DFC_OPENCL -I ../src",
           CHECK_COUNT_PER_THREAD);
   cl_int status = clBuildProgram(*program, 1, &device, arguments, NULL, NULL);
 
@@ -169,35 +166,22 @@ cl_command_queue createCommandQueue(DfcOpenClEnvironment *env) {
 }
 
 DfcOpenClMemory createMemory(DfcOpenClEnvironment *environment,
-                             DFC_STRUCTURE *dfc, DFC_PATTERNS *dfcPatterns,
-                             int inputLength) {
+                             DFC_PATTERNS *dfcPatterns, int inputLength) {
   cl_context context = environment->context;
   cl_mem kernelInput =
       clCreateBuffer(context, CL_MEM_READ_ONLY, inputLength, NULL, NULL);
   cl_mem patterns = clCreateBuffer(
       context, CL_MEM_READ_ONLY,
       sizeof(DFC_FIXED_PATTERN) * dfcPatterns->numPatterns, NULL, NULL);
-  cl_mem dfSmall = clCreateBuffer(context, CL_MEM_READ_ONLY,
-                                  sizeof(dfc->directFilterSmall), NULL, NULL);
-  cl_mem ctSmall = clCreateBuffer(context, CL_MEM_READ_ONLY,
-                                  sizeof(dfc->compactTableSmall), NULL, NULL);
-  cl_mem dfLarge = clCreateBuffer(context, CL_MEM_READ_ONLY,
-                                  sizeof(dfc->directFilterLarge), NULL, NULL);
-  cl_mem dfLargeHash =
-      clCreateBuffer(context, CL_MEM_READ_ONLY,
-                     sizeof(dfc->directFilterLargeHash), NULL, NULL);
-  cl_mem ctLarge = clCreateBuffer(context, CL_MEM_READ_ONLY,
-                                  sizeof(dfc->compactTableLarge), NULL, NULL);
+
+  cl_mem dfcStructure = clCreateBuffer(context, CL_MEM_READ_ONLY,
+                                       sizeof(DFC_STRUCTURE), NULL, NULL);
   cl_mem result =
       clCreateBuffer(context, CL_MEM_READ_WRITE, inputLength, NULL, NULL);
 
   DfcOpenClMemory memory = {.input = kernelInput,
                             .patterns = patterns,
-                            .dfSmall = dfSmall,
-                            .ctSmall = ctSmall,
-                            .dfLarge = dfLarge,
-                            .dfLargeHash = dfLargeHash,
-                            .ctLarge = ctLarge,
+                            .dfcStructure = dfcStructure,
                             .result = result};
 
   return memory;
@@ -212,31 +196,14 @@ void writeMemory(DfcOpenClMemory *memory, cl_command_queue queue,
   clEnqueueWriteBuffer(queue, memory->patterns, BLOCKING, 0,
                        sizeof(DFC_FIXED_PATTERN) * dfcPatterns->numPatterns,
                        dfcPatterns->dfcMatchList, 0, NULL, NULL);
-  clEnqueueWriteBuffer(queue, memory->dfSmall, BLOCKING, 0,
-                       sizeof(dfc->directFilterSmall), dfc->directFilterSmall,
-                       0, NULL, NULL);
-  clEnqueueWriteBuffer(queue, memory->ctSmall, BLOCKING, 0,
-                       sizeof(dfc->compactTableSmall), dfc->compactTableSmall,
-                       0, NULL, NULL);
-  clEnqueueWriteBuffer(queue, memory->dfLarge, BLOCKING, 0,
-                       sizeof(dfc->directFilterLarge), dfc->directFilterLarge,
-                       0, NULL, NULL);
-  clEnqueueWriteBuffer(queue, memory->dfLargeHash, BLOCKING, 0,
-                       sizeof(dfc->directFilterLargeHash),
-                       dfc->directFilterLargeHash, 0, NULL, NULL);
-  clEnqueueWriteBuffer(queue, memory->ctLarge, BLOCKING, 0,
-                       sizeof(dfc->compactTableLarge), dfc->compactTableLarge,
-                       0, NULL, NULL);
+  clEnqueueWriteBuffer(queue, memory->dfcStructure, BLOCKING, 0,
+                       sizeof(DFC_STRUCTURE), dfc, 0, NULL, NULL);
 }
 
 void freeMemory(DfcOpenClMemory *mem) {
   clReleaseMemObject(mem->input);
   clReleaseMemObject(mem->patterns);
-  clReleaseMemObject(mem->dfSmall);
-  clReleaseMemObject(mem->ctSmall);
-  clReleaseMemObject(mem->dfLarge);
-  clReleaseMemObject(mem->dfLargeHash);
-  clReleaseMemObject(mem->ctLarge);
+  clReleaseMemObject(mem->dfcStructure);
   clReleaseMemObject(mem->result);
 }
 
@@ -244,12 +211,8 @@ void setKernelArgs(cl_kernel kernel, DfcOpenClMemory *mem) {
   clSetKernelArg(kernel, 0, sizeof(int), &mem->inputLength);
   clSetKernelArg(kernel, 1, sizeof(cl_mem), &mem->input);
   clSetKernelArg(kernel, 2, sizeof(cl_mem), &mem->patterns);
-  clSetKernelArg(kernel, 3, sizeof(cl_mem), &mem->dfSmall);
-  clSetKernelArg(kernel, 4, sizeof(cl_mem), &mem->ctSmall);
-  clSetKernelArg(kernel, 5, sizeof(cl_mem), &mem->dfLarge);
-  clSetKernelArg(kernel, 6, sizeof(cl_mem), &mem->dfLargeHash);
-  clSetKernelArg(kernel, 7, sizeof(cl_mem), &mem->ctLarge);
-  clSetKernelArg(kernel, 8, sizeof(cl_mem), &mem->result);
+  clSetKernelArg(kernel, 3, sizeof(cl_mem), &mem->dfcStructure);
+  clSetKernelArg(kernel, 4, sizeof(cl_mem), &mem->result);
 }
 
 size_t getGlobalGroupSize(size_t localGroupSize, int inputLength) {
@@ -303,7 +266,7 @@ int search(DFC_STRUCTURE *dfc, DFC_PATTERNS *patterns, uint8_t *input,
            int inputLength) {
   DfcOpenClEnvironment env = setupEnvironment();
   cl_command_queue queue = createCommandQueue(&env);
-  DfcOpenClMemory mem = createMemory(&env, dfc, patterns, inputLength);
+  DfcOpenClMemory mem = createMemory(&env, patterns, inputLength);
   writeMemory(&mem, queue, dfc, patterns, input, inputLength);
 
   setKernelArgs(env.kernel, &mem);
