@@ -31,10 +31,14 @@ add_definitions(-DCL_USE_DEPRECATED_OPENCL_1_2_APIS)
 # 0 = OFF
 # 1 = ON
 
+# Feature flags
 set(DFC_SEARCH_WITH_GPU 1)
+set(DFC_MAP_MEMORY 0)
+
+# Continous values
 set(DFC_WORK_GROUP_SIZE 32)
 # the amount positions in the input that gets checked per thread
-# higher value = more work per thread = less threads
+# higher value = more work per thread = fewer threads
 set(DFC_CHECK_COUNT_PER_THREAD 10)
 
 #########################################
@@ -44,9 +48,14 @@ set(DFC_HEADERS
   ${CMAKE_CURRENT_SOURCE_DIR}/src/utility.h
   ${CMAKE_CURRENT_SOURCE_DIR}/src/constants.h
   ${CMAKE_CURRENT_SOURCE_DIR}/src/search.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/shared.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/shared-functions.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/memory.h
+
 )
 set(DFC_SOURCES
       ${CMAKE_CURRENT_SOURCE_DIR}/src/dfc.c
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/memory.c
       ${CMAKE_CURRENT_SOURCE_DIR}/src/utility.c
       )
 

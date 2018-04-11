@@ -1,9 +1,6 @@
 #ifndef DFC_SEARCH_H
 #define DFC_SEARCH_H
 
-#include "dfc.h"
-
-int search(DFC_STRUCTURE *dfc, DFC_PATTERNS *patterns, uint8_t *input,
-           int inputLength);
+int search();
 
 #endif

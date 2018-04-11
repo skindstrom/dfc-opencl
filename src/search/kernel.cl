@@ -113,8 +113,8 @@ bool isInHashDf(__global uchar *df, __global uchar *input) {
 __kernel void search(int inputLength, __global uchar *input,
                      __global DFC_FIXED_PATTERN *patterns,
                      __global DFC_STRUCTURE *dfc, __global uchar *result) {
-  uint i = get_group_id(0) * get_local_size(0) * CHECK_COUNT_PER_THREAD +
-           get_local_id(0);
+  uint i = (get_group_id(0) * get_local_size(0) + get_local_id(0)) *
+           CHECK_COUNT_PER_THREAD;
 
   for (int j = 0; j < CHECK_COUNT_PER_THREAD && i < inputLength; ++j, ++i) {
     uchar matches = 0;

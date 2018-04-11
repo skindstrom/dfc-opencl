@@ -8,6 +8,8 @@
 void Print_Result(unsigned char *, uint32_t *, uint32_t);
 
 int main(void) {
+  DFC_SetupEnvironment();
+
   char *buf = DFC_NewInput(200);
   strcpy(buf,
          "This input includes an attack pattern. It might CRASH your machine.");
@@ -44,16 +46,21 @@ int main(void) {
   DFC_Compile(dfc, patternInit);
 
   DFC_PATTERNS *dfcPatterns = DFC_PATTERNS_New(patternInit->numPatterns);
+  DFC_CompilePatterns(patternInit, dfcPatterns);
 
   // 4. [DFC] Search
   printf("* Result:\n");
-  int res = DFC_Search(dfc, dfcPatterns, (unsigned char *)buf, strlen(buf));
+  int res = DFC_Search();
   printf("\n* Total match count: %d\n", res);
 
   // 5. [DFC] Free DFC structure
   DFC_FreePatternsInit(patternInit);
-  DFC_FreePatterns(dfcPatterns);
-  DFC_FreeStructure(dfc);
+
+  DFC_FreeInput();
+  DFC_FreePatterns();
+  DFC_FreeStructure();
+
+  DFC_ReleaseEnvironment();
 
   return 0;
 }

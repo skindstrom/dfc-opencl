@@ -3,8 +3,10 @@
 /* Contact - cbkbrad@kaist.ac.kr */
 /*********************************/
 
+#include <assert.h>
+
 #include "dfc.h"
-#include "assert.h"
+#include "memory.h"
 #include "search.h"
 #include "shared-functions.h"
 #include "utility.h"
@@ -32,24 +34,22 @@ static void setupCompactTables(DFC_STRUCTURE *dfc, DFC_PATTERN_INIT *patterns);
 
 static uint8_t toggleCharacterCase(uint8_t);
 
-char *DFC_NewInput(int size) { return malloc(size); }
+void DFC_SetupEnvironment() { setupExecutionEnvironment(); }
+void DFC_ReleaseEnvironment() { releaseExecutionEnvironment(); }
 
-DFC_STRUCTURE *DFC_New(void) {
-  DFC_STRUCTURE *p;
+char *DFC_NewInput(int size) {
+  allocateInput(size);
+  return DFC_HOST_MEMORY.input;
+}
 
-  p = (DFC_STRUCTURE *)DFC_MALLOC(sizeof(DFC_STRUCTURE));
-  MEMASSERT_DFC(p, "DFC_New");
-
-  return p;
+DFC_STRUCTURE *DFC_New() {
+  allocateDfcStructure();
+  return DFC_HOST_MEMORY.dfcStructure;
 }
 
 DFC_PATTERNS *DFC_PATTERNS_New(int numPatterns) {
-  DFC_PATTERNS *patterns = malloc(sizeof(DFC_PATTERNS));
-
-  patterns->numPatterns = numPatterns;
-  patterns->dfcMatchList = DFC_MALLOC(sizeof(DFC_FIXED_PATTERN) * numPatterns);
-
-  return patterns;
+  allocateDfcPatterns(numPatterns);
+  return DFC_HOST_MEMORY.patterns;
 }
 
 DFC_PATTERN_INIT *DFC_PATTERN_INIT_New(void) {
@@ -98,13 +98,11 @@ void DFC_FreePatternsInit(DFC_PATTERN_INIT *patterns) {
   free(patterns->init_hash);
 }
 
-void DFC_FreePatterns(DFC_PATTERNS *patterns) { free(patterns->dfcMatchList); }
+void DFC_FreePatterns() { freeDfcPatterns(); }
 
-void DFC_FreeStructure(DFC_STRUCTURE *dfc) {
-  if (dfc == NULL) return;
+void DFC_FreeStructure() { freeDfcStructure(); }
 
-  free(dfc);
-}
+void DFC_FreeInput() { freeDfcInput(); }
 
 void DFC_AddPattern(DFC_PATTERN_INIT *dfc, unsigned char *pat, int n,
                     int is_case_insensitive, PID_TYPE sid) {
@@ -172,10 +170,7 @@ int DFC_Compile(DFC_STRUCTURE *dfc, DFC_PATTERN_INIT *patterns) {
   return 0;
 }
 
-int DFC_Search(DFC_STRUCTURE *dfc, DFC_PATTERNS *patterns, uint8_t *input,
-               int inputLength) {
-  return search(dfc, patterns, input, inputLength);
-}
+int DFC_Search() { return search(); }
 
 static void *DFC_REALLOC(void *p, uint16_t n, dfcDataType type) {
   switch (type) {

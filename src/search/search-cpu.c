@@ -2,8 +2,10 @@
 #define DFC_SEARCH_CPU_H
 
 #include <ctype.h>
+#include <stdbool.h>
 #include <stdint.h>
 
+#include "memory.h"
 #include "search.h"
 #include "shared-functions.h"
 #include "utility.h"
@@ -113,8 +115,12 @@ static bool isInHashDf(uint8_t *df, uint8_t *input) {
   return df[byteIndex] & bitMask;
 }
 
-int search(DFC_STRUCTURE *dfc, DFC_PATTERNS *patterns, uint8_t *input,
-           int inputLength) {
+int search() {
+  DFC_STRUCTURE *dfc = DFC_HOST_MEMORY.dfcStructure;
+  DFC_PATTERNS *patterns = DFC_HOST_MEMORY.patterns;
+  uint8_t *input = (uint8_t *)DFC_HOST_MEMORY.input;
+  int inputLength = DFC_HOST_MEMORY.inputLength;
+
   int matches = 0;
 
   for (int i = 0; i < inputLength; ++i) {
