@@ -295,10 +295,6 @@ static void setupMatchList(DFC_PATTERN_INIT *init, DFC_PATTERNS *patterns) {
     }
   }
 
-  patterns->dfcMatchList = (DFC_FIXED_PATTERN *)DFC_MALLOC(
-      sizeof(DFC_FIXED_PATTERN) * init->numPatterns);
-  MEMASSERT_DFC(patterns->dfcMatchList, "setupMatchList");
-
   for (DFC_PATTERN *plist = init->dfcPatterns; plist != NULL;
        plist = plist->next) {
     patterns->dfcMatchList[plist->iid] = createFixed(plist);

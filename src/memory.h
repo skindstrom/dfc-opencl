@@ -25,10 +25,15 @@ typedef struct {
   cl_context context;
   cl_program program;
   cl_kernel kernel;
+  cl_command_queue queue;
 } DfcOpenClEnvironment;
 
 extern DfcOpenClMemory DFC_OPENCL_BUFFERS;
 extern DfcOpenClEnvironment DFC_OPENCL_ENVIRONMENT;
+
+#if MAP_MEMORY
+void unmapOpenClInputBuffers();
+#endif
 
 #endif
 

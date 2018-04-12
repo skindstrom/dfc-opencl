@@ -112,6 +112,10 @@ cl_kernel createKernel(cl_program *program) {
   return kernel;
 }
 
+cl_command_queue createCommandQueue(cl_context context, cl_device_id device) {
+  return clCreateCommandQueue(context, device, 0, NULL);
+}
+
 DfcOpenClEnvironment setupOpenClEnvironment() {
   cl_platform_id platform = getPlatform();
   cl_device_id device = getDevice(platform);
@@ -119,14 +123,14 @@ DfcOpenClEnvironment setupOpenClEnvironment() {
   cl_program program = loadAndCreateProgram(context);
   buildProgram(&program, device);
   cl_kernel kernel = createKernel(&program);
+  cl_command_queue queue = createCommandQueue(context, device);
 
-  DfcOpenClEnvironment env = {
-      .platform = platform,
-      .device = device,
-      .context = context,
-      .program = program,
-      .kernel = kernel,
-  };
+  DfcOpenClEnvironment env = {.platform = platform,
+                              .device = device,
+                              .context = context,
+                              .program = program,
+                              .kernel = kernel,
+                              .queue = queue};
 
   return env;
 }
@@ -152,12 +156,117 @@ void releaseExecutionEnvironment() {}
 #endif
 
 #if MAP_MEMORY
-DFC_STRUCTURE *allocateDfcStructure() {}
+void allocateDfcStructure() {
+  cl_int errcode;
 
-DFC_PATTERNS *allocateDfcPatterns(int numPatterns);
+  DFC_OPENCL_BUFFERS.dfcStructure = clCreateBuffer(
+      DFC_OPENCL_ENVIRONMENT.context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR,
+      sizeof(DFC_STRUCTURE), NULL, &errcode);
 
-void freeDfcStructure();
-void freeDfcPatterns();
+  if (errcode != CL_SUCCESS) {
+    fprintf(stderr, "Could not create mapped DFC buffer");
+    exit(OPENCL_COULD_NOT_CREATE_MAPPED_DFC_BUFFER);
+  }
+
+  DFC_HOST_MEMORY.dfcStructure = clEnqueueMapBuffer(
+      DFC_OPENCL_ENVIRONMENT.queue, DFC_OPENCL_BUFFERS.dfcStructure,
+      CL_BLOCKING, CL_MAP_READ | CL_MAP_WRITE, 0, sizeof(DFC_STRUCTURE), 0,
+      NULL, NULL, &errcode);
+
+  if (errcode != CL_SUCCESS) {
+    fprintf(stderr, "Could not map DFC buffer to host memory");
+    exit(OPENCL_COULD_NOT_MAP_DFC_TO_HOST);
+  }
+
+  memset(DFC_HOST_MEMORY.dfcStructure, 0, sizeof(DFC_STRUCTURE));
+}
+
+void allocateDfcPatterns(int numPatterns) {
+  const size_t size = sizeof(DFC_FIXED_PATTERN) * numPatterns;
+  cl_int errcode;
+
+  DFC_OPENCL_BUFFERS.patterns = clCreateBuffer(
+      DFC_OPENCL_ENVIRONMENT.context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR,
+      size, NULL, &errcode);
+
+  if (errcode != CL_SUCCESS) {
+    fprintf(stderr, "Could not create mapped pattern buffer");
+    exit(OPENCL_COULD_NOT_CREATE_MAPPED_PATTERN_BUFFER);
+  }
+
+  DFC_PATTERNS *patterns = malloc(sizeof(DFC_PATTERNS));
+
+  patterns->numPatterns = numPatterns;
+  patterns->dfcMatchList = clEnqueueMapBuffer(
+      DFC_OPENCL_ENVIRONMENT.queue, DFC_OPENCL_BUFFERS.patterns, CL_BLOCKING,
+      CL_MAP_READ | CL_MAP_WRITE, 0, size, 0, NULL, NULL, &errcode);
+
+  if (errcode != CL_SUCCESS) {
+    fprintf(stderr, "Could not map pattern buffer to host memory");
+    exit(OPENCL_COULD_NOT_MAP_PATTERN_TO_HOST);
+  }
+
+  DFC_HOST_MEMORY.patterns = patterns;
+}
+
+void allocateInput(int size) {
+  DFC_HOST_MEMORY.inputLength = size;
+  DFC_OPENCL_BUFFERS.inputLength = size;
+
+  cl_int errcode;
+
+  DFC_OPENCL_BUFFERS.input = clCreateBuffer(
+      DFC_OPENCL_ENVIRONMENT.context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR,
+      size, NULL, &errcode);
+
+  if (errcode != CL_SUCCESS) {
+    fprintf(stderr, "Could not create mapped input buffer");
+    exit(OPENCL_COULD_NOT_CREATE_MAPPED_INPUT_BUFFER);
+  }
+
+  DFC_HOST_MEMORY.input = clEnqueueMapBuffer(
+      DFC_OPENCL_ENVIRONMENT.queue, DFC_OPENCL_BUFFERS.input, CL_BLOCKING,
+      CL_MAP_READ | CL_MAP_WRITE, 0, size, 0, NULL, NULL, &errcode);
+
+  if (errcode != CL_SUCCESS) {
+    fprintf(stderr, "Could not map input buffer to host memory");
+    exit(OPENCL_COULD_NOT_MAP_INPUT_TO_HOST);
+  }
+}
+
+// Done after search
+void freeDfcStructure() {}
+void freeDfcPatterns() {}
+void freeDfcInput() {}
+
+void unmapOpenClInputBuffers() {
+  cl_int errcode = clEnqueueUnmapMemObject(
+      DFC_OPENCL_ENVIRONMENT.queue, DFC_OPENCL_BUFFERS.dfcStructure,
+      DFC_HOST_MEMORY.dfcStructure, 0, NULL, NULL);
+
+  if (errcode != CL_SUCCESS) {
+    fprintf(stderr, "Could not unmap DFC");
+    exit(OPENCL_COULD_NOT_UNMAP_DFC);
+  }
+
+  errcode = clEnqueueUnmapMemObject(
+      DFC_OPENCL_ENVIRONMENT.queue, DFC_OPENCL_BUFFERS.patterns,
+      DFC_HOST_MEMORY.patterns->dfcMatchList, 0, NULL, NULL);
+
+  if (errcode != CL_SUCCESS) {
+    fprintf(stderr, "Could not unmap patterns: %d", errcode);
+    exit(OPENCL_COULD_NOT_UNMAP_PATTERNS);
+  }
+
+  errcode = clEnqueueUnmapMemObject(DFC_OPENCL_ENVIRONMENT.queue,
+                                    DFC_OPENCL_BUFFERS.input,
+                                    DFC_HOST_MEMORY.input, 0, NULL, NULL);
+
+  if (errcode != CL_SUCCESS) {
+    fprintf(stderr, "Could not unmap input");
+    exit(OPENCL_COULD_NOT_UNMAP_INPUT);
+  }
+}
 
 #else
 
