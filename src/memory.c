@@ -2,8 +2,6 @@
 
 DfcHostMemory DFC_HOST_MEMORY;
 
-#if SEARCH_WITH_GPU
-
 DfcOpenClMemory DFC_OPENCL_BUFFERS;
 DfcOpenClEnvironment DFC_OPENCL_ENVIRONMENT;
 
@@ -142,21 +140,17 @@ void releaseOpenClEnvironment(DfcOpenClEnvironment *environment) {
 }
 
 void setupExecutionEnvironment() {
-  DFC_OPENCL_ENVIRONMENT = setupOpenClEnvironment();
+  if (SEARCH_WITH_GPU) {
+    DFC_OPENCL_ENVIRONMENT = setupOpenClEnvironment();
+  }
 }
 void releaseExecutionEnvironment() {
-  releaseOpenClEnvironment(&DFC_OPENCL_ENVIRONMENT);
+  if (SEARCH_WITH_GPU) {
+    releaseOpenClEnvironment(&DFC_OPENCL_ENVIRONMENT);
+  }
 }
 
-#else
-
-void setupExecutionEnvironment() {}
-void releaseExecutionEnvironment() {}
-
-#endif
-
-#if MAP_MEMORY
-void allocateDfcStructure() {
+void allocateDfcStructureWithMap() {
   cl_int errcode;
 
   DFC_OPENCL_BUFFERS.dfcStructure = clCreateBuffer(
@@ -181,7 +175,7 @@ void allocateDfcStructure() {
   memset(DFC_HOST_MEMORY.dfcStructure, 0, sizeof(DFC_STRUCTURE));
 }
 
-void allocateDfcPatterns(int numPatterns) {
+void allocateDfcPatternsWithMap(int numPatterns) {
   const size_t size = sizeof(DFC_FIXED_PATTERN) * numPatterns;
   cl_int errcode;
 
@@ -209,7 +203,7 @@ void allocateDfcPatterns(int numPatterns) {
   DFC_HOST_MEMORY.patterns = patterns;
 }
 
-void allocateInput(int size) {
+void allocateInputWithMap(int size) {
   DFC_HOST_MEMORY.inputLength = size;
   DFC_OPENCL_BUFFERS.inputLength = size;
 
@@ -233,11 +227,6 @@ void allocateInput(int size) {
     exit(OPENCL_COULD_NOT_MAP_INPUT_TO_HOST);
   }
 }
-
-// Done after search
-void freeDfcStructure() {}
-void freeDfcPatterns() {}
-void freeDfcInput() {}
 
 void unmapOpenClInputBuffers() {
   cl_int errcode = clEnqueueUnmapMemObject(
@@ -268,13 +257,11 @@ void unmapOpenClInputBuffers() {
   }
 }
 
-#else
-
-void allocateDfcStructure() {
+void allocateDfcStructureOnHost() {
   DFC_HOST_MEMORY.dfcStructure = calloc(1, sizeof(DFC_STRUCTURE));
 }
 
-void allocateDfcPatterns(int numPatterns) {
+void allocateDfcPatternsOnHost(int numPatterns) {
   DFC_PATTERNS *patterns = malloc(sizeof(DFC_PATTERNS));
 
   patterns->numPatterns = numPatterns;
@@ -283,21 +270,63 @@ void allocateDfcPatterns(int numPatterns) {
   DFC_HOST_MEMORY.patterns = patterns;
 }
 
-void allocateInput(int size) {
+void allocateInputOnHost(int size) {
   DFC_HOST_MEMORY.inputLength = size;
   DFC_HOST_MEMORY.input = calloc(1, size);
 }
 
-void freeDfcStructure() { free(DFC_HOST_MEMORY.dfcStructure); }
+void freeDfcStructureOnHost() { free(DFC_HOST_MEMORY.dfcStructure); }
 
-void freeDfcPatterns() {
+void freeDfcPatternsOnHost() {
   free(DFC_HOST_MEMORY.patterns->dfcMatchList);
   free(DFC_HOST_MEMORY.patterns);
 }
 
-void freeDfcInput() {
+void freeDfcInputOnHost() {
   DFC_HOST_MEMORY.inputLength = 0;
   free(DFC_HOST_MEMORY.input);
 }
 
-#endif
+bool shouldUseMappedMemory() { return MAP_MEMORY && SEARCH_WITH_GPU; }
+
+void allocateDfcStructure() {
+  if (shouldUseMappedMemory()) {
+    allocateDfcStructureWithMap();
+  } else {
+    allocateDfcStructureOnHost();
+  }
+}
+
+void allocateDfcPatterns(int numPatterns) {
+  if (shouldUseMappedMemory()) {
+    allocateDfcPatternsWithMap(numPatterns);
+  } else {
+    allocateDfcPatternsOnHost(numPatterns);
+  }
+}
+
+void allocateInput(int size) {
+  if (shouldUseMappedMemory()) {
+    allocateInputWithMap(size);
+  } else {
+    allocateInputOnHost(size);
+  }
+}
+
+void freeDfcStructure() {
+  if (!shouldUseMappedMemory()) {
+    freeDfcStructureOnHost();
+  }
+}
+
+void freeDfcPatterns() {
+  if (!shouldUseMappedMemory()) {
+    freeDfcPatternsOnHost();
+  }
+}
+
+void freeDfcInput() {
+  if (!shouldUseMappedMemory()) {
+    freeDfcInputOnHost();
+  }
+}

@@ -3,8 +3,6 @@
 
 #include "dfc.h"
 
-#if SEARCH_WITH_GPU
-
 #ifdef __APPLE__
 #include <OpenCL/opencl.h>
 #else
@@ -31,11 +29,7 @@ typedef struct {
 extern DfcOpenClMemory DFC_OPENCL_BUFFERS;
 extern DfcOpenClEnvironment DFC_OPENCL_ENVIRONMENT;
 
-#if MAP_MEMORY
 void unmapOpenClInputBuffers();
-#endif
-
-#endif
 
 typedef struct {
   int inputLength;
