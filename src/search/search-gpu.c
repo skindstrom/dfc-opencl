@@ -1,6 +1,3 @@
-#ifndef DFC_SEARCH_CPU_H
-#define DFC_SEARCH_CPU_H
-
 #ifdef __APPLE__
 #include <OpenCL/opencl.h>
 #else
@@ -174,5 +171,3 @@ int search() {
 
   return matches;
 }
-
-#endif

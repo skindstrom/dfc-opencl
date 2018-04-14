@@ -1,6 +1,3 @@
-#ifndef DFC_SEARCH_CPU_H
-#define DFC_SEARCH_CPU_H
-
 #include <ctype.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -142,5 +139,3 @@ int search() {
 
   return matches;
 }
-
-#endif
