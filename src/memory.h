@@ -15,7 +15,7 @@ typedef struct {
   cl_mem patterns;
   cl_mem dfcStructure;
   cl_mem result;
-} DfcOpenClMemory;
+} DfcOpenClBuffers;
 
 typedef struct {
   cl_platform_id platform;
@@ -26,7 +26,7 @@ typedef struct {
   cl_command_queue queue;
 } DfcOpenClEnvironment;
 
-extern DfcOpenClMemory DFC_OPENCL_BUFFERS;
+extern DfcOpenClBuffers DFC_OPENCL_BUFFERS;
 extern DfcOpenClEnvironment DFC_OPENCL_ENVIRONMENT;
 
 void unmapOpenClInputBuffers();
@@ -35,6 +35,7 @@ typedef struct {
   int inputLength;
   char *input;
   DFC_STRUCTURE *dfcStructure;
+
   DFC_PATTERNS *patterns;
 } DfcHostMemory;
 
@@ -50,5 +51,8 @@ void allocateInput(int size);
 void freeDfcStructure();
 void freeDfcPatterns();
 void freeDfcInput();
+
+void prepareOpenClBuffersForSearch();
+void freeOpenClBuffers();
 
 #endif

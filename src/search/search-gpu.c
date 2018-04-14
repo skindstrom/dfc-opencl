@@ -11,57 +11,7 @@
 #include "memory.h"
 #include "search.h"
 
-DfcOpenClMemory createOpenClBuffers(DfcOpenClEnvironment *environment,
-                                    DFC_PATTERNS *dfcPatterns,
-                                    int inputLength) {
-  cl_context context = environment->context;
-  cl_mem kernelInput =
-      clCreateBuffer(context, CL_MEM_READ_ONLY, inputLength, NULL, NULL);
-  cl_mem patterns = clCreateBuffer(
-      context, CL_MEM_READ_ONLY,
-      sizeof(DFC_FIXED_PATTERN) * dfcPatterns->numPatterns, NULL, NULL);
-
-  cl_mem dfcStructure = clCreateBuffer(context, CL_MEM_READ_ONLY,
-                                       sizeof(DFC_STRUCTURE), NULL, NULL);
-  cl_mem result =
-      clCreateBuffer(context, CL_MEM_READ_WRITE, inputLength, NULL, NULL);
-
-  DfcOpenClMemory memory = {.inputLength = inputLength,
-                            .input = kernelInput,
-                            .patterns = patterns,
-                            .dfcStructure = dfcStructure,
-                            .result = result};
-
-  return memory;
-}
-
-void writeOpenClBuffers(DfcOpenClMemory *deviceMemory, cl_command_queue queue,
-                        DfcHostMemory *hostMemory) {
-  clEnqueueWriteBuffer(queue, deviceMemory->input, CL_BLOCKING, 0,
-                       deviceMemory->inputLength, hostMemory->input, 0, NULL,
-                       NULL);
-  clEnqueueWriteBuffer(
-      queue, deviceMemory->patterns, CL_BLOCKING, 0,
-      sizeof(DFC_FIXED_PATTERN) * hostMemory->patterns->numPatterns,
-      hostMemory->patterns->dfcMatchList, 0, NULL, NULL);
-  clEnqueueWriteBuffer(queue, deviceMemory->dfcStructure, CL_BLOCKING, 0,
-                       sizeof(DFC_STRUCTURE), hostMemory->dfcStructure, 0, NULL,
-                       NULL);
-}
-
-cl_mem createMappedResultBuffer(cl_context context, int inputLength) {
-  return clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR,
-                        inputLength, NULL, NULL);
-}
-
-void freeOpenClMemory(DfcOpenClMemory *mem) {
-  clReleaseMemObject(mem->input);
-  clReleaseMemObject(mem->patterns);
-  clReleaseMemObject(mem->dfcStructure);
-  clReleaseMemObject(mem->result);
-}
-
-void setKernelArgs(cl_kernel kernel, DfcOpenClMemory *mem) {
+void setKernelArgs(cl_kernel kernel, DfcOpenClBuffers *mem) {
   clSetKernelArg(kernel, 0, sizeof(int), &mem->inputLength);
   clSetKernelArg(kernel, 1, sizeof(cl_mem), &mem->input);
   clSetKernelArg(kernel, 2, sizeof(cl_mem), &mem->patterns);
@@ -92,7 +42,7 @@ void startKernelForQueue(cl_kernel kernel, cl_command_queue queue,
   }
 }
 
-int readResultWithoutMap(DfcOpenClMemory *mem, cl_command_queue queue) {
+int readResultWithoutMap(DfcOpenClBuffers *mem, cl_command_queue queue) {
   uint8_t *output = calloc(1, mem->inputLength);
   int status = clEnqueueReadBuffer(queue, mem->result, CL_BLOCKING, 0,
                                    mem->inputLength, output, 0, NULL, NULL);
@@ -113,10 +63,10 @@ int readResultWithoutMap(DfcOpenClMemory *mem, cl_command_queue queue) {
   return matches;
 }
 
-int readResultWithMap(DfcOpenClMemory *mem, cl_command_queue queue) {
+int readResultWithMap(DfcOpenClBuffers *mem, cl_command_queue queue) {
   cl_int status;
   uint8_t *output = clEnqueueMapBuffer(
-      DFC_OPENCL_ENVIRONMENT.queue, DFC_OPENCL_BUFFERS.result, CL_BLOCKING,
+      queue, mem->result, CL_BLOCKING,
       CL_MAP_READ | CL_MAP_WRITE, 0, mem->inputLength, 0, NULL, NULL, &status);
 
   if (status != CL_SUCCESS) {
@@ -135,7 +85,7 @@ int readResultWithMap(DfcOpenClMemory *mem, cl_command_queue queue) {
   return matches;
 }
 
-int readResult(DfcOpenClMemory *mem, cl_command_queue queue) {
+int readResult(DfcOpenClBuffers *mem, cl_command_queue queue) {
   if (MAP_MEMORY) {
     return readResultWithMap(mem, queue);
   } else {
@@ -143,22 +93,8 @@ int readResult(DfcOpenClMemory *mem, cl_command_queue queue) {
   }
 }
 
-void prepareBuffers() {
-  if (MAP_MEMORY) {
-    unmapOpenClInputBuffers();
-    DFC_OPENCL_BUFFERS.result = createMappedResultBuffer(
-        DFC_OPENCL_ENVIRONMENT.context, DFC_OPENCL_BUFFERS.inputLength);
-  } else {
-    DFC_OPENCL_BUFFERS =
-        createOpenClBuffers(&DFC_OPENCL_ENVIRONMENT, DFC_HOST_MEMORY.patterns,
-                            DFC_HOST_MEMORY.inputLength);
-    writeOpenClBuffers(&DFC_OPENCL_BUFFERS, DFC_OPENCL_ENVIRONMENT.queue,
-                       &DFC_HOST_MEMORY);
-  }
-}
-
 int search() {
-  prepareBuffers();
+  prepareOpenClBuffersForSearch();
 
   setKernelArgs(DFC_OPENCL_ENVIRONMENT.kernel, &DFC_OPENCL_BUFFERS);
   startKernelForQueue(DFC_OPENCL_ENVIRONMENT.kernel,
@@ -167,7 +103,7 @@ int search() {
 
   int matches = readResult(&DFC_OPENCL_BUFFERS, DFC_OPENCL_ENVIRONMENT.queue);
 
-  freeOpenClMemory(&DFC_OPENCL_BUFFERS);
+  freeOpenClBuffers();
 
   return matches;
 }

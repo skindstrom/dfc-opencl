@@ -2,7 +2,7 @@
 
 DfcHostMemory DFC_HOST_MEMORY;
 
-DfcOpenClMemory DFC_OPENCL_BUFFERS;
+DfcOpenClBuffers DFC_OPENCL_BUFFERS;
 DfcOpenClEnvironment DFC_OPENCL_ENVIRONMENT;
 
 cl_platform_id getPlatform() {
@@ -329,4 +329,69 @@ void freeDfcInput() {
   if (!shouldUseMappedMemory()) {
     freeDfcInputOnHost();
   }
+}
+
+DfcOpenClBuffers createOpenClBuffers(DfcOpenClEnvironment *environment,
+                                    DFC_PATTERNS *dfcPatterns,
+                                    int inputLength) {
+  cl_context context = environment->context;
+  cl_mem kernelInput =
+      clCreateBuffer(context, CL_MEM_READ_ONLY, inputLength, NULL, NULL);
+  cl_mem patterns = clCreateBuffer(
+      context, CL_MEM_READ_ONLY,
+      sizeof(DFC_FIXED_PATTERN) * dfcPatterns->numPatterns, NULL, NULL);
+
+  cl_mem dfcStructure = clCreateBuffer(context, CL_MEM_READ_ONLY,
+                                       sizeof(DFC_STRUCTURE), NULL, NULL);
+  cl_mem result =
+      clCreateBuffer(context, CL_MEM_READ_WRITE, inputLength, NULL, NULL);
+
+  DfcOpenClBuffers memory = {.inputLength = inputLength,
+                            .input = kernelInput,
+                            .patterns = patterns,
+                            .dfcStructure = dfcStructure,
+                            .result = result};
+
+  return memory;
+}
+
+void writeOpenClBuffers(DfcOpenClBuffers *deviceMemory, cl_command_queue queue,
+                        DfcHostMemory *hostMemory) {
+  clEnqueueWriteBuffer(queue, deviceMemory->input, CL_BLOCKING, 0,
+                       deviceMemory->inputLength, hostMemory->input, 0, NULL,
+                       NULL);
+  clEnqueueWriteBuffer(
+      queue, deviceMemory->patterns, CL_BLOCKING, 0,
+      sizeof(DFC_FIXED_PATTERN) * hostMemory->patterns->numPatterns,
+      hostMemory->patterns->dfcMatchList, 0, NULL, NULL);
+  clEnqueueWriteBuffer(queue, deviceMemory->dfcStructure, CL_BLOCKING, 0,
+                       sizeof(DFC_STRUCTURE), hostMemory->dfcStructure, 0, NULL,
+                       NULL);
+}
+
+cl_mem createMappedResultBuffer(cl_context context, int inputLength) {
+  return clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR,
+                        inputLength, NULL, NULL);
+}
+
+void prepareOpenClBuffersForSearch() {
+  if (MAP_MEMORY) {
+    unmapOpenClInputBuffers();
+    DFC_OPENCL_BUFFERS.result = createMappedResultBuffer(
+        DFC_OPENCL_ENVIRONMENT.context, DFC_OPENCL_BUFFERS.inputLength);
+  } else {
+    DFC_OPENCL_BUFFERS =
+        createOpenClBuffers(&DFC_OPENCL_ENVIRONMENT, DFC_HOST_MEMORY.patterns,
+                            DFC_HOST_MEMORY.inputLength);
+    writeOpenClBuffers(&DFC_OPENCL_BUFFERS, DFC_OPENCL_ENVIRONMENT.queue,
+                       &DFC_HOST_MEMORY);
+  }
+}
+
+void freeOpenClBuffers() {
+  DFC_OPENCL_BUFFERS.inputLength = 0;
+  clReleaseMemObject(DFC_OPENCL_BUFFERS.input);
+  clReleaseMemObject(DFC_OPENCL_BUFFERS.patterns);
+  clReleaseMemObject(DFC_OPENCL_BUFFERS.dfcStructure);
+  clReleaseMemObject(DFC_OPENCL_BUFFERS.result);
 }
