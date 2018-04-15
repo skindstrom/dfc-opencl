@@ -112,7 +112,9 @@ bool isInHashDf(__global uchar *df, __global uchar *input) {
 
 __kernel void search(int inputLength, __global uchar *input,
                      __global DFC_FIXED_PATTERN *patterns,
-                     __global DFC_STRUCTURE *dfc, __global uchar *result) {
+                     __global uchar *dfSmall, __global uchar *ctSmall,
+                     __global uchar *dfLarge, __global uchar *dfLargeHash,
+                     __global uchar *ctLarge, __global uchar *result) {
   uint i = (get_group_id(0) * get_local_size(0) + get_local_id(0)) *
            CHECK_COUNT_PER_THREAD;
 
@@ -122,15 +124,13 @@ __kernel void search(int inputLength, __global uchar *input,
     short byteIndex = BINDEX(data & DF_MASK);
     short bitMask = BMASK(data & DF_MASK);
 
-    if (dfc->directFilterSmall[byteIndex] & bitMask) {
-      matches += verifySmall(dfc->compactTableSmall, patterns, input + i, i,
-                             inputLength);
+    if (dfSmall[byteIndex] & bitMask) {
+      matches += verifySmall(ctSmall, patterns, input + i, i, inputLength);
     }
 
-    if (i >= 2 && (dfc->directFilterLarge[byteIndex] & bitMask) &&
-        isInHashDf(dfc->directFilterLargeHash, input + i)) {
-      matches += verifyLarge(dfc->compactTableLarge, patterns, input + i, i,
-                             inputLength);
+    if (i >= 2 && (dfLarge[byteIndex] & bitMask) &&
+        isInHashDf(dfLargeHash, input + i)) {
+      matches += verifyLarge(ctLarge, patterns, input + i, i, inputLength);
     }
 
     result[i] = matches;

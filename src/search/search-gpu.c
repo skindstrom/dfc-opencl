@@ -14,9 +14,17 @@
 void setKernelArgs(cl_kernel kernel, DfcOpenClBuffers *mem) {
   clSetKernelArg(kernel, 0, sizeof(int), &mem->inputLength);
   clSetKernelArg(kernel, 1, sizeof(cl_mem), &mem->input);
+
   clSetKernelArg(kernel, 2, sizeof(cl_mem), &mem->patterns);
-  clSetKernelArg(kernel, 3, sizeof(cl_mem), &mem->dfcStructure);
-  clSetKernelArg(kernel, 4, sizeof(cl_mem), &mem->result);
+
+  clSetKernelArg(kernel, 3, sizeof(cl_mem), &mem->dfSmall);
+  clSetKernelArg(kernel, 4, sizeof(cl_mem), &mem->ctSmall);
+
+  clSetKernelArg(kernel, 5, sizeof(cl_mem), &mem->dfLarge);
+  clSetKernelArg(kernel, 6, sizeof(cl_mem), &mem->dfLargeHash);
+  clSetKernelArg(kernel, 7, sizeof(cl_mem), &mem->ctLarge);
+
+  clSetKernelArg(kernel, 8, sizeof(cl_mem), &mem->result);
 }
 
 size_t getGlobalGroupSize(size_t localGroupSize, int inputLength) {
@@ -66,8 +74,8 @@ int readResultWithoutMap(DfcOpenClBuffers *mem, cl_command_queue queue) {
 int readResultWithMap(DfcOpenClBuffers *mem, cl_command_queue queue) {
   cl_int status;
   uint8_t *output = clEnqueueMapBuffer(
-      queue, mem->result, CL_BLOCKING,
-      CL_MAP_READ | CL_MAP_WRITE, 0, mem->inputLength, 0, NULL, NULL, &status);
+      queue, mem->result, CL_BLOCKING, CL_MAP_READ | CL_MAP_WRITE, 0,
+      mem->inputLength, 0, NULL, NULL, &status);
 
   if (status != CL_SUCCESS) {
     free(output);

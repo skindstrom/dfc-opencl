@@ -150,29 +150,50 @@ void releaseExecutionEnvironment() {
   }
 }
 
-void allocateDfcStructureWithMap() {
+void createBufferAndMap(cl_context context, void **host, cl_mem *buffer,
+                        int size) {
   cl_int errcode;
 
-  DFC_OPENCL_BUFFERS.dfcStructure = clCreateBuffer(
-      DFC_OPENCL_ENVIRONMENT.context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR,
-      sizeof(DFC_STRUCTURE), NULL, &errcode);
+  *buffer = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR,
+                           size, NULL, &errcode);
 
   if (errcode != CL_SUCCESS) {
     fprintf(stderr, "Could not create mapped DFC buffer");
     exit(OPENCL_COULD_NOT_CREATE_MAPPED_DFC_BUFFER);
   }
 
-  DFC_HOST_MEMORY.dfcStructure = clEnqueueMapBuffer(
-      DFC_OPENCL_ENVIRONMENT.queue, DFC_OPENCL_BUFFERS.dfcStructure,
-      CL_BLOCKING, CL_MAP_READ | CL_MAP_WRITE, 0, sizeof(DFC_STRUCTURE), 0,
-      NULL, NULL, &errcode);
+  *host = clEnqueueMapBuffer(DFC_OPENCL_ENVIRONMENT.queue, *buffer, CL_BLOCKING,
+                             CL_MAP_READ | CL_MAP_WRITE, 0, size, 0, NULL, NULL,
+                             &errcode);
 
   if (errcode != CL_SUCCESS) {
     fprintf(stderr, "Could not map DFC buffer to host memory");
     exit(OPENCL_COULD_NOT_MAP_DFC_TO_HOST);
   }
 
-  memset(DFC_HOST_MEMORY.dfcStructure, 0, sizeof(DFC_STRUCTURE));
+  memset(*host, 0, size);
+}
+
+void allocateDfcStructureWithMap() {
+  cl_context context = DFC_OPENCL_ENVIRONMENT.context;
+
+  DFC_STRUCTURE *dfc = malloc(sizeof(DFC_STRUCTURE));
+
+  createBufferAndMap(context, (void *)&dfc->directFilterSmall,
+                     &DFC_OPENCL_BUFFERS.dfSmall, DF_SIZE_REAL);
+  createBufferAndMap(context, (void *)&dfc->compactTableSmall,
+                     &DFC_OPENCL_BUFFERS.ctSmall,
+                     COMPACT_TABLE_SIZE_SMALL * sizeof(CompactTableSmallEntry));
+
+  createBufferAndMap(context, (void *)&dfc->directFilterLarge,
+                     &DFC_OPENCL_BUFFERS.dfLarge, DF_SIZE_REAL);
+  createBufferAndMap(context, (void *)&dfc->directFilterLargeHash,
+                     &DFC_OPENCL_BUFFERS.dfLargeHash, DF_SIZE_REAL);
+  createBufferAndMap(context, (void *)&dfc->compactTableLarge,
+                     &DFC_OPENCL_BUFFERS.ctLarge,
+                     COMPACT_TABLE_SIZE_LARGE * sizeof(CompactTableLarge));
+
+  DFC_HOST_MEMORY.dfcStructure = dfc;
 }
 
 void allocateDfcPatternsWithMap(int numPatterns) {
@@ -228,37 +249,46 @@ void allocateInputWithMap(int size) {
   }
 }
 
-void unmapOpenClInputBuffers() {
-  cl_int errcode = clEnqueueUnmapMemObject(
-      DFC_OPENCL_ENVIRONMENT.queue, DFC_OPENCL_BUFFERS.dfcStructure,
-      DFC_HOST_MEMORY.dfcStructure, 0, NULL, NULL);
+void unmapOpenClBuffer(cl_command_queue queue, void *host, cl_mem buffer) {
+  cl_int errcode = clEnqueueUnmapMemObject(queue, buffer, host, 0, NULL, NULL);
 
   if (errcode != CL_SUCCESS) {
     fprintf(stderr, "Could not unmap DFC");
     exit(OPENCL_COULD_NOT_UNMAP_DFC);
   }
+}
 
-  errcode = clEnqueueUnmapMemObject(
-      DFC_OPENCL_ENVIRONMENT.queue, DFC_OPENCL_BUFFERS.patterns,
-      DFC_HOST_MEMORY.patterns->dfcMatchList, 0, NULL, NULL);
+void unmapOpenClInputBuffers() {
+  cl_command_queue queue = DFC_OPENCL_ENVIRONMENT.queue;
+  DFC_STRUCTURE *dfc = DFC_HOST_MEMORY.dfcStructure;
+  DfcOpenClBuffers *buffers = &DFC_OPENCL_BUFFERS;
 
-  if (errcode != CL_SUCCESS) {
-    fprintf(stderr, "Could not unmap patterns: %d", errcode);
-    exit(OPENCL_COULD_NOT_UNMAP_PATTERNS);
-  }
+  unmapOpenClBuffer(queue, dfc->directFilterSmall, buffers->dfSmall);
+  unmapOpenClBuffer(queue, dfc->compactTableSmall, buffers->ctSmall);
 
-  errcode = clEnqueueUnmapMemObject(DFC_OPENCL_ENVIRONMENT.queue,
-                                    DFC_OPENCL_BUFFERS.input,
-                                    DFC_HOST_MEMORY.input, 0, NULL, NULL);
+  unmapOpenClBuffer(queue, dfc->directFilterLarge, buffers->dfLarge);
+  unmapOpenClBuffer(queue, dfc->directFilterLargeHash, buffers->dfLargeHash);
+  unmapOpenClBuffer(queue, dfc->compactTableLarge, buffers->ctLarge);
 
-  if (errcode != CL_SUCCESS) {
-    fprintf(stderr, "Could not unmap input");
-    exit(OPENCL_COULD_NOT_UNMAP_INPUT);
-  }
+  unmapOpenClBuffer(queue, DFC_HOST_MEMORY.patterns->dfcMatchList,
+                    DFC_OPENCL_BUFFERS.patterns);
+
+  unmapOpenClBuffer(queue, DFC_HOST_MEMORY.input, DFC_OPENCL_BUFFERS.input);
 }
 
 void allocateDfcStructureOnHost() {
-  DFC_HOST_MEMORY.dfcStructure = calloc(1, sizeof(DFC_STRUCTURE));
+  DFC_STRUCTURE *dfc = malloc(sizeof(DFC_STRUCTURE));
+
+  dfc->directFilterSmall = calloc(1, DF_SIZE_REAL);
+  dfc->compactTableSmall =
+      calloc(1, sizeof(CompactTableSmallEntry) * COMPACT_TABLE_SIZE_SMALL);
+
+  dfc->directFilterLarge = calloc(1, DF_SIZE_REAL);
+  dfc->directFilterLargeHash = calloc(1, DF_SIZE_REAL);
+  dfc->compactTableLarge =
+      calloc(1, sizeof(CompactTableLarge) * COMPACT_TABLE_SIZE_LARGE);
+
+  DFC_HOST_MEMORY.dfcStructure = dfc;
 }
 
 void allocateDfcPatternsOnHost(int numPatterns) {
@@ -275,7 +305,20 @@ void allocateInputOnHost(int size) {
   DFC_HOST_MEMORY.input = calloc(1, size);
 }
 
-void freeDfcStructureOnHost() { free(DFC_HOST_MEMORY.dfcStructure); }
+void freeDfcStructureOnHost() {
+  DFC_STRUCTURE *dfc = DFC_HOST_MEMORY.dfcStructure;
+
+  free(dfc->directFilterSmall);
+  free(dfc->compactTableSmall);
+
+  free(dfc->directFilterLarge);
+  free(dfc->directFilterLargeHash);
+  free(dfc->compactTableLarge);
+
+  free(dfc);
+
+  DFC_HOST_MEMORY.dfcStructure = NULL;
+}
 
 void freeDfcPatternsOnHost() {
   free(DFC_HOST_MEMORY.patterns->dfcMatchList);
@@ -331,42 +374,100 @@ void freeDfcInput() {
   }
 }
 
-DfcOpenClBuffers createOpenClBuffers(DfcOpenClEnvironment *environment,
-                                    DFC_PATTERNS *dfcPatterns,
-                                    int inputLength) {
-  cl_context context = environment->context;
-  cl_mem kernelInput =
-      clCreateBuffer(context, CL_MEM_READ_ONLY, inputLength, NULL, NULL);
-  cl_mem patterns = clCreateBuffer(
-      context, CL_MEM_READ_ONLY,
-      sizeof(DFC_FIXED_PATTERN) * dfcPatterns->numPatterns, NULL, NULL);
+cl_mem createReadOnlyBuffer(cl_context context, int size) {
+  cl_int errcode;
+  cl_mem buffer =
+      clCreateBuffer(context, CL_MEM_READ_ONLY, size, NULL, &errcode);
 
-  cl_mem dfcStructure = clCreateBuffer(context, CL_MEM_READ_ONLY,
-                                       sizeof(DFC_STRUCTURE), NULL, NULL);
-  cl_mem result =
-      clCreateBuffer(context, CL_MEM_READ_WRITE, inputLength, NULL, NULL);
+  if (errcode != CL_SUCCESS) {
+    fprintf(stderr, "Could not create read only buffer");
+    exit(1);
+  }
+
+  return buffer;
+}
+
+cl_mem createReadWriteBuffer(cl_context context, int size) {
+  cl_int errcode;
+  cl_mem buffer =
+      clCreateBuffer(context, CL_MEM_READ_WRITE, size, NULL, &errcode);
+
+  if (errcode != CL_SUCCESS) {
+    fprintf(stderr, "Could not create read write buffer");
+    exit(1);
+  }
+
+  return buffer;
+}
+
+DfcOpenClBuffers createOpenClBuffers(DfcOpenClEnvironment *environment,
+                                     DFC_PATTERNS *dfcPatterns,
+                                     int inputLength) {
+  cl_context context = environment->context;
+  cl_mem kernelInput = createReadOnlyBuffer(context, inputLength);
+  cl_mem patterns = createReadOnlyBuffer(
+      context, sizeof(DFC_FIXED_PATTERN) * dfcPatterns->numPatterns);
+
+  cl_mem dfSmall = createReadOnlyBuffer(context, DF_SIZE_REAL);
+  cl_mem ctSmall = createReadOnlyBuffer(
+      context, sizeof(CompactTableSmallEntry) * COMPACT_TABLE_SIZE_SMALL);
+
+  cl_mem dfLarge = createReadOnlyBuffer(context, DF_SIZE_REAL);
+  cl_mem dfLargeHash = createReadOnlyBuffer(context, DF_SIZE_REAL);
+  cl_mem ctLarge = createReadOnlyBuffer(
+      context, sizeof(CompactTableLarge) * COMPACT_TABLE_SIZE_LARGE);
+
+  cl_mem result = createReadWriteBuffer(context, inputLength);
 
   DfcOpenClBuffers memory = {.inputLength = inputLength,
-                            .input = kernelInput,
-                            .patterns = patterns,
-                            .dfcStructure = dfcStructure,
-                            .result = result};
+                             .input = kernelInput,
+                             .patterns = patterns,
+
+                             .dfSmall = dfSmall,
+                             .ctSmall = ctSmall,
+
+                             .dfLarge = dfLarge,
+                             .dfLargeHash = dfLargeHash,
+                             .ctLarge = ctLarge,
+
+                             .result = result};
 
   return memory;
 }
 
+void writeOpenClBuffer(cl_command_queue queue, void *host, cl_mem buffer,
+                       int size) {
+  cl_int errcode = clEnqueueWriteBuffer(queue, buffer, CL_BLOCKING, 0, size,
+                                        host, 0, NULL, NULL);
+
+  if (errcode != CL_SUCCESS) {
+    fprintf(stderr, "Could not write to buffer");
+    exit(1);
+  }
+}
+
 void writeOpenClBuffers(DfcOpenClBuffers *deviceMemory, cl_command_queue queue,
                         DfcHostMemory *hostMemory) {
-  clEnqueueWriteBuffer(queue, deviceMemory->input, CL_BLOCKING, 0,
-                       deviceMemory->inputLength, hostMemory->input, 0, NULL,
-                       NULL);
-  clEnqueueWriteBuffer(
-      queue, deviceMemory->patterns, CL_BLOCKING, 0,
-      sizeof(DFC_FIXED_PATTERN) * hostMemory->patterns->numPatterns,
-      hostMemory->patterns->dfcMatchList, 0, NULL, NULL);
-  clEnqueueWriteBuffer(queue, deviceMemory->dfcStructure, CL_BLOCKING, 0,
-                       sizeof(DFC_STRUCTURE), hostMemory->dfcStructure, 0, NULL,
-                       NULL);
+  writeOpenClBuffer(queue, hostMemory->input, deviceMemory->input,
+                    deviceMemory->inputLength);
+
+  writeOpenClBuffer(
+      queue, hostMemory->patterns->dfcMatchList, deviceMemory->patterns,
+      hostMemory->patterns->numPatterns * sizeof(DFC_FIXED_PATTERN));
+
+  writeOpenClBuffer(queue, hostMemory->dfcStructure->directFilterSmall,
+                    deviceMemory->dfSmall, DF_SIZE_REAL);
+  writeOpenClBuffer(queue, hostMemory->dfcStructure->compactTableSmall,
+                    deviceMemory->ctSmall,
+                    sizeof(CompactTableSmallEntry) * COMPACT_TABLE_SIZE_SMALL);
+
+  writeOpenClBuffer(queue, hostMemory->dfcStructure->directFilterLarge,
+                    deviceMemory->dfLarge, DF_SIZE_REAL);
+  writeOpenClBuffer(queue, hostMemory->dfcStructure->directFilterLargeHash,
+                    deviceMemory->dfLargeHash, DF_SIZE_REAL);
+  writeOpenClBuffer(queue, hostMemory->dfcStructure->compactTableLarge,
+                    deviceMemory->ctLarge,
+                    sizeof(CompactTableLarge) * COMPACT_TABLE_SIZE_LARGE);
 }
 
 cl_mem createMappedResultBuffer(cl_context context, int inputLength) {
@@ -392,6 +493,10 @@ void freeOpenClBuffers() {
   DFC_OPENCL_BUFFERS.inputLength = 0;
   clReleaseMemObject(DFC_OPENCL_BUFFERS.input);
   clReleaseMemObject(DFC_OPENCL_BUFFERS.patterns);
-  clReleaseMemObject(DFC_OPENCL_BUFFERS.dfcStructure);
+  clReleaseMemObject(DFC_OPENCL_BUFFERS.dfSmall);
+  clReleaseMemObject(DFC_OPENCL_BUFFERS.ctSmall);
+  clReleaseMemObject(DFC_OPENCL_BUFFERS.dfLarge);
+  clReleaseMemObject(DFC_OPENCL_BUFFERS.dfLargeHash);
+  clReleaseMemObject(DFC_OPENCL_BUFFERS.ctLarge);
   clReleaseMemObject(DFC_OPENCL_BUFFERS.result);
 }

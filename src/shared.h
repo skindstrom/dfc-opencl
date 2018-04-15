@@ -66,13 +66,13 @@ typedef struct _dfc_fixed_pattern {
 } DFC_FIXED_PATTERN;
 
 typedef struct {
-  uint8_t directFilterSmall[DF_SIZE_REAL];
-  CompactTableSmallEntry compactTableSmall[COMPACT_TABLE_SIZE_SMALL];
+  uint8_t* directFilterSmall;
+  CompactTableSmallEntry* compactTableSmall;
 
-  uint8_t directFilterLarge[DF_SIZE_REAL];
+  uint8_t* directFilterLarge;
   // Indexed by hashing more bytes of the input
-  uint8_t directFilterLargeHash[DF_SIZE_REAL];
-  CompactTableLarge compactTableLarge[COMPACT_TABLE_SIZE_LARGE];
+  uint8_t* directFilterLargeHash;
+  CompactTableLarge* compactTableLarge;
 } DFC_STRUCTURE;
 
 #endif

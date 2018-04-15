@@ -13,7 +13,14 @@ typedef struct {
   int inputLength;
   cl_mem input;
   cl_mem patterns;
-  cl_mem dfcStructure;
+
+  cl_mem dfSmall;
+  cl_mem ctSmall;
+
+  cl_mem dfLarge;
+  cl_mem dfLargeHash;
+  cl_mem ctLarge;
+
   cl_mem result;
 } DfcOpenClBuffers;
 
