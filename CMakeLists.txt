@@ -32,9 +32,9 @@ add_definitions(-DCL_USE_DEPRECATED_OPENCL_1_2_APIS)
 # 1 = ON
 
 # Feature flags
-set(DFC_SEARCH_WITH_GPU 1)
-set(DFC_MAP_MEMORY 1)
-set(DFC_USE_TEXTURE_MEMORY 1)
+set(DFC_SEARCH_WITH_GPU 0)
+set(DFC_MAP_MEMORY 0)
+set(DFC_USE_TEXTURE_MEMORY 0)
 
 # Continous values
 set(DFC_WORK_GROUP_SIZE 32)
