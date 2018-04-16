@@ -9,20 +9,6 @@ set(EXT_PROJECTS_DIR external)
 set(OpenCL_VERSION 120)
 find_package(OpenCL)
 
-if(NOT ${OpenCL_FOUND})
-  set (LOCAL_OpenCL "${CMAKE_SOURCE_DIR}/../Mali_OpenCL_SDK")
-  if (EXISTS ${LOCAL_OpenCL})
-    message("DFC: Found local version of OpenCL")
-    set(OpenCL_INCLUDE_DIRS "${LOCAL_OpenCL}/include")
-    # Needs a system-wide opencl library installed
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -L/usr/lib/arm-linux-gnueabihf/")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -L/usr/lib/arm-linux-gnueabihf/")
-    set(OpenCL_LIBRARIES "OpenCL")
-  else()
-    message( FATAL_ERROR "OpenCL not found" )
-  endif()
-endif()
-
 # The ODROID-XU4 only supports OpenCL 1.2, so enable the deprecated API
 add_definitions(-DCL_USE_DEPRECATED_OPENCL_1_2_APIS)
 
@@ -32,8 +18,8 @@ add_definitions(-DCL_USE_DEPRECATED_OPENCL_1_2_APIS)
 # 1 = ON
 
 # Feature flags
-set(DFC_SEARCH_WITH_GPU 0)
-set(DFC_MAP_MEMORY 0)
+set(DFC_SEARCH_WITH_GPU 1)
+set(DFC_MAP_MEMORY 1)
 set(DFC_USE_TEXTURE_MEMORY 0)
 
 # Continous values
