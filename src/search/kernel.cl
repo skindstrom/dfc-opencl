@@ -138,9 +138,11 @@ __kernel void search(int inputLength, __global uchar *input,
 }
 
 typedef union {
-  uchar scalar[16];
+  uchar scalar[TEXTURE_CHANNEL_BYTE_SIZE];
   uint4 vector;
 } img_read;
+
+#define SHIFT_BY_CHANNEL_SIZE(x) (x >> 4)
 
 __kernel void search_with_image(int inputLength, __global uchar *input,
                                 __global DFC_FIXED_PATTERN *patterns,
@@ -160,13 +162,15 @@ __kernel void search_with_image(int inputLength, __global uchar *input,
     short bitMask = BMASK(data & DF_MASK);
 
     // divide by 16 as we actually just want a single byte, but we're getting 16
-    img_read df = (img_read)read_imageui(dfSmall, byteIndex >> 4);
-    if (df.scalar[byteIndex % 16] & bitMask) {
+    img_read df =
+        (img_read)read_imageui(dfSmall, SHIFT_BY_CHANNEL_SIZE(byteIndex));
+    if (df.scalar[byteIndex % TEXTURE_CHANNEL_BYTE_SIZE] & bitMask) {
       matches += verifySmall(ctSmall, patterns, input + i, i, inputLength);
     }
 
-    df = (img_read)read_imageui(dfLarge, byteIndex >> 4);
-    if (i >= 2 && (df.scalar[byteIndex % 16] & bitMask) &&
+    df = (img_read)read_imageui(dfLarge, SHIFT_BY_CHANNEL_SIZE(byteIndex));
+    if (i >= 2 &&
+        (df.scalar[byteIndex % TEXTURE_CHANNEL_BYTE_SIZE] & bitMask) &&
         isInHashDf(dfLargeHash, input + i)) {
       matches += verifyLarge(ctLarge, patterns, input + i, i, inputLength);
     }

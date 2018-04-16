@@ -413,12 +413,11 @@ cl_mem createReadOnlyTextureBuffer(cl_context context, int size) {
        * no way around it
        * Therefore, make sure to use as much data as possible
        */
-      .image_channel_data_type =
-          CL_UNSIGNED_INT32  
-  };
+      .image_channel_data_type = CL_UNSIGNED_INT32};
   cl_image_desc imageDescription = {
       .image_type = CL_MEM_OBJECT_IMAGE1D,
-      .image_width = size / 16, // divide by size of channel
+      .image_width =
+          size / TEXTURE_CHANNEL_BYTE_SIZE,  // divide by size of channel
       .image_height = 1,
       .image_depth = 1,
       .image_array_size = 0,   // not used since we're not creating an array
@@ -500,9 +499,10 @@ void writeOpenClBuffer(cl_command_queue queue, void *host, cl_mem buffer,
 
 void writeOpenClTextureBuffer(cl_command_queue queue, void *host, cl_mem buffer,
                               int size) {
-  size_t offset[3] = {0, 0, 0};            // origin in OpenCL
-  size_t imageSize[3] = {size / 16, 1, 1};  // region in OpenCL
-  size_t pitch = 0;  // if 0, OpenCL calculates a fitting pitch
+  size_t offset[3] = {0, 0, 0};  // origin in OpenCL
+  size_t imageSize[3] = {size / TEXTURE_CHANNEL_BYTE_SIZE, 1,
+                         1};  // region in OpenCL
+  size_t pitch = 0;           // if 0, OpenCL calculates a fitting pitch
   cl_int errcode =
       clEnqueueWriteImage(queue, buffer, CL_BLOCKING, offset, imageSize, pitch,
                           pitch, host, 0, NULL, NULL);

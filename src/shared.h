@@ -38,6 +38,8 @@
 #define GET_ENTRY_LARGE_CT(hash, x) \
   ((ct + hash)->entries + sizeof(CompactTableLargeEntry) * x)
 
+#define TEXTURE_CHANNEL_BYTE_SIZE 16
+
 typedef struct CompactTableSmallEntry_ {
   uint8_t pattern;
   uint8_t pidCount;
