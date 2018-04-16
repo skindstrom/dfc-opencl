@@ -33,7 +33,8 @@ add_definitions(-DCL_USE_DEPRECATED_OPENCL_1_2_APIS)
 
 # Feature flags
 set(DFC_SEARCH_WITH_GPU 1)
-set(DFC_MAP_MEMORY 1)
+set(DFC_MAP_MEMORY 0)
+set(DFC_USE_TEXTURE_MEMORY 1)
 
 # Continous values
 set(DFC_WORK_GROUP_SIZE 32)
@@ -80,6 +81,7 @@ target_compile_definitions(dfc PRIVATE
     WORK_GROUP_SIZE=${DFC_WORK_GROUP_SIZE}
     MAP_MEMORY=${DFC_MAP_MEMORY}
     CHECK_COUNT_PER_THREAD=${DFC_CHECK_COUNT_PER_THREAD}
+    USE_TEXTURE_MEMORY=${DFC_USE_TEXTURE_MEMORY}
     )
 
 add_subdirectory(${EXT_PROJECTS_DIR}/catch)

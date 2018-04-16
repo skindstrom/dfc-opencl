@@ -125,15 +125,17 @@ int search() {
     int16_t byteIndex = BINDEX(data & DF_MASK);
     int16_t bitMask = BMASK(data & DF_MASK);
 
+    matches += dfc->directFilterSmall[byteIndex];
+
     if (dfc->directFilterSmall[byteIndex] & bitMask) {
-      matches += verifySmall(dfc->compactTableSmall, patterns->dfcMatchList,
-                             input + i, i, inputLength);
+      verifySmall(dfc->compactTableSmall, patterns->dfcMatchList, input + i, i,
+                  inputLength);
     }
 
     if (i >= 2 && (dfc->directFilterLarge[byteIndex] & bitMask) &&
         isInHashDf(dfc->directFilterLargeHash, input + i)) {
-      matches += verifyLarge(dfc->compactTableLarge, patterns->dfcMatchList,
-                             input + i, i, inputLength);
+      verifyLarge(dfc->compactTableLarge, patterns->dfcMatchList, input + i, i,
+                  inputLength);
     }
   }
 

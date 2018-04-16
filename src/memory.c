@@ -100,7 +100,12 @@ void buildProgram(cl_program *program, cl_device_id device) {
 
 cl_kernel createKernel(cl_program *program) {
   cl_int status;
-  cl_kernel kernel = clCreateKernel(*program, "search", &status);
+  cl_kernel kernel;
+  if (USE_TEXTURE_MEMORY) {
+    kernel = clCreateKernel(*program, "search_with_image", &status);
+  } else {
+    kernel = clCreateKernel(*program, "search", &status);
+  }
 
   if (status != CL_SUCCESS) {
     fprintf(stderr, "Could not create kernel for reason %i", status);
@@ -400,6 +405,42 @@ cl_mem createReadWriteBuffer(cl_context context, int size) {
   return buffer;
 }
 
+cl_mem createReadOnlyTextureBuffer(cl_context context, int size) {
+  cl_image_format imageFormat = {
+      .image_channel_order = CL_RGBA,  // use all 4 bytes of channel
+      /**
+       * when reading image data, 128 bits (4 * 4 bytes) are always read
+       * no way around it
+       * Therefore, make sure to use as much data as possible
+       */
+      .image_channel_data_type =
+          CL_UNSIGNED_INT32  
+  };
+  cl_image_desc imageDescription = {
+      .image_type = CL_MEM_OBJECT_IMAGE1D,
+      .image_width = size / 16, // divide by size of channel
+      .image_height = 1,
+      .image_depth = 1,
+      .image_array_size = 0,   // not used since we're not creating an array
+      .image_row_pitch = 0,    // must be 0 if host_ptr is NULL
+      .image_slice_pitch = 0,  // must be 0 if host_ptr is NULL
+      .num_mip_levels = 0,     // must always be 0
+      .num_samples = 0,        // must always be 0
+      .buffer = NULL           // must be NULL since we're not using a buffer
+  };
+
+  void *host = NULL;
+  cl_int errcode;
+  cl_mem buffer = clCreateImage(context, CL_MEM_READ_ONLY, &imageFormat,
+                                &imageDescription, host, &errcode);
+  if (errcode != CL_SUCCESS) {
+    fprintf(stderr, "Could not create texture buffer");
+    exit(1);
+  }
+
+  return buffer;
+}
+
 DfcOpenClBuffers createOpenClBuffers(DfcOpenClEnvironment *environment,
                                      DFC_PATTERNS *dfcPatterns,
                                      int inputLength) {
@@ -408,11 +449,22 @@ DfcOpenClBuffers createOpenClBuffers(DfcOpenClEnvironment *environment,
   cl_mem patterns = createReadOnlyBuffer(
       context, sizeof(DFC_FIXED_PATTERN) * dfcPatterns->numPatterns);
 
-  cl_mem dfSmall = createReadOnlyBuffer(context, DF_SIZE_REAL);
+  cl_mem dfSmall;
+  if (USE_TEXTURE_MEMORY) {
+    dfSmall = createReadOnlyTextureBuffer(context, DF_SIZE_REAL);
+  } else {
+    dfSmall = createReadOnlyBuffer(context, DF_SIZE_REAL);
+  }
+
   cl_mem ctSmall = createReadOnlyBuffer(
       context, sizeof(CompactTableSmallEntry) * COMPACT_TABLE_SIZE_SMALL);
 
-  cl_mem dfLarge = createReadOnlyBuffer(context, DF_SIZE_REAL);
+  cl_mem dfLarge;
+  if (USE_TEXTURE_MEMORY) {
+    dfLarge = createReadOnlyTextureBuffer(context, DF_SIZE_REAL);
+  } else {
+    dfLarge = createReadOnlyBuffer(context, DF_SIZE_REAL);
+  }
   cl_mem dfLargeHash = createReadOnlyBuffer(context, DF_SIZE_REAL);
   cl_mem ctLarge = createReadOnlyBuffer(
       context, sizeof(CompactTableLarge) * COMPACT_TABLE_SIZE_LARGE);
@@ -446,6 +498,21 @@ void writeOpenClBuffer(cl_command_queue queue, void *host, cl_mem buffer,
   }
 }
 
+void writeOpenClTextureBuffer(cl_command_queue queue, void *host, cl_mem buffer,
+                              int size) {
+  size_t offset[3] = {0, 0, 0};            // origin in OpenCL
+  size_t imageSize[3] = {size / 16, 1, 1};  // region in OpenCL
+  size_t pitch = 0;  // if 0, OpenCL calculates a fitting pitch
+  cl_int errcode =
+      clEnqueueWriteImage(queue, buffer, CL_BLOCKING, offset, imageSize, pitch,
+                          pitch, host, 0, NULL, NULL);
+
+  if (errcode != CL_SUCCESS) {
+    fprintf(stderr, "Could not write to texture buffer: %d\n", errcode);
+    exit(1);
+  }
+}
+
 void writeOpenClBuffers(DfcOpenClBuffers *deviceMemory, cl_command_queue queue,
                         DfcHostMemory *hostMemory) {
   writeOpenClBuffer(queue, hostMemory->input, deviceMemory->input,
@@ -455,14 +522,24 @@ void writeOpenClBuffers(DfcOpenClBuffers *deviceMemory, cl_command_queue queue,
       queue, hostMemory->patterns->dfcMatchList, deviceMemory->patterns,
       hostMemory->patterns->numPatterns * sizeof(DFC_FIXED_PATTERN));
 
-  writeOpenClBuffer(queue, hostMemory->dfcStructure->directFilterSmall,
-                    deviceMemory->dfSmall, DF_SIZE_REAL);
+  if (USE_TEXTURE_MEMORY) {
+    writeOpenClTextureBuffer(queue, hostMemory->dfcStructure->directFilterSmall,
+                             deviceMemory->dfSmall, DF_SIZE_REAL);
+  } else {
+    writeOpenClBuffer(queue, hostMemory->dfcStructure->directFilterSmall,
+                      deviceMemory->dfSmall, DF_SIZE_REAL);
+  }
   writeOpenClBuffer(queue, hostMemory->dfcStructure->compactTableSmall,
                     deviceMemory->ctSmall,
                     sizeof(CompactTableSmallEntry) * COMPACT_TABLE_SIZE_SMALL);
 
-  writeOpenClBuffer(queue, hostMemory->dfcStructure->directFilterLarge,
-                    deviceMemory->dfLarge, DF_SIZE_REAL);
+  if (USE_TEXTURE_MEMORY) {
+    writeOpenClTextureBuffer(queue, hostMemory->dfcStructure->directFilterLarge,
+                             deviceMemory->dfLarge, DF_SIZE_REAL);
+  } else {
+    writeOpenClBuffer(queue, hostMemory->dfcStructure->directFilterLarge,
+                      deviceMemory->dfLarge, DF_SIZE_REAL);
+  }
   writeOpenClBuffer(queue, hostMemory->dfcStructure->directFilterLargeHash,
                     deviceMemory->dfLargeHash, DF_SIZE_REAL);
   writeOpenClBuffer(queue, hostMemory->dfcStructure->compactTableLarge,

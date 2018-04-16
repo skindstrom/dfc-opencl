@@ -116,7 +116,7 @@ TEST_CASE("DFC") {
     REQUIRE(matchCount == 0);
   }
 
-  SECTION("Multiple equal patternInit counts as single even if different pid") {
+  SECTION("Multiple equal patterns counts as single even if different pid") {
     PID_TYPE pid = 0;
     char* input = DFC_NewInput(100);
     strcpy(input, "attack");
@@ -463,7 +463,7 @@ TEST_CASE("DFC") {
     REQUIRE(matchCount == 2);
   }
 
-  SECTION("Many patternInit work") {
+  SECTION("Many patterns work") {
     // passwords from some old password leak
     // https://github.com/danielmiessler/SecLists/blob/aad07fff50ca37af2926de4d07ff670bf3416fbc/Passwords/elitehacker.txt
     std::vector<std::string> patterns{
@@ -505,7 +505,7 @@ TEST_CASE("DFC") {
   executing the test using the password file.
   The password was "1340lu" and failed against "blue"
   */
-  SECTION("Bounds checking done for short patternInit") {
+  SECTION("Bounds checking done for short patterns") {
     PID_TYPE pid = 0;
 
     char* input = DFC_NewInput(100);
@@ -531,7 +531,7 @@ TEST_CASE("DFC") {
     REQUIRE(matchCount == 0);
   }
 
-  SECTION("Bounds checking done for long patternInit") {
+  SECTION("Bounds checking done for long patterns") {
     PID_TYPE pid = 0;
 
     char* input = DFC_NewInput(100);
@@ -581,7 +581,7 @@ TEST_CASE("DFC") {
     REQUIRE(matchCount == 1);
   }
 
-  SECTION("Two patternInit with equal last 4 characters both get matched") {
+  SECTION("Two patterns with equal last 4 characters both get matched") {
     PID_TYPE pid = 0;
     char* input = DFC_NewInput(100);
     strcpy(input, "Attack");

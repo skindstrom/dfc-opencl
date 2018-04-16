@@ -136,3 +136,41 @@ __kernel void search(int inputLength, __global uchar *input,
     result[i] = matches;
   }
 }
+
+typedef union {
+  uchar scalar[16];
+  uint4 vector;
+} img_read;
+
+__kernel void search_with_image(int inputLength, __global uchar *input,
+                                __global DFC_FIXED_PATTERN *patterns,
+                                __read_only image1d_t dfSmall,
+                                __global uchar *ctSmall,
+                                __read_only image1d_t dfLarge,
+                                __global uchar *dfLargeHash,
+                                __global uchar *ctLarge,
+                                __global uchar *result) {
+  uint i = (get_group_id(0) * get_local_size(0) + get_local_id(0)) *
+           CHECK_COUNT_PER_THREAD;
+
+  for (int j = 0; j < CHECK_COUNT_PER_THREAD && i < inputLength; ++j, ++i) {
+    uchar matches = 0;
+    short data = *(input + i + 1) << 8 | *(input + i);
+    short byteIndex = BINDEX(data & DF_MASK);
+    short bitMask = BMASK(data & DF_MASK);
+
+    // divide by 16 as we actually just want a single byte, but we're getting 16
+    img_read df = (img_read)read_imageui(dfSmall, byteIndex >> 4);
+    if (df.scalar[byteIndex % 16] & bitMask) {
+      matches += verifySmall(ctSmall, patterns, input + i, i, inputLength);
+    }
+
+    df = (img_read)read_imageui(dfLarge, byteIndex >> 4);
+    if (i >= 2 && (df.scalar[byteIndex % 16] & bitMask) &&
+        isInHashDf(dfLargeHash, input + i)) {
+      matches += verifyLarge(ctLarge, patterns, input + i, i, inputLength);
+    }
+
+    result[i] = matches;
+  }
+}
