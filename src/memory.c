@@ -179,21 +179,81 @@ void createBufferAndMap(cl_context context, void **host, cl_mem *buffer,
   memset(*host, 0, size);
 }
 
+void createTextureBufferAndMap(cl_context context, void **host, cl_mem *buffer,
+                               int size) {
+  cl_image_format imageFormat = {
+      .image_channel_order = CL_RGBA,  // use all 4 bytes of channel
+      /**
+       * when reading image data, 128 bits (4 * 4 bytes) are always read
+       * no way around it
+       * Therefore, make sure to use as much data as possible
+       */
+      .image_channel_data_type = CL_UNSIGNED_INT32};
+  cl_image_desc imageDescription = {
+      .image_type = CL_MEM_OBJECT_IMAGE1D,
+      .image_width =
+          size / TEXTURE_CHANNEL_BYTE_SIZE,  // divide by size of channel
+      .image_height = 1,
+      .image_depth = 1,
+      .image_array_size = 0,   // not used since we're not creating an array
+      .image_row_pitch = 0,    // must be 0 if host_ptr is NULL
+      .image_slice_pitch = 0,  // must be 0 if host_ptr is NULL
+      .num_mip_levels = 0,     // must always be 0
+      .num_samples = 0,        // must always be 0
+      .buffer = NULL           // must be NULL since we're not using a buffer
+  };
+
+  cl_int errcode;
+  *buffer = clCreateImage(context, CL_MEM_READ_ONLY, &imageFormat,
+                          &imageDescription, NULL, &errcode);
+
+  if (errcode != CL_SUCCESS) {
+    fprintf(stderr, "Could not create mapped DFC buffer");
+    exit(OPENCL_COULD_NOT_CREATE_MAPPED_DFC_BUFFER);
+  }
+
+  size_t offset[3] = {0, 0, 0};  // origin in OpenCL
+  size_t imageSize[3] = {size / TEXTURE_CHANNEL_BYTE_SIZE, 1,
+                         1};  // region in OpenCL
+  size_t pitch = 0;           // if 0, OpenCL calculates a fitting pitch
+  *host = clEnqueueMapImage(DFC_OPENCL_ENVIRONMENT.queue, *buffer, CL_BLOCKING,
+                            CL_MAP_READ | CL_MAP_WRITE, offset, imageSize,
+                            &pitch, &pitch, 0, NULL, NULL, &errcode);
+
+  if (errcode != CL_SUCCESS) {
+    fprintf(stderr, "Could not map DFC texture buffer to host memory");
+    exit(OPENCL_COULD_NOT_MAP_DFC_TO_HOST);
+  }
+
+  memset(*host, 0, size);
+}
+
 void allocateDfcStructureWithMap() {
   cl_context context = DFC_OPENCL_ENVIRONMENT.context;
 
   DFC_STRUCTURE *dfc = malloc(sizeof(DFC_STRUCTURE));
 
-  createBufferAndMap(context, (void *)&dfc->directFilterSmall,
-                     &DFC_OPENCL_BUFFERS.dfSmall, DF_SIZE_REAL);
+  if (USE_TEXTURE_MEMORY) {
+    createTextureBufferAndMap(context, (void *)&dfc->directFilterSmall, 
+                      &DFC_OPENCL_BUFFERS.dfSmall, DF_SIZE_REAL);
+  } else {
+    createBufferAndMap(context, (void *)&dfc->directFilterSmall, 
+                      &DFC_OPENCL_BUFFERS.dfSmall, DF_SIZE_REAL);
+  }
   createBufferAndMap(context, (void *)&dfc->compactTableSmall,
                      &DFC_OPENCL_BUFFERS.ctSmall,
                      COMPACT_TABLE_SIZE_SMALL * sizeof(CompactTableSmallEntry));
 
-  createBufferAndMap(context, (void *)&dfc->directFilterLarge,
-                     &DFC_OPENCL_BUFFERS.dfLarge, DF_SIZE_REAL);
+  if (USE_TEXTURE_MEMORY) {
+    createTextureBufferAndMap(context, (void *)&dfc->directFilterLarge,
+                      &DFC_OPENCL_BUFFERS.dfLarge, DF_SIZE_REAL);
+  } else {
+    createBufferAndMap(context, (void *)&dfc->directFilterLarge,
+                      &DFC_OPENCL_BUFFERS.dfLarge, DF_SIZE_REAL);
+  }
+
   createBufferAndMap(context, (void *)&dfc->directFilterLargeHash,
-                     &DFC_OPENCL_BUFFERS.dfLargeHash, DF_SIZE_REAL);
+                    &DFC_OPENCL_BUFFERS.dfLargeHash, DF_SIZE_REAL);
   createBufferAndMap(context, (void *)&dfc->compactTableLarge,
                      &DFC_OPENCL_BUFFERS.ctLarge,
                      COMPACT_TABLE_SIZE_LARGE * sizeof(CompactTableLarge));
