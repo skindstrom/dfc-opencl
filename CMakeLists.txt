@@ -64,6 +64,20 @@ else()
   message("DFC: Using CPU version of DFC algorithm")
 endif()
 
+if(${DFC_MAP_MEMORY})
+  message("DFC: Mapping memory to reduce memory transfers")
+endif()
+
+if(${DFC_USE_TEXTURE_MEMORY})
+  message("DFC: Using texture memory for some data structures")
+endif()
+
+message("DFC: Using work groups of size ${DFC_WORK_GROUP_SIZE}")
+
+if(${DFC_SEARCH_WITH_GPU} OR ${DFC_HETEROGENEOUS_DESIGN})
+message("DFC: Each GPU thread will check ${DFC_CHECK_COUNT_PER_THREAD} locations of the input")
+endif()
+
 set(DFC_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 add_library(dfc SHARED ${DFC_HEADERS} ${DFC_SOURCES})
