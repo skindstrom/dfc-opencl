@@ -69,11 +69,11 @@ typedef struct _dfc_fixed_pattern {
 
 typedef struct {
   uint8_t* directFilterSmall;
-  CompactTableSmallEntry* compactTableSmall;
-
   uint8_t* directFilterLarge;
   // Indexed by hashing more bytes of the input
   uint8_t* directFilterLargeHash;
+
+  CompactTableSmallEntry* compactTableSmall;
   CompactTableLarge* compactTableLarge;
 } DFC_STRUCTURE;
 

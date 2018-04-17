@@ -15,10 +15,10 @@ typedef struct {
   cl_mem patterns;
 
   cl_mem dfSmall;
-  cl_mem ctSmall;
-
   cl_mem dfLarge;
   cl_mem dfLargeHash;
+
+  cl_mem ctSmall;
   cl_mem ctLarge;
 
   cl_mem result;

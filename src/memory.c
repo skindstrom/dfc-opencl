@@ -234,26 +234,22 @@ void allocateDfcStructureWithMap() {
   DFC_STRUCTURE *dfc = malloc(sizeof(DFC_STRUCTURE));
 
   if (USE_TEXTURE_MEMORY) {
-    createTextureBufferAndMap(context, (void *)&dfc->directFilterSmall, 
-                      &DFC_OPENCL_BUFFERS.dfSmall, DF_SIZE_REAL);
+    createTextureBufferAndMap(context, (void *)&dfc->directFilterSmall,
+                              &DFC_OPENCL_BUFFERS.dfSmall, DF_SIZE_REAL);
+    createTextureBufferAndMap(context, (void *)&dfc->directFilterLarge,
+                              &DFC_OPENCL_BUFFERS.dfLarge, DF_SIZE_REAL);
   } else {
-    createBufferAndMap(context, (void *)&dfc->directFilterSmall, 
-                      &DFC_OPENCL_BUFFERS.dfSmall, DF_SIZE_REAL);
+    createBufferAndMap(context, (void *)&dfc->directFilterSmall,
+                       &DFC_OPENCL_BUFFERS.dfSmall, DF_SIZE_REAL);
+    createBufferAndMap(context, (void *)&dfc->directFilterLarge,
+                       &DFC_OPENCL_BUFFERS.dfLarge, DF_SIZE_REAL);
   }
+  createBufferAndMap(context, (void *)&dfc->directFilterLargeHash,
+                     &DFC_OPENCL_BUFFERS.dfLargeHash, DF_SIZE_REAL);
+
   createBufferAndMap(context, (void *)&dfc->compactTableSmall,
                      &DFC_OPENCL_BUFFERS.ctSmall,
                      COMPACT_TABLE_SIZE_SMALL * sizeof(CompactTableSmallEntry));
-
-  if (USE_TEXTURE_MEMORY) {
-    createTextureBufferAndMap(context, (void *)&dfc->directFilterLarge,
-                      &DFC_OPENCL_BUFFERS.dfLarge, DF_SIZE_REAL);
-  } else {
-    createBufferAndMap(context, (void *)&dfc->directFilterLarge,
-                      &DFC_OPENCL_BUFFERS.dfLarge, DF_SIZE_REAL);
-  }
-
-  createBufferAndMap(context, (void *)&dfc->directFilterLargeHash,
-                    &DFC_OPENCL_BUFFERS.dfLargeHash, DF_SIZE_REAL);
   createBufferAndMap(context, (void *)&dfc->compactTableLarge,
                      &DFC_OPENCL_BUFFERS.ctLarge,
                      COMPACT_TABLE_SIZE_LARGE * sizeof(CompactTableLarge));
@@ -329,10 +325,10 @@ void unmapOpenClInputBuffers() {
   DfcOpenClBuffers *buffers = &DFC_OPENCL_BUFFERS;
 
   unmapOpenClBuffer(queue, dfc->directFilterSmall, buffers->dfSmall);
-  unmapOpenClBuffer(queue, dfc->compactTableSmall, buffers->ctSmall);
-
   unmapOpenClBuffer(queue, dfc->directFilterLarge, buffers->dfLarge);
   unmapOpenClBuffer(queue, dfc->directFilterLargeHash, buffers->dfLargeHash);
+
+  unmapOpenClBuffer(queue, dfc->compactTableSmall, buffers->ctSmall);
   unmapOpenClBuffer(queue, dfc->compactTableLarge, buffers->ctLarge);
 
   unmapOpenClBuffer(queue, DFC_HOST_MEMORY.patterns->dfcMatchList,
@@ -345,11 +341,11 @@ void allocateDfcStructureOnHost() {
   DFC_STRUCTURE *dfc = malloc(sizeof(DFC_STRUCTURE));
 
   dfc->directFilterSmall = calloc(1, DF_SIZE_REAL);
-  dfc->compactTableSmall =
-      calloc(1, sizeof(CompactTableSmallEntry) * COMPACT_TABLE_SIZE_SMALL);
-
   dfc->directFilterLarge = calloc(1, DF_SIZE_REAL);
   dfc->directFilterLargeHash = calloc(1, DF_SIZE_REAL);
+
+  dfc->compactTableSmall =
+      calloc(1, sizeof(CompactTableSmallEntry) * COMPACT_TABLE_SIZE_SMALL);
   dfc->compactTableLarge =
       calloc(1, sizeof(CompactTableLarge) * COMPACT_TABLE_SIZE_LARGE);
 
@@ -374,10 +370,10 @@ void freeDfcStructureOnHost() {
   DFC_STRUCTURE *dfc = DFC_HOST_MEMORY.dfcStructure;
 
   free(dfc->directFilterSmall);
-  free(dfc->compactTableSmall);
-
   free(dfc->directFilterLarge);
   free(dfc->directFilterLargeHash);
+
+  free(dfc->compactTableSmall);
   free(dfc->compactTableLarge);
 
   free(dfc);
@@ -509,22 +505,18 @@ DfcOpenClBuffers createOpenClBuffers(DfcOpenClEnvironment *environment,
       context, sizeof(DFC_FIXED_PATTERN) * dfcPatterns->numPatterns);
 
   cl_mem dfSmall;
-  if (USE_TEXTURE_MEMORY) {
-    dfSmall = createReadOnlyTextureBuffer(context, DF_SIZE_REAL);
-  } else {
-    dfSmall = createReadOnlyBuffer(context, DF_SIZE_REAL);
-  }
-
-  cl_mem ctSmall = createReadOnlyBuffer(
-      context, sizeof(CompactTableSmallEntry) * COMPACT_TABLE_SIZE_SMALL);
-
   cl_mem dfLarge;
   if (USE_TEXTURE_MEMORY) {
+    dfSmall = createReadOnlyTextureBuffer(context, DF_SIZE_REAL);
     dfLarge = createReadOnlyTextureBuffer(context, DF_SIZE_REAL);
   } else {
+    dfSmall = createReadOnlyBuffer(context, DF_SIZE_REAL);
     dfLarge = createReadOnlyBuffer(context, DF_SIZE_REAL);
   }
   cl_mem dfLargeHash = createReadOnlyBuffer(context, DF_SIZE_REAL);
+
+  cl_mem ctSmall = createReadOnlyBuffer(
+      context, sizeof(CompactTableSmallEntry) * COMPACT_TABLE_SIZE_SMALL);
   cl_mem ctLarge = createReadOnlyBuffer(
       context, sizeof(CompactTableLarge) * COMPACT_TABLE_SIZE_LARGE);
 
@@ -585,23 +577,20 @@ void writeOpenClBuffers(DfcOpenClBuffers *deviceMemory, cl_command_queue queue,
   if (USE_TEXTURE_MEMORY) {
     writeOpenClTextureBuffer(queue, hostMemory->dfcStructure->directFilterSmall,
                              deviceMemory->dfSmall, DF_SIZE_REAL);
-  } else {
-    writeOpenClBuffer(queue, hostMemory->dfcStructure->directFilterSmall,
-                      deviceMemory->dfSmall, DF_SIZE_REAL);
-  }
-  writeOpenClBuffer(queue, hostMemory->dfcStructure->compactTableSmall,
-                    deviceMemory->ctSmall,
-                    sizeof(CompactTableSmallEntry) * COMPACT_TABLE_SIZE_SMALL);
-
-  if (USE_TEXTURE_MEMORY) {
     writeOpenClTextureBuffer(queue, hostMemory->dfcStructure->directFilterLarge,
                              deviceMemory->dfLarge, DF_SIZE_REAL);
   } else {
+    writeOpenClBuffer(queue, hostMemory->dfcStructure->directFilterSmall,
+                      deviceMemory->dfSmall, DF_SIZE_REAL);
     writeOpenClBuffer(queue, hostMemory->dfcStructure->directFilterLarge,
                       deviceMemory->dfLarge, DF_SIZE_REAL);
   }
   writeOpenClBuffer(queue, hostMemory->dfcStructure->directFilterLargeHash,
                     deviceMemory->dfLargeHash, DF_SIZE_REAL);
+
+  writeOpenClBuffer(queue, hostMemory->dfcStructure->compactTableSmall,
+                    deviceMemory->ctSmall,
+                    sizeof(CompactTableSmallEntry) * COMPACT_TABLE_SIZE_SMALL);
   writeOpenClBuffer(queue, hostMemory->dfcStructure->compactTableLarge,
                     deviceMemory->ctLarge,
                     sizeof(CompactTableLarge) * COMPACT_TABLE_SIZE_LARGE);
@@ -629,11 +618,15 @@ void prepareOpenClBuffersForSearch() {
 void freeOpenClBuffers() {
   DFC_OPENCL_BUFFERS.inputLength = 0;
   clReleaseMemObject(DFC_OPENCL_BUFFERS.input);
+
   clReleaseMemObject(DFC_OPENCL_BUFFERS.patterns);
+
   clReleaseMemObject(DFC_OPENCL_BUFFERS.dfSmall);
-  clReleaseMemObject(DFC_OPENCL_BUFFERS.ctSmall);
   clReleaseMemObject(DFC_OPENCL_BUFFERS.dfLarge);
   clReleaseMemObject(DFC_OPENCL_BUFFERS.dfLargeHash);
+
+  clReleaseMemObject(DFC_OPENCL_BUFFERS.ctSmall);
   clReleaseMemObject(DFC_OPENCL_BUFFERS.ctLarge);
+
   clReleaseMemObject(DFC_OPENCL_BUFFERS.result);
 }

@@ -18,10 +18,10 @@ void setKernelArgs(cl_kernel kernel, DfcOpenClBuffers *mem) {
   clSetKernelArg(kernel, 2, sizeof(cl_mem), &mem->patterns);
 
   clSetKernelArg(kernel, 3, sizeof(cl_mem), &mem->dfSmall);
-  clSetKernelArg(kernel, 4, sizeof(cl_mem), &mem->ctSmall);
+  clSetKernelArg(kernel, 4, sizeof(cl_mem), &mem->dfLarge);
+  clSetKernelArg(kernel, 5, sizeof(cl_mem), &mem->dfLargeHash);
 
-  clSetKernelArg(kernel, 5, sizeof(cl_mem), &mem->dfLarge);
-  clSetKernelArg(kernel, 6, sizeof(cl_mem), &mem->dfLargeHash);
+  clSetKernelArg(kernel, 6, sizeof(cl_mem), &mem->ctSmall);
   clSetKernelArg(kernel, 7, sizeof(cl_mem), &mem->ctLarge);
 
   clSetKernelArg(kernel, 8, sizeof(cl_mem), &mem->result);

@@ -112,8 +112,8 @@ bool isInHashDf(__global uchar *df, __global uchar *input) {
 
 __kernel void search(int inputLength, __global uchar *input,
                      __global DFC_FIXED_PATTERN *patterns,
-                     __global uchar *dfSmall, __global uchar *ctSmall,
-                     __global uchar *dfLarge, __global uchar *dfLargeHash,
+                     __global uchar *dfSmall, __global uchar *dfLarge,
+                     __global uchar *dfLargeHash, __global uchar *ctSmall,
                      __global uchar *ctLarge, __global uchar *result) {
   uint i = (get_group_id(0) * get_local_size(0) + get_local_id(0)) *
            CHECK_COUNT_PER_THREAD;
@@ -144,14 +144,11 @@ typedef union {
 
 #define SHIFT_BY_CHANNEL_SIZE(x) (x >> 4)
 
-__kernel void search_with_image(int inputLength, __global uchar *input,
-                                __global DFC_FIXED_PATTERN *patterns,
-                                __read_only image1d_t dfSmall,
-                                __global uchar *ctSmall,
-                                __read_only image1d_t dfLarge,
-                                __global uchar *dfLargeHash,
-                                __global uchar *ctLarge,
-                                __global uchar *result) {
+__kernel void search_with_image(
+    int inputLength, __global uchar *input,
+    __global DFC_FIXED_PATTERN *patterns, __read_only image1d_t dfSmall,
+    __read_only image1d_t dfLarge, __global uchar *dfLargeHash,
+    __global uchar *ctSmall, __global uchar *ctLarge, __global uchar *result) {
   uint i = (get_group_id(0) * get_local_size(0) + get_local_id(0)) *
            CHECK_COUNT_PER_THREAD;
 
