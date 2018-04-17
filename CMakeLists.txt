@@ -18,8 +18,11 @@ add_definitions(-DCL_USE_DEPRECATED_OPENCL_1_2_APIS)
 # 1 = ON
 
 # Feature flags
-set(DFC_SEARCH_WITH_GPU 1)
-set(DFC_MAP_MEMORY 0)
+# These two are mutually exclusive
+set(DFC_SEARCH_WITH_GPU 0)
+set(DFC_HETEROGENEOUS_DESIGN 1)
+
+set(DFC_MAP_MEMORY 1)
 set(DFC_USE_TEXTURE_MEMORY 0)
 
 # Continous values
@@ -29,6 +32,10 @@ set(DFC_WORK_GROUP_SIZE 32)
 set(DFC_CHECK_COUNT_PER_THREAD 10)
 
 #########################################
+
+if (${DFC_SEARCH_WITH_GPU} AND ${DFC_HETEROGENEOUS_DESIGN})
+  message( FATAL_ERROR "DFC: Both DFC_SEARCH_WITH_GPU and DFC_HETEROGENEOUS_DESIGN may not be set")
+endif()
 
 set(DFC_HEADERS
   ${CMAKE_CURRENT_SOURCE_DIR}/src/dfc.h
@@ -44,18 +51,18 @@ set(DFC_SOURCES
       ${CMAKE_CURRENT_SOURCE_DIR}/src/dfc.c
       ${CMAKE_CURRENT_SOURCE_DIR}/src/memory.c
       ${CMAKE_CURRENT_SOURCE_DIR}/src/utility.c
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/search/search.c
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/search/search-gpu.c
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/search/search-cpu.c
       )
 
 if(${DFC_SEARCH_WITH_GPU})
   message("DFC: Using GPU version of DFC algorithm")
-  set(DFC_SOURCES ${DFC_SOURCES}
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/search/search-gpu.c)
+elseif(${DFC_HETEROGENEOUS_DESIGN})
+  message("DFC: Using heterogeneous version of DFC algorithm")
 else()
   message("DFC: Using CPU version of DFC algorithm")
-  set(DFC_SOURCES ${DFC_SOURCES}
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/search/search-cpu.c)
 endif()
-
 
 set(DFC_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
@@ -64,6 +71,7 @@ target_include_directories(dfc PUBLIC ${DFC_INCLUDE_DIR} ${OpenCL_INCLUDE_DIRS})
 target_link_libraries(dfc ${OpenCL_LIBRARIES} -lm)
 target_compile_definitions(dfc PRIVATE
     SEARCH_WITH_GPU=${DFC_SEARCH_WITH_GPU}
+    HETEROGENEOUS_DESIGN=${DFC_HETEROGENEOUS_DESIGN}
     WORK_GROUP_SIZE=${DFC_WORK_GROUP_SIZE}
     MAP_MEMORY=${DFC_MAP_MEMORY}
     CHECK_COUNT_PER_THREAD=${DFC_CHECK_COUNT_PER_THREAD}

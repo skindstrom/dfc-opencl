@@ -175,3 +175,26 @@ __kernel void search_with_image(
     result[i] = matches;
   }
 }
+
+__kernel void filter(int inputLength, __global uchar *input,
+                     __global uchar *dfSmall, __global uchar *dfLarge,
+                     __global uchar *dfLargeHash, __global uchar *result) {
+  uint i = (get_group_id(0) * get_local_size(0) + get_local_id(0)) *
+           CHECK_COUNT_PER_THREAD;
+
+  for (int j = 0; j < CHECK_COUNT_PER_THREAD && i < inputLength; ++j, ++i) {
+    short data = *(input + i + 1) << 8 | *(input + i);
+    short byteIndex = BINDEX(data & DF_MASK);
+    short bitMask = BMASK(data & DF_MASK);
+
+    // set the first bit
+    // (important that it's not an OR as we need to set it to 0 since the memory
+    // might be uninitialized)
+    result[i] = (dfSmall[byteIndex] & bitMask) > 0;
+
+    // set the second bit
+    result[i] |= (i >= 2 && (dfLarge[byteIndex] & bitMask) &&
+                  isInHashDf(dfLargeHash, input + i))
+                 << 1;
+  }
+}

@@ -11,7 +11,9 @@
 #include "memory.h"
 #include "search.h"
 
-void setKernelArgs(cl_kernel kernel, DfcOpenClBuffers *mem) {
+extern int exactMatchingUponFiltering(uint8_t *result, int length);
+
+void setKernelArgsNormalDesign(cl_kernel kernel, DfcOpenClBuffers *mem) {
   clSetKernelArg(kernel, 0, sizeof(int), &mem->inputLength);
   clSetKernelArg(kernel, 1, sizeof(cl_mem), &mem->input);
 
@@ -25,6 +27,25 @@ void setKernelArgs(cl_kernel kernel, DfcOpenClBuffers *mem) {
   clSetKernelArg(kernel, 7, sizeof(cl_mem), &mem->ctLarge);
 
   clSetKernelArg(kernel, 8, sizeof(cl_mem), &mem->result);
+}
+
+void setKernelArgsHetDesign(cl_kernel kernel, DfcOpenClBuffers *mem) {
+  clSetKernelArg(kernel, 0, sizeof(int), &mem->inputLength);
+  clSetKernelArg(kernel, 1, sizeof(cl_mem), &mem->input);
+
+  clSetKernelArg(kernel, 2, sizeof(cl_mem), &mem->dfSmall);
+  clSetKernelArg(kernel, 3, sizeof(cl_mem), &mem->dfLarge);
+  clSetKernelArg(kernel, 4, sizeof(cl_mem), &mem->dfLargeHash);
+
+  clSetKernelArg(kernel, 5, sizeof(cl_mem), &mem->result);
+}
+
+void setKernelArgs(cl_kernel kernel, DfcOpenClBuffers *mem) {
+  if (HETEROGENEOUS_DESIGN) {
+    setKernelArgsHetDesign(kernel, mem);
+  } else {
+    setKernelArgsNormalDesign(kernel, mem);
+  }
 }
 
 size_t getGlobalGroupSize(size_t localGroupSize, int inputLength) {
@@ -50,6 +71,14 @@ void startKernelForQueue(cl_kernel kernel, cl_command_queue queue,
   }
 }
 
+int sumMatches(uint8_t *result, int length) {
+  int sum = 0;
+  for (int i = 0; i < length; ++i) {
+    sum += result[i];
+  }
+  return sum;
+}
+
 int readResultWithoutMap(DfcOpenClBuffers *mem, cl_command_queue queue) {
   uint8_t *output = calloc(1, mem->inputLength);
   int status = clEnqueueReadBuffer(queue, mem->result, CL_BLOCKING, 0,
@@ -61,9 +90,12 @@ int readResultWithoutMap(DfcOpenClBuffers *mem, cl_command_queue queue) {
     exit(OPENCL_COULD_NOT_READ_RESULTS);
   }
 
-  int matches = 0;
-  for (int i = 0; i < mem->inputLength; ++i) {
-    matches += output[i];
+
+  int matches;
+  if (HETEROGENEOUS_DESIGN) {
+    matches = exactMatchingUponFiltering(output, mem->inputLength);
+  } else {
+    matches = sumMatches(output, mem->inputLength);
   }
 
   free(output);
@@ -83,9 +115,11 @@ int readResultWithMap(DfcOpenClBuffers *mem, cl_command_queue queue) {
     exit(OPENCL_COULD_NOT_READ_RESULTS);
   }
 
-  int matches = 0;
-  for (int i = 0; i < mem->inputLength; ++i) {
-    matches += output[i];
+  int matches;
+  if (HETEROGENEOUS_DESIGN) {
+    matches = exactMatchingUponFiltering(output, mem->inputLength);
+  } else {
+    matches = sumMatches(output, mem->inputLength);
   }
 
   status = clEnqueueUnmapMemObject(queue, mem->result, output, 0, NULL, NULL);
@@ -101,7 +135,7 @@ int readResult(DfcOpenClBuffers *mem, cl_command_queue queue) {
   }
 }
 
-int search() {
+int searchGpu() {
   prepareOpenClBuffersForSearch();
 
   setKernelArgs(DFC_OPENCL_ENVIRONMENT.kernel, &DFC_OPENCL_BUFFERS);

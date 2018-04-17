@@ -112,7 +112,7 @@ static bool isInHashDf(uint8_t *df, uint8_t *input) {
   return df[byteIndex] & bitMask;
 }
 
-int search() {
+int searchCpu() {
   DFC_STRUCTURE *dfc = DFC_HOST_MEMORY.dfcStructure;
   DFC_PATTERNS *patterns = DFC_HOST_MEMORY.patterns;
   uint8_t *input = (uint8_t *)DFC_HOST_MEMORY.input;
@@ -134,6 +134,28 @@ int search() {
         isInHashDf(dfc->directFilterLargeHash, input + i)) {
       matches += verifyLarge(dfc->compactTableLarge, patterns->dfcMatchList,
                              input + i, i, inputLength);
+    }
+  }
+
+  return matches;
+}
+
+int exactMatchingUponFiltering(uint8_t *result, int length) {
+  DFC_STRUCTURE *dfc = DFC_HOST_MEMORY.dfcStructure;
+  DFC_PATTERNS *patterns = DFC_HOST_MEMORY.patterns;
+  uint8_t *input = (uint8_t *)DFC_HOST_MEMORY.input;
+
+  int matches = 0;
+
+  for (int i = 0; i < length; ++i) {
+    if (result[i] & 0x01) {
+      matches += verifySmall(dfc->compactTableSmall, patterns->dfcMatchList,
+                             input + i, i, length);
+    }
+
+    if (result[i] & 0x02) {
+      matches += verifyLarge(dfc->compactTableLarge, patterns->dfcMatchList,
+                             input + i, i, length);
     }
   }
 
