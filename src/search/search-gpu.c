@@ -90,7 +90,6 @@ int readResultWithoutMap(DfcOpenClBuffers *mem, cl_command_queue queue) {
     exit(OPENCL_COULD_NOT_READ_RESULTS);
   }
 
-
   int matches;
   if (HETEROGENEOUS_DESIGN) {
     matches = exactMatchingUponFiltering(output, mem->inputLength);

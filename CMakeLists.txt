@@ -18,12 +18,12 @@ add_definitions(-DCL_USE_DEPRECATED_OPENCL_1_2_APIS)
 # 1 = ON
 
 # Feature flags
-# These two are mutually exclusive
+# These SEARCH_WITH_GPU and HETEROGENEOUS_DESIGN are mutually exclusive
 set(DFC_SEARCH_WITH_GPU 0)
 set(DFC_HETEROGENEOUS_DESIGN 1)
 
 set(DFC_MAP_MEMORY 1)
-set(DFC_USE_TEXTURE_MEMORY 0)
+set(DFC_USE_TEXTURE_MEMORY 1)
 
 # Continous values
 set(DFC_WORK_GROUP_SIZE 32)
@@ -75,7 +75,7 @@ endif()
 message("DFC: Using work groups of size ${DFC_WORK_GROUP_SIZE}")
 
 if(${DFC_SEARCH_WITH_GPU} OR ${DFC_HETEROGENEOUS_DESIGN})
-message("DFC: Each GPU thread will check ${DFC_CHECK_COUNT_PER_THREAD} locations of the input")
+message("DFC: Each GPU thread will perform filtering at ${DFC_CHECK_COUNT_PER_THREAD} positions of the input")
 endif()
 
 set(DFC_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)

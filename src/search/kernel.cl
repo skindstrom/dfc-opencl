@@ -198,3 +198,30 @@ __kernel void filter(int inputLength, __global uchar *input,
                  << 1;
   }
 }
+
+__kernel void filter_with_image(int inputLength, __global uchar *input,
+                                __read_only image1d_t dfSmall,
+                                __read_only image1d_t dfLarge,
+                                __global uchar *dfLargeHash,
+                                __global uchar *result) {
+  uint i = (get_group_id(0) * get_local_size(0) + get_local_id(0)) *
+           CHECK_COUNT_PER_THREAD;
+
+  for (int j = 0; j < CHECK_COUNT_PER_THREAD && i < inputLength; ++j, ++i) {
+    uchar matches = 0;
+    short data = *(input + i + 1) << 8 | *(input + i);
+    short byteIndex = BINDEX(data & DF_MASK);
+    short bitMask = BMASK(data & DF_MASK);
+
+    img_read df =
+        (img_read)read_imageui(dfSmall, SHIFT_BY_CHANNEL_SIZE(byteIndex));
+    result[i] = (df.scalar[byteIndex % TEXTURE_CHANNEL_BYTE_SIZE] & bitMask) > 0;
+
+    df = (img_read)read_imageui(dfLarge, SHIFT_BY_CHANNEL_SIZE(byteIndex));
+    result[i] |=
+        (i >= 2 &&
+         (df.scalar[byteIndex % TEXTURE_CHANNEL_BYTE_SIZE] & bitMask) &&
+         isInHashDf(dfLargeHash, input + i))
+        << 1;
+  }
+}
