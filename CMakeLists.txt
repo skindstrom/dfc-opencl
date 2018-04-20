@@ -56,7 +56,7 @@ set(DFC_HEADERS
   ${CMAKE_CURRENT_SOURCE_DIR}/src/shared.h
   ${CMAKE_CURRENT_SOURCE_DIR}/src/shared-functions.h
   ${CMAKE_CURRENT_SOURCE_DIR}/src/memory.h
-
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/timer.h
 )
 set(DFC_SOURCES
       ${CMAKE_CURRENT_SOURCE_DIR}/src/dfc.c
@@ -65,7 +65,8 @@ set(DFC_SOURCES
       ${CMAKE_CURRENT_SOURCE_DIR}/src/search/search.c
       ${CMAKE_CURRENT_SOURCE_DIR}/src/search/search-gpu.c
       ${CMAKE_CURRENT_SOURCE_DIR}/src/search/search-cpu.c
-      )
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/timer.c
+)
 
 if(${DFC_SEARCH_WITH_GPU})
   message("DFC: Using GPU version of DFC algorithm")

@@ -170,7 +170,9 @@ int DFC_Compile(DFC_STRUCTURE *dfc, DFC_PATTERN_INIT *patterns) {
   return 0;
 }
 
-int DFC_Search() { return search(); }
+int DFC_Search() { 
+  return search();
+}
 
 static void *DFC_REALLOC(void *p, uint16_t n, dfcDataType type) {
   switch (type) {
