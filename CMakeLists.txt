@@ -22,8 +22,9 @@ add_definitions(-DCL_USE_DEPRECATED_OPENCL_1_2_APIS)
 set(DFC_SEARCH_WITH_GPU 0)
 set(DFC_HETEROGENEOUS_DESIGN 1)
 
-set(DFC_MAP_MEMORY 1)
-set(DFC_USE_TEXTURE_MEMORY 1)
+set(DFC_MAP_MEMORY 0)
+set(DFC_USE_TEXTURE_MEMORY 0)
+set(DFC_USE_LOCAL_MEMORY 1)
 
 # Continous values
 set(DFC_WORK_GROUP_SIZE 32)
@@ -34,8 +35,18 @@ set(DFC_CHECK_COUNT_PER_THREAD 10)
 #########################################
 
 if (${DFC_SEARCH_WITH_GPU} AND ${DFC_HETEROGENEOUS_DESIGN})
-  message( FATAL_ERROR "DFC: Both DFC_SEARCH_WITH_GPU and DFC_HETEROGENEOUS_DESIGN may not be set")
+  message( FATAL_ERROR "DFC: DFC_SEARCH_WITH_GPU and DFC_HETEROGENEOUS_DESIGN are mutually exclusive")
 endif()
+
+math(EXPR DFC_WORK_GROUP_SIZE_POWER_OF_TWO "${DFC_WORK_GROUP_SIZE} / 2")
+if (!${DFC_WORK_GROUP_SIZE_POWER_OF_TWO})
+  message( FATAL_ERROR "DFC: WORK_GROUP_SIZE must be a power of 2")
+endif()
+
+if (${DFC_USE_TEXTURE_MEMORY} AND ${DFC_USE_LOCAL_MEMORY})
+  message( FATAL_ERROR "DFC: USE_TEXTURE_MEMORY and USE_LOCAL_MEMORY are mutually exclusive")
+endif()
+
 
 set(DFC_HEADERS
   ${CMAKE_CURRENT_SOURCE_DIR}/src/dfc.h
@@ -72,6 +83,10 @@ if(${DFC_USE_TEXTURE_MEMORY})
   message("DFC: Using texture memory for some data structures")
 endif()
 
+if(${DFC_USE_LOCAL_MEMORY})
+  message("DFC: Using local memory for direct filters")
+endif()
+
 message("DFC: Using work groups of size ${DFC_WORK_GROUP_SIZE}")
 
 if(${DFC_SEARCH_WITH_GPU} OR ${DFC_HETEROGENEOUS_DESIGN})
@@ -90,6 +105,7 @@ target_compile_definitions(dfc PRIVATE
     MAP_MEMORY=${DFC_MAP_MEMORY}
     CHECK_COUNT_PER_THREAD=${DFC_CHECK_COUNT_PER_THREAD}
     USE_TEXTURE_MEMORY=${DFC_USE_TEXTURE_MEMORY}
+    USE_LOCAL_MEMORY=${DFC_USE_LOCAL_MEMORY}
     )
 
 add_subdirectory(${EXT_PROJECTS_DIR}/catch)

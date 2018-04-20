@@ -75,10 +75,14 @@ cl_program loadAndCreateProgram(cl_context context) {
 }
 
 void buildProgram(cl_program *program, cl_device_id device) {
-  char arguments[200];
+  char arguments[400];
   sprintf(arguments,
-          "-cl-std=CL1.2 -D CHECK_COUNT_PER_THREAD=%d -D DFC_OPENCL -I ../src",
-          CHECK_COUNT_PER_THREAD);
+          "-cl-std=CL1.2 "
+          "-D CHECK_COUNT_PER_THREAD=%d "
+          "-D LOCAL_MEMORY_LOAD_PER_ITEM=%d "
+          "-D DFC_OPENCL "
+          "-I ../src",
+          CHECK_COUNT_PER_THREAD, DF_SIZE_REAL / WORK_GROUP_SIZE);
   cl_int status = clBuildProgram(*program, 1, &device, arguments, NULL, NULL);
 
   if (status != CL_SUCCESS) {
@@ -101,10 +105,14 @@ void buildProgram(cl_program *program, cl_device_id device) {
 void setKernelName(char *name) {
   if (HETEROGENEOUS_DESIGN && USE_TEXTURE_MEMORY) {
     strcpy(name, "filter_with_image");
+  } else if (HETEROGENEOUS_DESIGN && USE_LOCAL_MEMORY) {
+    strcpy(name, "filter_with_local");
   } else if (HETEROGENEOUS_DESIGN) {
     strcpy(name, "filter");
-  } else if(USE_TEXTURE_MEMORY) {
+  } else if (USE_TEXTURE_MEMORY) {
     strcpy(name, "search_with_image");
+  } else if (USE_LOCAL_MEMORY) {
+    strcpy(name, "search_with_local");
   } else {
     strcpy(name, "search");
   }
@@ -154,9 +162,7 @@ void releaseOpenClEnvironment(DfcOpenClEnvironment *environment) {
   clReleaseContext(environment->context);
 }
 
-bool shouldUseOpenCl() {
-  return SEARCH_WITH_GPU || HETEROGENEOUS_DESIGN;
-}
+bool shouldUseOpenCl() { return SEARCH_WITH_GPU || HETEROGENEOUS_DESIGN; }
 
 void setupExecutionEnvironment() {
   if (shouldUseOpenCl()) {
@@ -427,7 +433,7 @@ void freeDfcInputOnHost() {
   free(DFC_HOST_MEMORY.input);
 }
 
-bool shouldUseMappedMemory() { return MAP_MEMORY && shouldUseOpenCl();}
+bool shouldUseMappedMemory() { return MAP_MEMORY && shouldUseOpenCl(); }
 
 void allocateDfcStructure() {
   if (shouldUseMappedMemory()) {
@@ -633,9 +639,10 @@ void writeOpenClBuffers(DfcOpenClBuffers *deviceMemory, cl_command_queue queue,
                     deviceMemory->dfLargeHash, DF_SIZE_REAL);
 
   if (!HETEROGENEOUS_DESIGN) {
-    writeOpenClBuffer(queue, hostMemory->dfcStructure->compactTableSmall,
-                      deviceMemory->ctSmall,
-                      sizeof(CompactTableSmallEntry) * COMPACT_TABLE_SIZE_SMALL);
+    writeOpenClBuffer(
+        queue, hostMemory->dfcStructure->compactTableSmall,
+        deviceMemory->ctSmall,
+        sizeof(CompactTableSmallEntry) * COMPACT_TABLE_SIZE_SMALL);
     writeOpenClBuffer(queue, hostMemory->dfcStructure->compactTableLarge,
                       deviceMemory->ctLarge,
                       sizeof(CompactTableLarge) * COMPACT_TABLE_SIZE_LARGE);

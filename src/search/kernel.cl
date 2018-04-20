@@ -176,6 +176,60 @@ __kernel void search_with_image(
   }
 }
 
+bool isInHashDfLocal(__local uchar *df, __global uchar *input) {
+  /*
+   the last two bytes are used to match,
+   hence we are now at least 2 bytes into the pattern
+   */
+  input -= 2;
+
+  uint data = input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
+  ushort byteIndex = directFilterHash(data);
+  ushort bitMask = BMASK(data & DF_MASK);
+
+  return df[byteIndex] & bitMask;
+}
+
+__kernel void search_with_local(
+    int inputLength, __global uchar *input,
+    __global DFC_FIXED_PATTERN *patterns, __global uchar *dfSmall,
+    __global uchar *dfLarge, __global uchar *dfLargeHash,
+    __global uchar *ctSmall, __global uchar *ctLarge, __global uchar *result) {
+  uint i = (get_group_id(0) * get_local_size(0) + get_local_id(0)) *
+           CHECK_COUNT_PER_THREAD;
+
+  __local uchar dfSmallLocal[DF_SIZE_REAL];
+  __local uchar dfLargeLocal[DF_SIZE_REAL];
+  __local uchar dfLargeHashLocal[DF_SIZE_REAL];
+
+  for (int j = LOCAL_MEMORY_LOAD_PER_ITEM * get_local_id(0);
+       j < (LOCAL_MEMORY_LOAD_PER_ITEM * (get_local_id(0) + 1)); ++j) {
+    dfSmallLocal[j] = dfSmall[j];
+    dfLargeLocal[j] = dfLarge[j];
+    dfLargeHashLocal[j] = dfLargeHash[j];
+  }
+
+  barrier(CLK_LOCAL_MEM_FENCE);
+
+  for (int j = 0; j < CHECK_COUNT_PER_THREAD && i < inputLength; ++j, ++i) {
+    uchar matches = 0;
+    short data = *(input + i + 1) << 8 | *(input + i);
+    short byteIndex = BINDEX(data & DF_MASK);
+    short bitMask = BMASK(data & DF_MASK);
+
+    if (dfSmallLocal[byteIndex] & bitMask) {
+      matches += verifySmall(ctSmall, patterns, input + i, i, inputLength);
+    }
+
+    if (i >= 2 && (dfLargeLocal[byteIndex] & bitMask) &&
+        isInHashDfLocal(dfLargeHashLocal, input + i)) {
+      matches += verifyLarge(ctLarge, patterns, input + i, i, inputLength);
+    }
+
+    result[i] = matches;
+  }
+}
+
 __kernel void filter(int inputLength, __global uchar *input,
                      __global uchar *dfSmall, __global uchar *dfLarge,
                      __global uchar *dfLargeHash, __global uchar *result) {
@@ -215,7 +269,8 @@ __kernel void filter_with_image(int inputLength, __global uchar *input,
 
     img_read df =
         (img_read)read_imageui(dfSmall, SHIFT_BY_CHANNEL_SIZE(byteIndex));
-    result[i] = (df.scalar[byteIndex % TEXTURE_CHANNEL_BYTE_SIZE] & bitMask) > 0;
+    result[i] =
+        (df.scalar[byteIndex % TEXTURE_CHANNEL_BYTE_SIZE] & bitMask) > 0;
 
     df = (img_read)read_imageui(dfLarge, SHIFT_BY_CHANNEL_SIZE(byteIndex));
     result[i] |=
@@ -223,5 +278,43 @@ __kernel void filter_with_image(int inputLength, __global uchar *input,
          (df.scalar[byteIndex % TEXTURE_CHANNEL_BYTE_SIZE] & bitMask) &&
          isInHashDf(dfLargeHash, input + i))
         << 1;
+  }
+}
+
+__kernel void filter_with_local(int inputLength, __global uchar *input,
+                                __global uchar *dfSmall,
+                                __global uchar *dfLarge,
+                                __global uchar *dfLargeHash,
+                                __global uchar *result) {
+  uint i = (get_group_id(0) * get_local_size(0) + get_local_id(0)) *
+           CHECK_COUNT_PER_THREAD;
+
+  __local uchar dfSmallLocal[DF_SIZE_REAL];
+  __local uchar dfLargeLocal[DF_SIZE_REAL];
+  __local uchar dfLargeHashLocal[DF_SIZE_REAL];
+
+  for (int j = LOCAL_MEMORY_LOAD_PER_ITEM * get_local_id(0);
+       j < (LOCAL_MEMORY_LOAD_PER_ITEM * (get_local_id(0) + 1)); ++j) {
+    dfSmallLocal[j] = dfSmall[j];
+    dfLargeLocal[j] = dfLarge[j];
+    dfLargeHashLocal[j] = dfLargeHash[j];
+  }
+
+  barrier(CLK_LOCAL_MEM_FENCE);
+
+  for (int j = 0; j < CHECK_COUNT_PER_THREAD && i < inputLength; ++j, ++i) {
+    short data = *(input + i + 1) << 8 | *(input + i);
+    short byteIndex = BINDEX(data & DF_MASK);
+    short bitMask = BMASK(data & DF_MASK);
+
+    // set the first bit
+    // (important that it's not an OR as we need to set it to 0 since the memory
+    // might be uninitialized)
+    result[i] = (dfSmallLocal[byteIndex] & bitMask) > 0;
+
+    // set the second bit
+    result[i] |= (i >= 2 && (dfLargeLocal[byteIndex] & bitMask) &&
+                  isInHashDfLocal(dfLargeHashLocal, input + i))
+                 << 1;
   }
 }
