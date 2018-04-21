@@ -8,10 +8,19 @@
 #define TIMER_WRITE_TO_DEVICE 3
 #define TIMER_READ_FROM_DEVICE 4
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void startTimer(int timer);
 void stopTimer(int timer);
 void resetTimer(int timer);
 
 double readTimerMs(int timer);
+
+#ifdef __cplusplus
+}
+#endif
+
 
 #endif

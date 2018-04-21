@@ -1,7 +1,11 @@
+#include <chrono>
+#include <thread>
+#include <stdio.h>
+
 #include "catch.hpp"
-#include "stdio.h"
 
 #include "dfc.h"
+#include "timer.h"
 
 void addCaseSensitivePattern(DFC_PATTERN_INIT* patternInit,
                              const std::string& pattern, PID_TYPE patternId) {
@@ -607,4 +611,28 @@ TEST_CASE("DFC") {
   }
 
   DFC_ReleaseEnvironment();
+}
+
+TEST_CASE("Timer") {
+  resetTimer(TIMER_EXECUTION);
+
+  SECTION("Tracks duration") {
+    REQUIRE(readTimerMs(TIMER_EXECUTION) == 0.0);
+
+    startTimer(TIMER_EXECUTION);
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    stopTimer(TIMER_EXECUTION);
+  
+    REQUIRE(readTimerMs(TIMER_EXECUTION) == Approx(10.0).epsilon(1.0));
+  }
+  SECTION("May be reset") {
+    startTimer(TIMER_EXECUTION);
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    stopTimer(TIMER_EXECUTION);
+  
+    REQUIRE(readTimerMs(TIMER_EXECUTION) != Approx(0));
+
+    resetTimer(TIMER_EXECUTION);
+    REQUIRE(readTimerMs(TIMER_EXECUTION) == 0.0);
+  }
 }
