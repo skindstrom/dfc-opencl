@@ -114,7 +114,7 @@ static bool isInHashDf(uint8_t *df, uint8_t *input) {
 
 int searchCpu() {
   DFC_STRUCTURE *dfc = DFC_HOST_MEMORY.dfcStructure;
-  DFC_PATTERNS *patterns = DFC_HOST_MEMORY.patterns;
+  DFC_PATTERNS *patterns = dfc->patterns;
   uint8_t *input = (uint8_t *)DFC_HOST_MEMORY.input;
   int inputLength = DFC_HOST_MEMORY.inputLength;
 
@@ -142,7 +142,7 @@ int searchCpu() {
 
 int exactMatchingUponFiltering(uint8_t *result, int length) {
   DFC_STRUCTURE *dfc = DFC_HOST_MEMORY.dfcStructure;
-  DFC_PATTERNS *patterns = DFC_HOST_MEMORY.patterns;
+  DFC_PATTERNS *patterns = dfc->patterns;
   uint8_t *input = (uint8_t *)DFC_HOST_MEMORY.input;
 
   int matches = 0;

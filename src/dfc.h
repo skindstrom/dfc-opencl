@@ -44,10 +44,21 @@ typedef struct {
   DFC_FIXED_PATTERN *dfcMatchList;
 } DFC_PATTERNS;
 
+typedef struct {
+  DFC_PATTERNS* patterns;
+
+  uint8_t* directFilterSmall;
+  uint8_t* directFilterLarge;
+  // Indexed by hashing more bytes of the input
+  uint8_t* directFilterLargeHash;
+
+  CompactTableSmallEntry* compactTableSmall;
+  CompactTableLarge* compactTableLarge;
+} DFC_STRUCTURE;
+
 void DFC_AddPattern(DFC_PATTERN_INIT *dfc, unsigned char *pat, int n,
                     int is_case_insensitive, PID_TYPE sid);
-void DFC_CompilePatterns(DFC_PATTERN_INIT *init, DFC_PATTERNS *patterns);
-int DFC_Compile(DFC_STRUCTURE *dfc, DFC_PATTERN_INIT *patterns);
+void DFC_Compile(DFC_STRUCTURE *dfc, DFC_PATTERN_INIT *patterns);
 
 /**
  * Accessing the input, DFC_STRUCTURE or DFC_PATTERNS is not safe after a call
@@ -60,13 +71,11 @@ int DFC_Search();
 void DFC_PrintInfo(DFC_STRUCTURE *dfc);
 
 char *DFC_NewInput(int size);
-DFC_STRUCTURE *DFC_New();
+DFC_STRUCTURE *DFC_New(int numPatterns);
 DFC_PATTERN_INIT *DFC_PATTERN_INIT_New();
-DFC_PATTERNS *DFC_PATTERNS_New(int numPatterns);
 
 void DFC_FreeInput();
 void DFC_FreePatternsInit(DFC_PATTERN_INIT *patterns);
-void DFC_FreePatterns();
 void DFC_FreeStructure();
 
 void DFC_SetupEnvironment();

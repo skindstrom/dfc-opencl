@@ -42,14 +42,9 @@ char *DFC_NewInput(int size) {
   return DFC_HOST_MEMORY.input;
 }
 
-DFC_STRUCTURE *DFC_New() {
-  allocateDfcStructure();
+DFC_STRUCTURE *DFC_New(int numPatterns) {
+  allocateDfcStructure(numPatterns);
   return DFC_HOST_MEMORY.dfcStructure;
-}
-
-DFC_PATTERNS *DFC_PATTERNS_New(int numPatterns) {
-  allocateDfcPatterns(numPatterns);
-  return DFC_HOST_MEMORY.patterns;
 }
 
 DFC_PATTERN_INIT *DFC_PATTERN_INIT_New(void) {
@@ -97,8 +92,6 @@ void DFC_FreePatternsInit(DFC_PATTERN_INIT *patterns) {
 
   free(patterns->init_hash);
 }
-
-void DFC_FreePatterns() { freeDfcPatterns(); }
 
 void DFC_FreeStructure() { freeDfcStructure(); }
 
@@ -159,15 +152,10 @@ void DFC_AddPattern(DFC_PATTERN_INIT *dfc, unsigned char *pat, int n,
   }
 }
 
-void DFC_CompilePatterns(DFC_PATTERN_INIT *init, DFC_PATTERNS *patterns) {
-  setupMatchList(init, patterns);
-}
-
-int DFC_Compile(DFC_STRUCTURE *dfc, DFC_PATTERN_INIT *patterns) {
+void DFC_Compile(DFC_STRUCTURE *dfc, DFC_PATTERN_INIT *patterns) {
+  setupMatchList(patterns, dfc->patterns);
   setupDirectFilters(dfc, patterns);
   setupCompactTables(dfc, patterns);
-
-  return 0;
 }
 
 int DFC_Search() { 

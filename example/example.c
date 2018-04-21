@@ -42,13 +42,10 @@ int main(void) {
                  1 /*case-insensitive pattern*/, 3 /*Pattern ID*/);
 
   // 3. [DFC] Build DFC structure
-  DFC_STRUCTURE *dfc = DFC_New();
+  DFC_STRUCTURE *dfc = DFC_New(patternInit->numPatterns);
   DFC_Compile(dfc, patternInit);
 
-  DFC_PATTERNS *dfcPatterns = DFC_PATTERNS_New(patternInit->numPatterns);
-  DFC_CompilePatterns(patternInit, dfcPatterns);
-
-  // 4. [DFC] Search
+  // 4. [DFC] SearpatternInit->numPatternsch
   printf("* Result:\n");
   int res = DFC_Search();
   printf("\n* Total match count: %d\n", res);
@@ -57,7 +54,6 @@ int main(void) {
   DFC_FreePatternsInit(patternInit);
 
   DFC_FreeInput();
-  DFC_FreePatterns();
   DFC_FreeStructure();
 
   DFC_ReleaseEnvironment();

@@ -67,14 +67,4 @@ typedef struct _dfc_fixed_pattern {
   PID_TYPE external_ids[MAX_EQUAL_PATTERNS];
 } DFC_FIXED_PATTERN;
 
-typedef struct {
-  uint8_t* directFilterSmall;
-  uint8_t* directFilterLarge;
-  // Indexed by hashing more bytes of the input
-  uint8_t* directFilterLargeHash;
-
-  CompactTableSmallEntry* compactTableSmall;
-  CompactTableLarge* compactTableLarge;
-} DFC_STRUCTURE;
-
 #endif

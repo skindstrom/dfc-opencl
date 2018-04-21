@@ -313,7 +313,7 @@ void allocateDfcPatternsWithMap(int numPatterns) {
     exit(OPENCL_COULD_NOT_MAP_PATTERN_TO_HOST);
   }
 
-  DFC_HOST_MEMORY.patterns = patterns;
+  DFC_HOST_MEMORY.dfcStructure->patterns = patterns;
 }
 
 void allocateInputWithMap(int size) {
@@ -362,7 +362,7 @@ void unmapOpenClInputBuffers() {
   if (!HETEROGENEOUS_DESIGN) {
     unmapOpenClBuffer(queue, dfc->compactTableSmall, buffers->ctSmall);
     unmapOpenClBuffer(queue, dfc->compactTableLarge, buffers->ctLarge);
-    unmapOpenClBuffer(queue, DFC_HOST_MEMORY.patterns->dfcMatchList,
+    unmapOpenClBuffer(queue, DFC_HOST_MEMORY.dfcStructure->patterns->dfcMatchList,
                       DFC_OPENCL_BUFFERS.patterns);
   }
 
@@ -387,7 +387,7 @@ void allocateDfcPatternsOnHost(int numPatterns) {
   patterns->numPatterns = numPatterns;
   patterns->dfcMatchList = calloc(1, sizeof(DFC_FIXED_PATTERN) * numPatterns);
 
-  DFC_HOST_MEMORY.patterns = patterns;
+  DFC_HOST_MEMORY.dfcStructure->patterns = patterns;
 }
 
 void allocateInputOnHost(int size) {
@@ -424,8 +424,8 @@ void freeDfcStructureWithMap() {
 }
 
 void freeDfcPatternsOnHost() {
-  free(DFC_HOST_MEMORY.patterns->dfcMatchList);
-  free(DFC_HOST_MEMORY.patterns);
+  free(DFC_HOST_MEMORY.dfcStructure->patterns->dfcMatchList);
+  free(DFC_HOST_MEMORY.dfcStructure->patterns);
 }
 
 void freeDfcInputOnHost() {
@@ -434,14 +434,6 @@ void freeDfcInputOnHost() {
 }
 
 bool shouldUseMappedMemory() { return MAP_MEMORY && shouldUseOpenCl(); }
-
-void allocateDfcStructure() {
-  if (shouldUseMappedMemory()) {
-    allocateDfcStructureWithMap();
-  } else {
-    allocateDfcStructureOnHost();
-  }
-}
 
 bool shouldMapPatternMemory() {
   return shouldUseMappedMemory() && !HETEROGENEOUS_DESIGN;
@@ -455,6 +447,16 @@ void allocateDfcPatterns(int numPatterns) {
   }
 }
 
+void allocateDfcStructure(int numPatterns) {
+  if (shouldUseMappedMemory()) {
+    allocateDfcStructureWithMap();
+  } else {
+    allocateDfcStructureOnHost();
+  }
+
+  allocateDfcPatterns(numPatterns);
+}
+
 void allocateInput(int size) {
   if (shouldUseMappedMemory()) {
     allocateInputWithMap(size);
@@ -463,17 +465,19 @@ void allocateInput(int size) {
   }
 }
 
+void freeDfcPatterns() {
+  if (!shouldMapPatternMemory()) {
+    freeDfcPatternsOnHost();
+  }
+}
+
 void freeDfcStructure() {
+  freeDfcPatterns();
+
   if (shouldUseMappedMemory()) {
     freeDfcStructureWithMap();
   } else {
     freeDfcStructureOnHost();
-  }
-}
-
-void freeDfcPatterns() {
-  if (!shouldMapPatternMemory()) {
-    freeDfcPatternsOnHost();
   }
 }
 
@@ -647,8 +651,8 @@ void writeOpenClBuffers(DfcOpenClBuffers *deviceMemory, cl_command_queue queue,
                       deviceMemory->ctLarge,
                       sizeof(CompactTableLarge) * COMPACT_TABLE_SIZE_LARGE);
     writeOpenClBuffer(
-        queue, hostMemory->patterns->dfcMatchList, deviceMemory->patterns,
-        hostMemory->patterns->numPatterns * sizeof(DFC_FIXED_PATTERN));
+        queue, hostMemory->dfcStructure->patterns->dfcMatchList, deviceMemory->patterns,
+        hostMemory->dfcStructure->patterns->numPatterns * sizeof(DFC_FIXED_PATTERN));
   }
 }
 
@@ -664,7 +668,7 @@ void prepareOpenClBuffersForSearch() {
         DFC_OPENCL_ENVIRONMENT.context, DFC_OPENCL_BUFFERS.inputLength);
   } else {
     DFC_OPENCL_BUFFERS =
-        createOpenClBuffers(&DFC_OPENCL_ENVIRONMENT, DFC_HOST_MEMORY.patterns,
+        createOpenClBuffers(&DFC_OPENCL_ENVIRONMENT, DFC_HOST_MEMORY.dfcStructure->patterns,
                             DFC_HOST_MEMORY.inputLength);
     writeOpenClBuffers(&DFC_OPENCL_BUFFERS, DFC_OPENCL_ENVIRONMENT.queue,
                        &DFC_HOST_MEMORY);

@@ -12,6 +12,7 @@
 typedef struct {
   int inputLength;
   cl_mem input;
+
   cl_mem patterns;
 
   cl_mem dfSmall;
@@ -42,8 +43,6 @@ typedef struct {
   int inputLength;
   char *input;
   DFC_STRUCTURE *dfcStructure;
-
-  DFC_PATTERNS *patterns;
 } DfcHostMemory;
 
 extern DfcHostMemory DFC_HOST_MEMORY;
@@ -51,12 +50,10 @@ extern DfcHostMemory DFC_HOST_MEMORY;
 void setupExecutionEnvironment();
 void releaseExecutionEnvironment();
 
-void allocateDfcStructure();
-void allocateDfcPatterns(int numPatterns);
+void allocateDfcStructure(int numPatterns);
 void allocateInput(int size);
 
 void freeDfcStructure();
-void freeDfcPatterns();
 void freeDfcInput();
 
 void prepareOpenClBuffersForSearch();
