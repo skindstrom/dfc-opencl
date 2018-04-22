@@ -10,6 +10,7 @@
 #include "search.h"
 #include "shared-functions.h"
 #include "utility.h"
+#include "timer.h"
 
 static unsigned char xlatcase[256];
 
@@ -153,9 +154,13 @@ void DFC_AddPattern(DFC_PATTERN_INIT *dfc, unsigned char *pat, int n,
 }
 
 void DFC_Compile(DFC_STRUCTURE *dfc, DFC_PATTERN_INIT *patterns) {
+  startTimer(TIMER_COMPILE_DFC);
+
   setupMatchList(patterns, dfc->patterns);
   setupDirectFilters(dfc, patterns);
   setupCompactTables(dfc, patterns);
+
+  stopTimer(TIMER_COMPILE_DFC);
 }
 
 int DFC_Search() { return search(); }
