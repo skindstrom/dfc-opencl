@@ -10,6 +10,7 @@
 
 #include "memory.h"
 #include "search.h"
+#include "timer.h"
 
 extern int exactMatchingUponFiltering(uint8_t *result, int length);
 
@@ -81,8 +82,11 @@ int sumMatches(uint8_t *result, int length) {
 
 int readResultWithoutMap(DfcOpenClBuffers *mem, cl_command_queue queue) {
   uint8_t *output = calloc(1, mem->inputLength);
+
+  startTimer(TIMER_READ_FROM_DEVICE);
   int status = clEnqueueReadBuffer(queue, mem->result, CL_BLOCKING, 0,
                                    mem->inputLength, output, 0, NULL, NULL);
+  stopTimer(TIMER_READ_FROM_DEVICE);
 
   if (status != CL_SUCCESS) {
     free(output);
@@ -104,9 +108,12 @@ int readResultWithoutMap(DfcOpenClBuffers *mem, cl_command_queue queue) {
 
 int readResultWithMap(DfcOpenClBuffers *mem, cl_command_queue queue) {
   cl_int status;
+
+  startTimer(TIMER_READ_FROM_DEVICE);
   uint8_t *output = clEnqueueMapBuffer(
       queue, mem->result, CL_BLOCKING, CL_MAP_READ | CL_MAP_WRITE, 0,
       mem->inputLength, 0, NULL, NULL, &status);
+  stopTimer(TIMER_READ_FROM_DEVICE);
 
   if (status != CL_SUCCESS) {
     free(output);
