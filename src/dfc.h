@@ -45,15 +45,15 @@ typedef struct {
 } DFC_PATTERNS;
 
 typedef struct {
-  DFC_PATTERNS* patterns;
+  DFC_PATTERNS *patterns;
 
-  uint8_t* directFilterSmall;
-  uint8_t* directFilterLarge;
+  uint8_t *directFilterSmall;
+  uint8_t *directFilterLarge;
   // Indexed by hashing more bytes of the input
-  uint8_t* directFilterLargeHash;
+  uint8_t *directFilterLargeHash;
 
-  CompactTableSmallEntry* compactTableSmall;
-  CompactTableLarge* compactTableLarge;
+  CompactTableSmallEntry *compactTableSmall;
+  CompactTableLarge *compactTableLarge;
 } DFC_STRUCTURE;
 
 void DFC_AddPattern(DFC_PATTERN_INIT *dfc, unsigned char *pat, int n,

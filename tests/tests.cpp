@@ -1,6 +1,6 @@
+#include <stdio.h>
 #include <chrono>
 #include <thread>
-#include <stdio.h>
 
 #include "catch.hpp"
 
@@ -522,25 +522,26 @@ TEST_CASE("DFC") {
 }
 
 TEST_CASE("Timer") {
-  resetTimer(TIMER_EXECUTION);
+  const int timer = 0;
+  resetTimer(timer);
 
   SECTION("Tracks duration") {
-    REQUIRE(readTimerMs(TIMER_EXECUTION) == 0.0);
+    REQUIRE(readTimerMs(timer) == 0.0);
 
-    startTimer(TIMER_EXECUTION);
+    startTimer(timer);
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    stopTimer(TIMER_EXECUTION);
-  
-    REQUIRE(readTimerMs(TIMER_EXECUTION) == Approx(10.0).epsilon(1.0));
+    stopTimer(timer);
+
+    REQUIRE(readTimerMs(timer) == Approx(10.0).epsilon(1.0));
   }
   SECTION("May be reset") {
-    startTimer(TIMER_EXECUTION);
+    startTimer(timer);
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    stopTimer(TIMER_EXECUTION);
-  
-    REQUIRE(readTimerMs(TIMER_EXECUTION) != Approx(0));
+    stopTimer(timer);
 
-    resetTimer(TIMER_EXECUTION);
-    REQUIRE(readTimerMs(TIMER_EXECUTION) == 0.0);
+    REQUIRE(readTimerMs(timer) != Approx(0));
+
+    resetTimer(timer);
+    REQUIRE(readTimerMs(timer) == 0.0);
   }
 }

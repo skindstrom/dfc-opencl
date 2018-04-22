@@ -1,5 +1,7 @@
 #include "memory.h"
 
+#include "timer.h"
+
 DfcHostMemory DFC_HOST_MEMORY;
 
 DfcOpenClBuffers DFC_OPENCL_BUFFERS;
@@ -165,19 +167,25 @@ void releaseOpenClEnvironment(DfcOpenClEnvironment *environment) {
 bool shouldUseOpenCl() { return SEARCH_WITH_GPU || HETEROGENEOUS_DESIGN; }
 
 void setupExecutionEnvironment() {
+  startTimer(TIMER_ENVIRONMENT_SETUP);
   if (shouldUseOpenCl()) {
     DFC_OPENCL_ENVIRONMENT = setupOpenClEnvironment();
   }
+  stopTimer(TIMER_ENVIRONMENT_SETUP);
 }
 void releaseExecutionEnvironment() {
+  startTimer(TIMER_ENVIRONMENT_TEARDOWN);
   if (shouldUseOpenCl()) {
     releaseOpenClEnvironment(&DFC_OPENCL_ENVIRONMENT);
   }
+  stopTimer(TIMER_ENVIRONMENT_TEARDOWN);
 }
 
 void createBufferAndMap(cl_context context, void **host, cl_mem *buffer,
                         int size) {
   cl_int errcode;
+
+  startTimer(TIMER_WRITE_TO_DEVICE);
 
   *buffer = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR,
                            size, NULL, &errcode);
@@ -190,6 +198,8 @@ void createBufferAndMap(cl_context context, void **host, cl_mem *buffer,
   *host = clEnqueueMapBuffer(DFC_OPENCL_ENVIRONMENT.queue, *buffer, CL_BLOCKING,
                              CL_MAP_READ | CL_MAP_WRITE, 0, size, 0, NULL, NULL,
                              &errcode);
+
+  stopTimer(TIMER_WRITE_TO_DEVICE);
 
   if (errcode != CL_SUCCESS) {
     fprintf(stderr, "Could not map DFC buffer to host memory");
@@ -224,6 +234,9 @@ void createTextureBufferAndMap(cl_context context, void **host, cl_mem *buffer,
   };
 
   cl_int errcode;
+
+  startTimer(TIMER_WRITE_TO_DEVICE);
+
   *buffer = clCreateImage(context, CL_MEM_READ_ONLY, &imageFormat,
                           &imageDescription, NULL, &errcode);
 
@@ -239,6 +252,8 @@ void createTextureBufferAndMap(cl_context context, void **host, cl_mem *buffer,
   *host = clEnqueueMapImage(DFC_OPENCL_ENVIRONMENT.queue, *buffer, CL_BLOCKING,
                             CL_MAP_READ | CL_MAP_WRITE, offset, imageSize,
                             &pitch, &pitch, 0, NULL, NULL, &errcode);
+
+  stopTimer(TIMER_WRITE_TO_DEVICE);
 
   if (errcode != CL_SUCCESS) {
     fprintf(stderr, "Could not map DFC texture buffer to host memory");
@@ -289,29 +304,14 @@ void allocateDfcStructureWithMap() {
 }
 
 void allocateDfcPatternsWithMap(int numPatterns) {
-  const size_t size = sizeof(DFC_FIXED_PATTERN) * numPatterns;
-  cl_int errcode;
-
-  DFC_OPENCL_BUFFERS.patterns = clCreateBuffer(
-      DFC_OPENCL_ENVIRONMENT.context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR,
-      size, NULL, &errcode);
-
-  if (errcode != CL_SUCCESS) {
-    fprintf(stderr, "Could not create mapped pattern buffer");
-    exit(OPENCL_COULD_NOT_CREATE_MAPPED_PATTERN_BUFFER);
-  }
+  cl_context context = DFC_OPENCL_ENVIRONMENT.context;
 
   DFC_PATTERNS *patterns = malloc(sizeof(DFC_PATTERNS));
 
   patterns->numPatterns = numPatterns;
-  patterns->dfcMatchList = clEnqueueMapBuffer(
-      DFC_OPENCL_ENVIRONMENT.queue, DFC_OPENCL_BUFFERS.patterns, CL_BLOCKING,
-      CL_MAP_READ | CL_MAP_WRITE, 0, size, 0, NULL, NULL, &errcode);
-
-  if (errcode != CL_SUCCESS) {
-    fprintf(stderr, "Could not map pattern buffer to host memory");
-    exit(OPENCL_COULD_NOT_MAP_PATTERN_TO_HOST);
-  }
+  createBufferAndMap(context, (void *)&patterns->dfcMatchList,
+                     &DFC_OPENCL_BUFFERS.patterns,
+                     sizeof(DFC_FIXED_PATTERN) * numPatterns);
 
   DFC_HOST_MEMORY.dfcStructure->patterns = patterns;
 }
@@ -320,29 +320,17 @@ void allocateInputWithMap(int size) {
   DFC_HOST_MEMORY.inputLength = size;
   DFC_OPENCL_BUFFERS.inputLength = size;
 
-  cl_int errcode;
-
-  DFC_OPENCL_BUFFERS.input = clCreateBuffer(
-      DFC_OPENCL_ENVIRONMENT.context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR,
-      size, NULL, &errcode);
-
-  if (errcode != CL_SUCCESS) {
-    fprintf(stderr, "Could not create mapped input buffer");
-    exit(OPENCL_COULD_NOT_CREATE_MAPPED_INPUT_BUFFER);
-  }
-
-  DFC_HOST_MEMORY.input = clEnqueueMapBuffer(
-      DFC_OPENCL_ENVIRONMENT.queue, DFC_OPENCL_BUFFERS.input, CL_BLOCKING,
-      CL_MAP_READ | CL_MAP_WRITE, 0, size, 0, NULL, NULL, &errcode);
-
-  if (errcode != CL_SUCCESS) {
-    fprintf(stderr, "Could not map input buffer to host memory");
-    exit(OPENCL_COULD_NOT_MAP_INPUT_TO_HOST);
-  }
+  createBufferAndMap(DFC_OPENCL_ENVIRONMENT.context,
+                     (void *)&DFC_HOST_MEMORY.input, &DFC_OPENCL_BUFFERS.input,
+                     size);
 }
 
 void unmapOpenClBuffer(cl_command_queue queue, void *host, cl_mem buffer) {
+  startTimer(TIMER_WRITE_TO_DEVICE);
+
   cl_int errcode = clEnqueueUnmapMemObject(queue, buffer, host, 0, NULL, NULL);
+
+  stopTimer(TIMER_WRITE_TO_DEVICE);
 
   if (errcode != CL_SUCCESS) {
     fprintf(stderr, "Could not unmap DFC");
@@ -362,7 +350,8 @@ void unmapOpenClInputBuffers() {
   if (!HETEROGENEOUS_DESIGN) {
     unmapOpenClBuffer(queue, dfc->compactTableSmall, buffers->ctSmall);
     unmapOpenClBuffer(queue, dfc->compactTableLarge, buffers->ctLarge);
-    unmapOpenClBuffer(queue, DFC_HOST_MEMORY.dfcStructure->patterns->dfcMatchList,
+    unmapOpenClBuffer(queue,
+                      DFC_HOST_MEMORY.dfcStructure->patterns->dfcMatchList,
                       DFC_OPENCL_BUFFERS.patterns);
   }
 
@@ -488,9 +477,13 @@ void freeDfcInput() {
 }
 
 cl_mem createReadOnlyBuffer(cl_context context, int size) {
+  startTimer(TIMER_WRITE_TO_DEVICE);
+
   cl_int errcode;
   cl_mem buffer =
       clCreateBuffer(context, CL_MEM_READ_ONLY, size, NULL, &errcode);
+
+  stopTimer(TIMER_WRITE_TO_DEVICE);
 
   if (errcode != CL_SUCCESS) {
     fprintf(stderr, "Could not create read only buffer");
@@ -501,9 +494,13 @@ cl_mem createReadOnlyBuffer(cl_context context, int size) {
 }
 
 cl_mem createReadWriteBuffer(cl_context context, int size) {
+  startTimer(TIMER_WRITE_TO_DEVICE);
+  
   cl_int errcode;
   cl_mem buffer =
       clCreateBuffer(context, CL_MEM_READ_WRITE, size, NULL, &errcode);
+
+  stopTimer(TIMER_WRITE_TO_DEVICE);
 
   if (errcode != CL_SUCCESS) {
     fprintf(stderr, "Could not create read write buffer");
@@ -536,10 +533,15 @@ cl_mem createReadOnlyTextureBuffer(cl_context context, int size) {
       .buffer = NULL           // must be NULL since we're not using a buffer
   };
 
+  startTimer(TIMER_WRITE_TO_DEVICE);
+
   void *host = NULL;
   cl_int errcode;
   cl_mem buffer = clCreateImage(context, CL_MEM_READ_ONLY, &imageFormat,
                                 &imageDescription, host, &errcode);
+
+  stopTimer(TIMER_WRITE_TO_DEVICE);
+
   if (errcode != CL_SUCCESS) {
     fprintf(stderr, "Could not create texture buffer");
     exit(1);
@@ -597,8 +599,12 @@ DfcOpenClBuffers createOpenClBuffers(DfcOpenClEnvironment *environment,
 
 void writeOpenClBuffer(cl_command_queue queue, void *host, cl_mem buffer,
                        int size) {
+  startTimer(TIMER_WRITE_TO_DEVICE);
+
   cl_int errcode = clEnqueueWriteBuffer(queue, buffer, CL_BLOCKING, 0, size,
                                         host, 0, NULL, NULL);
+
+  stopTimer(TIMER_WRITE_TO_DEVICE);
 
   if (errcode != CL_SUCCESS) {
     fprintf(stderr, "Could not write to buffer");
@@ -612,9 +618,14 @@ void writeOpenClTextureBuffer(cl_command_queue queue, void *host, cl_mem buffer,
   size_t imageSize[3] = {size / TEXTURE_CHANNEL_BYTE_SIZE, 1,
                          1};  // region in OpenCL
   size_t pitch = 0;           // if 0, OpenCL calculates a fitting pitch
+
+  startTimer(TIMER_WRITE_TO_DEVICE);
+
   cl_int errcode =
       clEnqueueWriteImage(queue, buffer, CL_BLOCKING, offset, imageSize, pitch,
                           pitch, host, 0, NULL, NULL);
+
+  stopTimer(TIMER_WRITE_TO_DEVICE);
 
   if (errcode != CL_SUCCESS) {
     fprintf(stderr, "Could not write to texture buffer: %d\n", errcode);
@@ -650,15 +661,22 @@ void writeOpenClBuffers(DfcOpenClBuffers *deviceMemory, cl_command_queue queue,
     writeOpenClBuffer(queue, hostMemory->dfcStructure->compactTableLarge,
                       deviceMemory->ctLarge,
                       sizeof(CompactTableLarge) * COMPACT_TABLE_SIZE_LARGE);
-    writeOpenClBuffer(
-        queue, hostMemory->dfcStructure->patterns->dfcMatchList, deviceMemory->patterns,
-        hostMemory->dfcStructure->patterns->numPatterns * sizeof(DFC_FIXED_PATTERN));
+    writeOpenClBuffer(queue, hostMemory->dfcStructure->patterns->dfcMatchList,
+                      deviceMemory->patterns,
+                      hostMemory->dfcStructure->patterns->numPatterns *
+                          sizeof(DFC_FIXED_PATTERN));
   }
 }
 
 cl_mem createMappedResultBuffer(cl_context context, int inputLength) {
-  return clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR,
+  startTimer(TIMER_WRITE_TO_DEVICE);
+
+  cl_mem buffer =  clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR,
                         inputLength, NULL, NULL);
+
+  stopTimer(TIMER_WRITE_TO_DEVICE);
+
+  return buffer;
 }
 
 void prepareOpenClBuffersForSearch() {
@@ -667,9 +685,9 @@ void prepareOpenClBuffersForSearch() {
     DFC_OPENCL_BUFFERS.result = createMappedResultBuffer(
         DFC_OPENCL_ENVIRONMENT.context, DFC_OPENCL_BUFFERS.inputLength);
   } else {
-    DFC_OPENCL_BUFFERS =
-        createOpenClBuffers(&DFC_OPENCL_ENVIRONMENT, DFC_HOST_MEMORY.dfcStructure->patterns,
-                            DFC_HOST_MEMORY.inputLength);
+    DFC_OPENCL_BUFFERS = createOpenClBuffers(
+        &DFC_OPENCL_ENVIRONMENT, DFC_HOST_MEMORY.dfcStructure->patterns,
+        DFC_HOST_MEMORY.inputLength);
     writeOpenClBuffers(&DFC_OPENCL_BUFFERS, DFC_OPENCL_ENVIRONMENT.queue,
                        &DFC_HOST_MEMORY);
   }
