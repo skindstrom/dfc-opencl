@@ -14,9 +14,10 @@
 
 #define TIMER_WRITE_TO_DEVICE 7
 #define TIMER_READ_FROM_DEVICE 8
+#define TIMER_EXECUTE_KERNEL 9
 
-#define TIMER_EXECUTE_DFC 9
 #define TIMER_EXECUTE_HETEROGENEOUS 10
+#define TIMER_PROCESS_MATCHES 11
 
 #ifdef __cplusplus
 extern "C" {

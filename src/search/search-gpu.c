@@ -64,8 +64,12 @@ void startKernelForQueue(cl_kernel kernel, cl_command_queue queue,
   const size_t globalGroupSize =
       getGlobalGroupSize(localGroupSize, inputLength);
 
+  startTimer(TIMER_EXECUTE_KERNEL);
   int status = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &globalGroupSize,
                                       &localGroupSize, 0, NULL, NULL);
+  clFinish(queue); // only necessary for timing
+  stopTimer(TIMER_EXECUTE_KERNEL);
+
   if (status != CL_SUCCESS) {
     fprintf(stderr, "Could not start kernel: %d\n", status);
     exit(OPENCL_COULD_NOT_START_KERNEL);
@@ -78,6 +82,21 @@ int sumMatches(uint8_t *result, int length) {
     sum += result[i];
   }
   return sum;
+}
+
+int handleResultsFromGpu(uint8_t* result, int length) {
+  int matches;
+  if (HETEROGENEOUS_DESIGN) {
+    startTimer(TIMER_EXECUTE_HETEROGENEOUS);
+    matches = exactMatchingUponFiltering(result, length);
+    stopTimer(TIMER_EXECUTE_HETEROGENEOUS);
+  } else {
+    startTimer(TIMER_PROCESS_MATCHES);
+    matches = sumMatches(result, length);
+    stopTimer(TIMER_PROCESS_MATCHES);
+  }
+
+  return matches;
 }
 
 int readResultWithoutMap(DfcOpenClBuffers *mem, cl_command_queue queue) {
@@ -94,12 +113,7 @@ int readResultWithoutMap(DfcOpenClBuffers *mem, cl_command_queue queue) {
     exit(OPENCL_COULD_NOT_READ_RESULTS);
   }
 
-  int matches;
-  if (HETEROGENEOUS_DESIGN) {
-    matches = exactMatchingUponFiltering(output, mem->inputLength);
-  } else {
-    matches = sumMatches(output, mem->inputLength);
-  }
+  int matches = handleResultsFromGpu(output, mem->inputLength);
 
   free(output);
 
@@ -121,12 +135,7 @@ int readResultWithMap(DfcOpenClBuffers *mem, cl_command_queue queue) {
     exit(OPENCL_COULD_NOT_READ_RESULTS);
   }
 
-  int matches;
-  if (HETEROGENEOUS_DESIGN) {
-    matches = exactMatchingUponFiltering(output, mem->inputLength);
-  } else {
-    matches = sumMatches(output, mem->inputLength);
-  }
+  int matches = handleResultsFromGpu(output, mem->inputLength);
 
   status = clEnqueueUnmapMemObject(queue, mem->result, output, 0, NULL, NULL);
 
