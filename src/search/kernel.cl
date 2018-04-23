@@ -1,9 +1,4 @@
-#include "shared.h"
-
-ushort directFilterHash(uint val) { return BINDEX((val * 8387) & DF_MASK); }
-uint hashForLargeCompactTable(uint input) {
-  return (input * 8389) & (COMPACT_TABLE_SIZE_LARGE - 1);
-}
+#include "shared-functions.h"
 
 int my_strncmp(__global unsigned char *a, __global unsigned char *b, int n) {
   int i;
