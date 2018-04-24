@@ -38,7 +38,122 @@ static bool doesPatternMatch(uint8_t *start, uint8_t *pattern, int length,
   return !my_strncmp(start, pattern, length);
 }
 
-static int verifySmall(CompactTableSmallEntry *ct, DFC_FIXED_PATTERN *patterns,
+static void verifySmall(CompactTableSmallEntry *ct, DFC_FIXED_PATTERN *patterns,
+                        uint8_t *input, int currentPos, int inputLength,
+                        VerifyResult *result) {
+  uint8_t hash = input[0];
+  for (int i = 0; i < MAX_PID_PER_ENTRY; ++i) {
+    PID_TYPE pid = (ct + hash)->pids[i];
+
+    int patternLength = (patterns + pid)->pattern_length;
+    if (patternLength == 3) {
+      --input;
+      --currentPos;
+    }
+
+    if ((ct + hash)->pidCount > i && currentPos >= 0 &&
+        inputLength - currentPos >= patternLength &&
+        doesPatternMatch(input, (patterns + pid)->original_pattern,
+                         patternLength,
+                         (patterns + pid)->is_case_insensitive)) {
+      result->matchesSmallCt[result->matchCountSmallCt] = pid;
+      ++result->matchCountSmallCt;
+    }
+  }
+}
+
+#define GET_ENTRY_LARGE_CT(hash, x) \
+  ((ct + hash)->entries + sizeof(CompactTableLargeEntry) * x)
+static void verifyLarge(CompactTableLarge *ct, DFC_FIXED_PATTERN *patterns,
+                        uint8_t *input, int currentPos, int inputLength,
+                        VerifyResult *result) {
+  /*
+   the last two bytes are used to match,
+   hence we are now at least 2 bytes into the pattern
+   */
+  input -= 2;
+  currentPos -= 2;
+
+  uint32_t bytePattern =
+      input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
+  uint32_t hash = hashForLargeCompactTable(bytePattern);
+
+  uint8_t multiplier = 0;
+  for (; GET_ENTRY_LARGE_CT(hash, multiplier)->pidCount; ++multiplier) {
+    if (GET_ENTRY_LARGE_CT(hash, multiplier)->pattern == bytePattern) {
+      for (int i = 0; i < GET_ENTRY_LARGE_CT(hash, multiplier)->pidCount; ++i) {
+        PID_TYPE pid = GET_ENTRY_LARGE_CT(hash, multiplier)->pids[i];
+
+        int patternLength = (patterns + pid)->pattern_length;
+        int startOfRelativeInput = currentPos - (patternLength - 4);
+        if (startOfRelativeInput >= 0 &&
+            inputLength - startOfRelativeInput >= patternLength) {
+          uint8_t *relativeInput = input - (patternLength - 4);
+          if (doesPatternMatch(
+                  relativeInput, (patterns + pid)->original_pattern,
+                  patternLength, (patterns + pid)->is_case_insensitive)) {
+            result->matchesLargeCt[result->matchCountLargeCt] = pid;
+            ++result->matchCountLargeCt;
+          }
+        }
+      }
+
+      break;
+    }
+  }
+}
+
+static bool isInHashDf(uint8_t *df, uint8_t *input) {
+  /*
+   the last two bytes are used to match,
+   hence we are now at least 2 bytes into the pattern
+   */
+  input -= 2;
+  uint32_t data = input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
+  uint16_t byteIndex = directFilterHash(data);
+  uint16_t bitMask = BMASK(data & DF_MASK);
+
+  return df[byteIndex] & bitMask;
+}
+
+int searchCpu() {
+  DFC_STRUCTURE *dfc = DFC_HOST_MEMORY.dfcStructure;
+  DFC_PATTERNS *patterns = dfc->patterns;
+  uint8_t *input = (uint8_t *)DFC_HOST_MEMORY.input;
+  int inputLength = DFC_HOST_MEMORY.inputLength;
+
+  VerifyResult *result = malloc(sizeInBytesOfResultVector(inputLength));
+
+  int matches = 0;
+
+  for (int i = 0; i < inputLength; ++i) {
+    int16_t data = input[i + 1] << 8 | input[i];
+    int16_t byteIndex = BINDEX(data & DF_MASK);
+    int16_t bitMask = BMASK(data & DF_MASK);
+
+    result[i].matchCountSmallCt = 0;
+    result[i].matchCountLargeCt = 0;
+
+    if (dfc->directFilterSmall[byteIndex] & bitMask) {
+      verifySmall(dfc->compactTableSmall, patterns->dfcMatchList, input + i, i,
+                  inputLength, result + i);
+    }
+
+    if (i >= 2 && (dfc->directFilterLarge[byteIndex] & bitMask) &&
+        isInHashDf(dfc->directFilterLargeHash, input + i)) {
+      verifyLarge(dfc->compactTableLarge, patterns->dfcMatchList, input + i, i,
+                  inputLength, result + i);
+    }
+  }
+
+  for (int i = 0; i < inputLength; ++i) {
+    matches += result[i].matchCountSmallCt + result[i].matchCountLargeCt;
+  }
+
+  return matches;
+}
+
+static int verifySmallRet(CompactTableSmallEntry *ct, DFC_FIXED_PATTERN *patterns,
                        uint8_t *input, int currentPos, int inputLength) {
   uint8_t hash = input[0];
   int matches = 0;
@@ -61,9 +176,7 @@ static int verifySmall(CompactTableSmallEntry *ct, DFC_FIXED_PATTERN *patterns,
   return matches;
 }
 
-#define GET_ENTRY_LARGE_CT(hash, x) \
-  ((ct + hash)->entries + sizeof(CompactTableLargeEntry) * x)
-static int verifyLarge(CompactTableLarge *ct, DFC_FIXED_PATTERN *patterns,
+static int verifyLargeRet(CompactTableLarge *ct, DFC_FIXED_PATTERN *patterns,
                        uint8_t *input, int currentPos, int inputLength) {
   /*
    the last two bytes are used to match,
@@ -99,47 +212,6 @@ static int verifyLarge(CompactTableLarge *ct, DFC_FIXED_PATTERN *patterns,
   return matches;
 }
 
-static bool isInHashDf(uint8_t *df, uint8_t *input) {
-  /*
-   the last two bytes are used to match,
-   hence we are now at least 2 bytes into the pattern
-   */
-  input -= 2;
-  uint32_t data = input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
-  uint16_t byteIndex = directFilterHash(data);
-  uint16_t bitMask = BMASK(data & DF_MASK);
-
-  return df[byteIndex] & bitMask;
-}
-
-int searchCpu() {
-  DFC_STRUCTURE *dfc = DFC_HOST_MEMORY.dfcStructure;
-  DFC_PATTERNS *patterns = dfc->patterns;
-  uint8_t *input = (uint8_t *)DFC_HOST_MEMORY.input;
-  int inputLength = DFC_HOST_MEMORY.inputLength;
-
-  int matches = 0;
-
-  for (int i = 0; i < inputLength; ++i) {
-    int16_t data = input[i + 1] << 8 | input[i];
-    int16_t byteIndex = BINDEX(data & DF_MASK);
-    int16_t bitMask = BMASK(data & DF_MASK);
-
-    if (dfc->directFilterSmall[byteIndex] & bitMask) {
-      matches += verifySmall(dfc->compactTableSmall, patterns->dfcMatchList,
-                             input + i, i, inputLength);
-    }
-
-    if (i >= 2 && (dfc->directFilterLarge[byteIndex] & bitMask) &&
-        isInHashDf(dfc->directFilterLargeHash, input + i)) {
-      matches += verifyLarge(dfc->compactTableLarge, patterns->dfcMatchList,
-                             input + i, i, inputLength);
-    }
-  }
-
-  return matches;
-}
-
 int exactMatchingUponFiltering(uint8_t *result, int length) {
   DFC_STRUCTURE *dfc = DFC_HOST_MEMORY.dfcStructure;
   DFC_PATTERNS *patterns = dfc->patterns;
@@ -149,13 +221,13 @@ int exactMatchingUponFiltering(uint8_t *result, int length) {
 
   for (int i = 0; i < length; ++i) {
     if (result[i] & 0x01) {
-      matches += verifySmall(dfc->compactTableSmall, patterns->dfcMatchList,
-                             input + i, i, length);
+      matches += verifySmallRet(dfc->compactTableSmall, patterns->dfcMatchList, input + i, i,
+                  length);
     }
 
     if (result[i] & 0x02) {
-      matches += verifyLarge(dfc->compactTableLarge, patterns->dfcMatchList,
-                             input + i, i, length);
+      matches += verifyLargeRet(dfc->compactTableLarge, patterns->dfcMatchList, input + i, i,
+                  length);
     }
   }
 

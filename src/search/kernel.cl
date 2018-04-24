@@ -37,9 +37,9 @@ bool doesPatternMatch(__global uchar *start, __global uchar *pattern,
   return !my_strncmp(start, pattern, length);
 }
 
-int verifySmall(__global CompactTableSmallEntry *ct,
-                __global DFC_FIXED_PATTERN *patterns, __global uchar *input,
-                int currentPos, int inputLength) {
+void verifySmall(__global CompactTableSmallEntry *ct,
+                   __global DFC_FIXED_PATTERN *patterns, __global uchar *input,
+                   int currentPos, int inputLength, __global VerifyResult *result) {
   uchar hash = input[0];
   int matches = 0;
   for (int i = 0; i < (ct + hash)->pidCount; ++i) {
@@ -51,19 +51,20 @@ int verifySmall(__global CompactTableSmallEntry *ct,
       --currentPos;
     }
 
-    if (currentPos >= 0 && inputLength - currentPos >= patternLength) {
-      matches += doesPatternMatch(input, (patterns + pid)->original_pattern,
-                                  patternLength,
-                                  (patterns + pid)->is_case_insensitive);
+    if ((ct + hash)->pidCount > i && currentPos >= 0 &&
+        inputLength - currentPos >= patternLength &&
+        doesPatternMatch(input, (patterns + pid)->original_pattern,
+                         patternLength,
+                         (patterns + pid)->is_case_insensitive)) {
+      result->matchesSmallCt[result->matchCountSmallCt] = pid;
+      ++result->matchCountSmallCt;
     }
   }
-
-  return matches;
 }
 
-int verifyLarge(__global CompactTableLarge *ct,
+void verifyLarge(__global CompactTableLarge *ct,
                 __global DFC_FIXED_PATTERN *patterns, __global uchar *input,
-                int currentPos, int inputLength) {
+                int currentPos, int inputLength, __global VerifyResult *result) {
   /*
    the last two bytes are used to match,
    hence we are now at least 2 bytes into the pattern
@@ -73,7 +74,6 @@ int verifyLarge(__global CompactTableLarge *ct,
   uint bytePattern = input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
   uint hash = hashForLargeCompactTable(bytePattern);
 
-  int matches = 0;
   uchar multiplier = 0;
   for (; GET_ENTRY_LARGE_CT(hash, multiplier)->pidCount; ++multiplier) {
     if (GET_ENTRY_LARGE_CT(hash, multiplier)->pattern == bytePattern) {
@@ -84,16 +84,18 @@ int verifyLarge(__global CompactTableLarge *ct,
         int startOfRelativeInput = currentPos - (patternLength - 4);
 
         if (startOfRelativeInput >= 0 &&
-            inputLength - startOfRelativeInput >= patternLength) {
-          matches += doesPatternMatch(
+            inputLength - startOfRelativeInput >= patternLength &&
+           doesPatternMatch(
               input - (patternLength - 4), (patterns + pid)->original_pattern,
-              patternLength, (patterns + pid)->is_case_insensitive);
+              patternLength, (patterns + pid)->is_case_insensitive)) {
+          result->matchesLargeCt[result->matchCountLargeCt] = pid;
+          ++result->matchCountLargeCt;
         }
       }
+
+      break;
     }
   }
-
-  return matches;
 }
 
 bool isInHashDf(__global uchar *df, __global uchar *input) {
@@ -114,26 +116,27 @@ __kernel void search(int inputLength, __global uchar *input,
                      __global DFC_FIXED_PATTERN *patterns,
                      __global uchar *dfSmall, __global uchar *dfLarge,
                      __global uchar *dfLargeHash, __global uchar *ctSmall,
-                     __global uchar *ctLarge, __global uchar *result) {
+                     __global uchar *ctLarge, __global VerifyResult *result) {
   uint i = (get_group_id(0) * get_local_size(0) + get_local_id(0)) *
            CHECK_COUNT_PER_THREAD;
 
   for (int j = 0; j < CHECK_COUNT_PER_THREAD && i < inputLength; ++j, ++i) {
-    uchar matches = 0;
     short data = *(input + i + 1) << 8 | *(input + i);
     short byteIndex = BINDEX(data & DF_MASK);
     short bitMask = BMASK(data & DF_MASK);
 
+    result[i].matchCountSmallCt = 0;
+    result[i].matchCountLargeCt = 0;
+
     if (dfSmall[byteIndex] & bitMask) {
-      matches += verifySmall(ctSmall, patterns, input + i, i, inputLength);
+      verifySmall(ctSmall, patterns, input + i, i, inputLength,
+                     result + i);
     }
 
     if (i >= 2 && (dfLarge[byteIndex] & bitMask) &&
         isInHashDf(dfLargeHash, input + i)) {
-      matches += verifyLarge(ctLarge, patterns, input + i, i, inputLength);
+      verifyLarge(ctLarge, patterns, input + i, i, inputLength, result + i);
     }
-
-    result[i] = matches;
   }
 }
 
@@ -148,39 +151,35 @@ __kernel void search_with_image(
     int inputLength, __global uchar *input,
     __global DFC_FIXED_PATTERN *patterns, __read_only image1d_t dfSmall,
     __read_only image1d_t dfLarge, __global uchar *dfLargeHash,
-    __global uchar *ctSmall, __global uchar *ctLarge, __global uchar *result) {
+    __global uchar *ctSmall, __global uchar *ctLarge, __global VerifyResult *result) {
   uint i = (get_group_id(0) * get_local_size(0) + get_local_id(0)) *
            CHECK_COUNT_PER_THREAD;
 
   for (int j = 0; j < CHECK_COUNT_PER_THREAD && i < inputLength; ++j, ++i) {
-    uchar matches = 0;
     short data = *(input + i + 1) << 8 | *(input + i);
     short byteIndex = BINDEX(data & DF_MASK);
     short bitMask = BMASK(data & DF_MASK);
+
+    result[i].matchCountSmallCt = 0;
+    result[i].matchCountLargeCt = 0;
 
     // divide by 16 as we actually just want a single byte, but we're getting 16
     img_read df =
         (img_read)read_imageui(dfSmall, SHIFT_BY_CHANNEL_SIZE(byteIndex));
     if (df.scalar[byteIndex % TEXTURE_CHANNEL_BYTE_SIZE] & bitMask) {
-      matches += verifySmall(ctSmall, patterns, input + i, i, inputLength);
+      verifySmall(ctSmall, patterns, input + i, i, inputLength, result + i);
     }
 
     df = (img_read)read_imageui(dfLarge, SHIFT_BY_CHANNEL_SIZE(byteIndex));
     if (i >= 2 &&
         (df.scalar[byteIndex % TEXTURE_CHANNEL_BYTE_SIZE] & bitMask) &&
         isInHashDf(dfLargeHash, input + i)) {
-      matches += verifyLarge(ctLarge, patterns, input + i, i, inputLength);
+      verifyLarge(ctLarge, patterns, input + i, i, inputLength, result + i);
     }
-
-    result[i] = matches;
   }
 }
 
 bool isInHashDfLocal(__local uchar *df, __global uchar *input) {
-  /*
-   the last two bytes are used to match,
-   hence we are now at least 2 bytes into the pattern
-   */
   input -= 2;
 
   uint data = input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
@@ -194,7 +193,7 @@ __kernel void search_with_local(
     int inputLength, __global uchar *input,
     __global DFC_FIXED_PATTERN *patterns, __global uchar *dfSmall,
     __global uchar *dfLarge, __global uchar *dfLargeHash,
-    __global uchar *ctSmall, __global uchar *ctLarge, __global uchar *result) {
+    __global uchar *ctSmall, __global uchar *ctLarge, __global VerifyResult *result) {
   uint i = (get_group_id(0) * get_local_size(0) + get_local_id(0)) *
            CHECK_COUNT_PER_THREAD;
 
@@ -217,16 +216,18 @@ __kernel void search_with_local(
     short byteIndex = BINDEX(data & DF_MASK);
     short bitMask = BMASK(data & DF_MASK);
 
-    if (dfSmallLocal[byteIndex] & bitMask) {
-      matches += verifySmall(ctSmall, patterns, input + i, i, inputLength);
+    result[i].matchCountSmallCt = 0;
+    result[i].matchCountLargeCt = 0;
+
+    if (dfSmall[byteIndex] & bitMask) {
+      verifySmall(ctSmall, patterns, input + i, i, inputLength,
+                     result + i);
     }
 
-    if (i >= 2 && (dfLargeLocal[byteIndex] & bitMask) &&
-        isInHashDfLocal(dfLargeHashLocal, input + i)) {
-      matches += verifyLarge(ctLarge, patterns, input + i, i, inputLength);
+    if (i >= 2 && (dfLarge[byteIndex] & bitMask) &&
+        isInHashDf(dfLargeHash, input + i)) {
+      verifyLarge(ctLarge, patterns, input + i, i, inputLength, result + i);
     }
-
-    result[i] = matches;
   }
 }
 

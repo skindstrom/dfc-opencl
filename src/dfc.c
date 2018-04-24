@@ -9,8 +9,8 @@
 #include "memory.h"
 #include "search.h"
 #include "shared-functions.h"
-#include "utility.h"
 #include "timer.h"
+#include "utility.h"
 
 static unsigned char xlatcase[256];
 

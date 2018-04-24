@@ -7,6 +7,14 @@ DfcHostMemory DFC_HOST_MEMORY;
 DfcOpenClBuffers DFC_OPENCL_BUFFERS;
 DfcOpenClEnvironment DFC_OPENCL_ENVIRONMENT;
 
+int sizeInBytesOfResultVector(int inputLength) {
+  if (HETEROGENEOUS_DESIGN) {
+    return inputLength;
+  }
+
+  return inputLength * sizeof(VerifyResult);
+}
+
 cl_platform_id getPlatform() {
   cl_platform_id id;
   int amountOfPlatformsToReturn = 1;
@@ -495,7 +503,7 @@ cl_mem createReadOnlyBuffer(cl_context context, int size) {
 
 cl_mem createReadWriteBuffer(cl_context context, int size) {
   startTimer(TIMER_WRITE_TO_DEVICE);
-  
+
   cl_int errcode;
   cl_mem buffer =
       clCreateBuffer(context, CL_MEM_READ_WRITE, size, NULL, &errcode);
@@ -579,7 +587,8 @@ DfcOpenClBuffers createOpenClBuffers(DfcOpenClEnvironment *environment,
         context, sizeof(DFC_FIXED_PATTERN) * dfcPatterns->numPatterns);
   }
 
-  cl_mem result = createReadWriteBuffer(context, inputLength);
+  cl_mem result =
+      createReadWriteBuffer(context, sizeInBytesOfResultVector(inputLength));
 
   DfcOpenClBuffers memory = {.inputLength = inputLength,
                              .input = kernelInput,
@@ -671,8 +680,9 @@ void writeOpenClBuffers(DfcOpenClBuffers *deviceMemory, cl_command_queue queue,
 cl_mem createMappedResultBuffer(cl_context context, int inputLength) {
   startTimer(TIMER_WRITE_TO_DEVICE);
 
-  cl_mem buffer =  clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR,
-                        inputLength, NULL, NULL);
+  cl_mem buffer =
+      clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR,
+                     inputLength, NULL, NULL);
 
   stopTimer(TIMER_WRITE_TO_DEVICE);
 
@@ -683,7 +693,7 @@ void prepareOpenClBuffersForSearch() {
   if (MAP_MEMORY) {
     unmapOpenClInputBuffers();
     DFC_OPENCL_BUFFERS.result = createMappedResultBuffer(
-        DFC_OPENCL_ENVIRONMENT.context, DFC_OPENCL_BUFFERS.inputLength);
+        DFC_OPENCL_ENVIRONMENT.context, sizeInBytesOfResultVector(DFC_HOST_MEMORY.inputLength));
   } else {
     DFC_OPENCL_BUFFERS = createOpenClBuffers(
         &DFC_OPENCL_ENVIRONMENT, DFC_HOST_MEMORY.dfcStructure->patterns,

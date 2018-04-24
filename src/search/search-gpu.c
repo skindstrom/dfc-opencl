@@ -67,7 +67,7 @@ void startKernelForQueue(cl_kernel kernel, cl_command_queue queue,
   startTimer(TIMER_EXECUTE_KERNEL);
   int status = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &globalGroupSize,
                                       &localGroupSize, 0, NULL, NULL);
-  clFinish(queue); // only necessary for timing
+  clFinish(queue);  // only necessary for timing
   stopTimer(TIMER_EXECUTE_KERNEL);
 
   if (status != CL_SUCCESS) {
@@ -76,23 +76,25 @@ void startKernelForQueue(cl_kernel kernel, cl_command_queue queue,
   }
 }
 
-int sumMatches(uint8_t *result, int length) {
+int sumMatches(uint8_t *result, int inputLength) {
+  VerifyResult *pidCounts = (VerifyResult *)result;
+
   int sum = 0;
-  for (int i = 0; i < length; ++i) {
-    sum += result[i];
+  for (int i = 0; i < inputLength; ++i) {
+    sum += pidCounts[i].matchCountSmallCt + pidCounts[i].matchCountLargeCt;
   }
   return sum;
 }
 
-int handleResultsFromGpu(uint8_t* result, int length) {
+int handleResultsFromGpu(uint8_t *result, int inputLength) {
   int matches;
   if (HETEROGENEOUS_DESIGN) {
     startTimer(TIMER_EXECUTE_HETEROGENEOUS);
-    matches = exactMatchingUponFiltering(result, length);
+    matches = exactMatchingUponFiltering(result, inputLength);
     stopTimer(TIMER_EXECUTE_HETEROGENEOUS);
   } else {
     startTimer(TIMER_PROCESS_MATCHES);
-    matches = sumMatches(result, length);
+    matches = sumMatches(result, inputLength);
     stopTimer(TIMER_PROCESS_MATCHES);
   }
 
@@ -100,11 +102,12 @@ int handleResultsFromGpu(uint8_t* result, int length) {
 }
 
 int readResultWithoutMap(DfcOpenClBuffers *mem, cl_command_queue queue) {
-  uint8_t *output = calloc(1, mem->inputLength);
+  uint8_t *output = calloc(1, sizeInBytesOfResultVector(mem->inputLength));
 
   startTimer(TIMER_READ_FROM_DEVICE);
   int status = clEnqueueReadBuffer(queue, mem->result, CL_BLOCKING, 0,
-                                   mem->inputLength, output, 0, NULL, NULL);
+                                   sizeInBytesOfResultVector(mem->inputLength),
+                                   output, 0, NULL, NULL);
   stopTimer(TIMER_READ_FROM_DEVICE);
 
   if (status != CL_SUCCESS) {
@@ -126,7 +129,7 @@ int readResultWithMap(DfcOpenClBuffers *mem, cl_command_queue queue) {
   startTimer(TIMER_READ_FROM_DEVICE);
   uint8_t *output = clEnqueueMapBuffer(
       queue, mem->result, CL_BLOCKING, CL_MAP_READ | CL_MAP_WRITE, 0,
-      mem->inputLength, 0, NULL, NULL, &status);
+      sizeInBytesOfResultVector(mem->inputLength), 0, NULL, NULL, &status);
   stopTimer(TIMER_READ_FROM_DEVICE);
 
   if (status != CL_SUCCESS) {

@@ -10,7 +10,7 @@
 #include <stdint.h>
 #endif
 
-#define PID_TYPE uint32_t
+#define PID_TYPE int32_t
 
 #define DF_SIZE 0x10000
 #define DF_SIZE_REAL 0x2000
@@ -66,5 +66,13 @@ typedef struct _dfc_fixed_pattern {
   int32_t external_id_count;
   PID_TYPE external_ids[MAX_EQUAL_PATTERNS];
 } DFC_FIXED_PATTERN;
+
+typedef struct VerifyResult_ {
+  uint8_t matchCountSmallCt;
+  PID_TYPE matchesSmallCt[MAX_PID_PER_ENTRY];
+
+  uint8_t matchCountLargeCt;
+  PID_TYPE matchesLargeCt[MAX_PID_PER_ENTRY];
+} VerifyResult;
 
 #endif

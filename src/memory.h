@@ -59,4 +59,6 @@ void freeDfcInput();
 void prepareOpenClBuffersForSearch();
 void freeOpenClBuffers();
 
+int sizeInBytesOfResultVector(int inputLength);
+
 #endif

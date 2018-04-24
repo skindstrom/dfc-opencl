@@ -403,7 +403,7 @@ TEST_CASE("DFC") {
     };
 
     DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
-    for (PID_TYPE i = 0; i < patterns.size(); ++i) {
+    for (size_t i = 0; i < patterns.size(); ++i) {
       addCaseSensitivePattern(patternInit, patterns[i], i);
     }
 
