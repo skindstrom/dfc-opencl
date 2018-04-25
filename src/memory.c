@@ -88,11 +88,11 @@ void buildProgram(cl_program *program, cl_device_id device) {
   char arguments[400];
   sprintf(arguments,
           "-cl-std=CL1.2 "
-          "-D CHECK_COUNT_PER_THREAD=%d "
+          "-D THREAD_GRANULARITY=%d "
           "-D LOCAL_MEMORY_LOAD_PER_ITEM=%d "
           "-D DFC_OPENCL "
           "-I ../src",
-          CHECK_COUNT_PER_THREAD, DF_SIZE_REAL / WORK_GROUP_SIZE);
+          THREAD_GRANULARITY, DF_SIZE_REAL / WORK_GROUP_SIZE);
   cl_int status = clBuildProgram(*program, 1, &device, arguments, NULL, NULL);
 
   if (status != CL_SUCCESS) {

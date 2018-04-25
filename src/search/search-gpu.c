@@ -50,7 +50,7 @@ void setKernelArgs(cl_kernel kernel, DfcOpenClBuffers *mem) {
 }
 
 size_t getGlobalGroupSize(size_t localGroupSize, int inputLength) {
-  const float threadCount = ceil(((float)inputLength) / CHECK_COUNT_PER_THREAD);
+  const float threadCount = ceil(((float)inputLength) / THREAD_GRANULARITY);
 
   const size_t globalGroupSize =
       ceil(threadCount / localGroupSize) * localGroupSize;
