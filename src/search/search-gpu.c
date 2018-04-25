@@ -12,7 +12,8 @@
 #include "search.h"
 #include "timer.h"
 
-extern int exactMatchingUponFiltering(uint8_t *result, int length, DFC_PATTERNS *patterns, MatchFunction);
+extern int exactMatchingUponFiltering(uint8_t *result, int length,
+                                      DFC_PATTERNS *patterns, MatchFunction);
 
 void setKernelArgsNormalDesign(cl_kernel kernel, DfcOpenClBuffers *mem) {
   clSetKernelArg(kernel, 0, sizeof(int), &mem->inputLength);
@@ -76,7 +77,8 @@ void startKernelForQueue(cl_kernel kernel, cl_command_queue queue,
   }
 }
 
-int handleMatches(uint8_t *result, int inputLength, DFC_PATTERNS *patterns, MatchFunction onMatch) {
+int handleMatches(uint8_t *result, int inputLength, DFC_PATTERNS *patterns,
+                  MatchFunction onMatch) {
   VerifyResult *pidCounts = (VerifyResult *)result;
 
   int matches = 0;
@@ -101,7 +103,8 @@ int handleResultsFromGpu(uint8_t *result, int inputLength,
   int matches;
   if (HETEROGENEOUS_DESIGN) {
     startTimer(TIMER_EXECUTE_HETEROGENEOUS);
-    matches = exactMatchingUponFiltering(result, inputLength, patterns, onMatch);
+    matches =
+        exactMatchingUponFiltering(result, inputLength, patterns, onMatch);
     stopTimer(TIMER_EXECUTE_HETEROGENEOUS);
   } else {
     startTimer(TIMER_PROCESS_MATCHES);

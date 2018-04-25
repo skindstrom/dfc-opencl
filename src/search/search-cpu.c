@@ -164,7 +164,8 @@ int searchCpu(MatchFunction onMatch) {
 
 static int verifySmallRet(CompactTableSmallEntry *ct,
                           DFC_FIXED_PATTERN *patterns, uint8_t *input,
-                          int currentPos, int inputLength, MatchFunction onMatch) {
+                          int currentPos, int inputLength,
+                          MatchFunction onMatch) {
   uint8_t hash = input[0];
   int matches = 0;
   for (int i = 0; i < (ct + hash)->pidCount; ++i) {
@@ -176,8 +177,7 @@ static int verifySmallRet(CompactTableSmallEntry *ct,
       --currentPos;
     }
 
-    if (currentPos >= 0 &&
-        inputLength - currentPos >= patternLength &&
+    if (currentPos >= 0 && inputLength - currentPos >= patternLength &&
         doesPatternMatch(input, (patterns + pid)->original_pattern,
                          patternLength,
                          (patterns + pid)->is_case_insensitive)) {
@@ -190,7 +190,8 @@ static int verifySmallRet(CompactTableSmallEntry *ct,
 }
 
 static int verifyLargeRet(CompactTableLarge *ct, DFC_FIXED_PATTERN *patterns,
-                          uint8_t *input, int currentPos, int inputLength, MatchFunction onMatch) {
+                          uint8_t *input, int currentPos, int inputLength,
+                          MatchFunction onMatch) {
   /*
    the last two bytes are used to match,
    hence we are now at least 2 bytes into the pattern
@@ -227,7 +228,8 @@ static int verifyLargeRet(CompactTableLarge *ct, DFC_FIXED_PATTERN *patterns,
   return matches;
 }
 
-int exactMatchingUponFiltering(uint8_t *result, int length, DFC_PATTERNS *patterns, MatchFunction onMatch) {
+int exactMatchingUponFiltering(uint8_t *result, int length,
+                               DFC_PATTERNS *patterns, MatchFunction onMatch) {
   DFC_STRUCTURE *dfc = DFC_HOST_MEMORY.dfcStructure;
   uint8_t *input = (uint8_t *)DFC_HOST_MEMORY.input;
 

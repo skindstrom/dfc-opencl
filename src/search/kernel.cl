@@ -129,7 +129,7 @@ __kernel void search(int inputLength, __global uchar *input,
       verifySmall(ctSmall, patterns, input + i, i, inputLength, result + i);
     }
 
-    if (i >= 2 && (dfLarge[byteIndex] & bitMask) &&
+    if ((dfLarge[byteIndex] & bitMask) && i >= 2 &&
         isInHashDf(dfLargeHash, input + i)) {
       verifyLarge(ctLarge, patterns, input + i, i, inputLength, result + i);
     }
@@ -170,9 +170,8 @@ __kernel void search_with_image(int inputLength, __global uchar *input,
     }
 
     df = (img_read)read_imageui(dfLarge, SHIFT_BY_CHANNEL_SIZE(byteIndex));
-    if (i >= 2 &&
-        (df.scalar[byteIndex % TEXTURE_CHANNEL_BYTE_SIZE] & bitMask) &&
-        isInHashDf(dfLargeHash, input + i)) {
+    if ((df.scalar[byteIndex % TEXTURE_CHANNEL_BYTE_SIZE] & bitMask) &&
+        i >= 2 && isInHashDf(dfLargeHash, input + i)) {
       verifyLarge(ctLarge, patterns, input + i, i, inputLength, result + i);
     }
   }
@@ -225,7 +224,7 @@ __kernel void search_with_local(int inputLength, __global uchar *input,
       verifySmall(ctSmall, patterns, input + i, i, inputLength, result + i);
     }
 
-    if (i >= 2 && (dfLarge[byteIndex] & bitMask) &&
+    if ((dfLarge[byteIndex] & bitMask) && i >= 2 &&
         isInHashDf(dfLargeHash, input + i)) {
       verifyLarge(ctLarge, patterns, input + i, i, inputLength, result + i);
     }
@@ -249,7 +248,7 @@ __kernel void filter(int inputLength, __global uchar *input,
     result[i] = (dfSmall[byteIndex] & bitMask) > 0;
 
     // set the second bit
-    result[i] |= (i >= 2 && (dfLarge[byteIndex] & bitMask) &&
+    result[i] |= ((dfLarge[byteIndex] & bitMask) && i >= 2 &&
                   isInHashDf(dfLargeHash, input + i))
                  << 1;
   }
@@ -276,9 +275,8 @@ __kernel void filter_with_image(int inputLength, __global uchar *input,
 
     df = (img_read)read_imageui(dfLarge, SHIFT_BY_CHANNEL_SIZE(byteIndex));
     result[i] |=
-        (i >= 2 &&
-         (df.scalar[byteIndex % TEXTURE_CHANNEL_BYTE_SIZE] & bitMask) &&
-         isInHashDf(dfLargeHash, input + i))
+        ((df.scalar[byteIndex % TEXTURE_CHANNEL_BYTE_SIZE] & bitMask) &&
+         i >= 2 && isInHashDf(dfLargeHash, input + i))
         << 1;
   }
 }
@@ -315,7 +313,7 @@ __kernel void filter_with_local(int inputLength, __global uchar *input,
     result[i] = (dfSmallLocal[byteIndex] & bitMask) > 0;
 
     // set the second bit
-    result[i] |= (i >= 2 && (dfLargeLocal[byteIndex] & bitMask) &&
+    result[i] |= ((dfLargeLocal[byteIndex] & bitMask) && i >= 2 &&
                   isInHashDfLocal(dfLargeHashLocal, input + i))
                  << 1;
   }
