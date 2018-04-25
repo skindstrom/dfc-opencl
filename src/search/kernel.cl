@@ -38,8 +38,9 @@ bool doesPatternMatch(__global uchar *start, __global uchar *pattern,
 }
 
 void verifySmall(__global CompactTableSmallEntry *ct,
-                   __global DFC_FIXED_PATTERN *patterns, __global uchar *input,
-                   int currentPos, int inputLength, __global VerifyResult *result) {
+                 __global DFC_FIXED_PATTERN *patterns, __global uchar *input,
+                 int currentPos, int inputLength,
+                 __global VerifyResult *result) {
   uchar hash = input[0];
   int matches = 0;
   for (int i = 0; i < (ct + hash)->pidCount; ++i) {
@@ -63,8 +64,9 @@ void verifySmall(__global CompactTableSmallEntry *ct,
 }
 
 void verifyLarge(__global CompactTableLarge *ct,
-                __global DFC_FIXED_PATTERN *patterns, __global uchar *input,
-                int currentPos, int inputLength, __global VerifyResult *result) {
+                 __global DFC_FIXED_PATTERN *patterns, __global uchar *input,
+                 int currentPos, int inputLength,
+                 __global VerifyResult *result) {
   /*
    the last two bytes are used to match,
    hence we are now at least 2 bytes into the pattern
@@ -85,9 +87,9 @@ void verifyLarge(__global CompactTableLarge *ct,
 
         if (startOfRelativeInput >= 0 &&
             inputLength - startOfRelativeInput >= patternLength &&
-           doesPatternMatch(
-              input - (patternLength - 4), (patterns + pid)->original_pattern,
-              patternLength, (patterns + pid)->is_case_insensitive)) {
+            doesPatternMatch(input - (patternLength - 4),
+                             (patterns + pid)->original_pattern, patternLength,
+                             (patterns + pid)->is_case_insensitive)) {
           result->matchesLargeCt[result->matchCountLargeCt] = pid;
           ++result->matchCountLargeCt;
         }
@@ -129,8 +131,7 @@ __kernel void search(int inputLength, __global uchar *input,
     result[i].matchCountLargeCt = 0;
 
     if (dfSmall[byteIndex] & bitMask) {
-      verifySmall(ctSmall, patterns, input + i, i, inputLength,
-                     result + i);
+      verifySmall(ctSmall, patterns, input + i, i, inputLength, result + i);
     }
 
     if (i >= 2 && (dfLarge[byteIndex] & bitMask) &&
@@ -147,11 +148,14 @@ typedef union {
 
 #define SHIFT_BY_CHANNEL_SIZE(x) (x >> 4)
 
-__kernel void search_with_image(
-    int inputLength, __global uchar *input,
-    __global DFC_FIXED_PATTERN *patterns, __read_only image1d_t dfSmall,
-    __read_only image1d_t dfLarge, __global uchar *dfLargeHash,
-    __global uchar *ctSmall, __global uchar *ctLarge, __global VerifyResult *result) {
+__kernel void search_with_image(int inputLength, __global uchar *input,
+                                __global DFC_FIXED_PATTERN *patterns,
+                                __read_only image1d_t dfSmall,
+                                __read_only image1d_t dfLarge,
+                                __global uchar *dfLargeHash,
+                                __global uchar *ctSmall,
+                                __global uchar *ctLarge,
+                                __global VerifyResult *result) {
   uint i = (get_group_id(0) * get_local_size(0) + get_local_id(0)) *
            THREAD_GRANULARITY;
 
@@ -189,11 +193,14 @@ bool isInHashDfLocal(__local uchar *df, __global uchar *input) {
   return df[byteIndex] & bitMask;
 }
 
-__kernel void search_with_local(
-    int inputLength, __global uchar *input,
-    __global DFC_FIXED_PATTERN *patterns, __global uchar *dfSmall,
-    __global uchar *dfLarge, __global uchar *dfLargeHash,
-    __global uchar *ctSmall, __global uchar *ctLarge, __global VerifyResult *result) {
+__kernel void search_with_local(int inputLength, __global uchar *input,
+                                __global DFC_FIXED_PATTERN *patterns,
+                                __global uchar *dfSmall,
+                                __global uchar *dfLarge,
+                                __global uchar *dfLargeHash,
+                                __global uchar *ctSmall,
+                                __global uchar *ctLarge,
+                                __global VerifyResult *result) {
   uint i = (get_group_id(0) * get_local_size(0) + get_local_id(0)) *
            THREAD_GRANULARITY;
 
@@ -220,8 +227,7 @@ __kernel void search_with_local(
     result[i].matchCountLargeCt = 0;
 
     if (dfSmall[byteIndex] & bitMask) {
-      verifySmall(ctSmall, patterns, input + i, i, inputLength,
-                     result + i);
+      verifySmall(ctSmall, patterns, input + i, i, inputLength, result + i);
     }
 
     if (i >= 2 && (dfLarge[byteIndex] & bitMask) &&

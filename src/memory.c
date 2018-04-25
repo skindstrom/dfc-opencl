@@ -693,7 +693,8 @@ void prepareOpenClBuffersForSearch() {
   if (MAP_MEMORY) {
     unmapOpenClInputBuffers();
     DFC_OPENCL_BUFFERS.result = createMappedResultBuffer(
-        DFC_OPENCL_ENVIRONMENT.context, sizeInBytesOfResultVector(DFC_HOST_MEMORY.inputLength));
+        DFC_OPENCL_ENVIRONMENT.context,
+        sizeInBytesOfResultVector(DFC_HOST_MEMORY.inputLength));
   } else {
     DFC_OPENCL_BUFFERS = createOpenClBuffers(
         &DFC_OPENCL_ENVIRONMENT, DFC_HOST_MEMORY.dfcStructure->patterns,

@@ -1,6 +1,8 @@
 #ifndef DFC_SEARCH_H
 #define DFC_SEARCH_H
 
-int search();
+#include "dfc.h"
+
+int search(MatchFunction onMatch);
 
 #endif

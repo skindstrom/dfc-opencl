@@ -5,7 +5,7 @@
 
 #include "dfc.h"
 
-void Print_Result(unsigned char *, uint32_t *, uint32_t);
+void printResult(DFC_FIXED_PATTERN *pattern);
 
 int main(void) {
   DFC_SetupEnvironment();
@@ -19,7 +19,6 @@ int main(void) {
   char *pat3 = "Piolink";
   char *pat4 = "ATTACK";
 
-  // 0. print info
   printf("\n* Text & Patterns Info\n");
   printf(" - (Text) %s\n", buf);
   printf(" - (Pattern) ID: 0, pat: %s, case-sensitive\n", pat1);
@@ -28,10 +27,8 @@ int main(void) {
   printf(" - (Pattern) ID: 3, pat: %s, case-insensitive\n", pat4);
   printf("\n");
 
-  // 1. [DFC] Initiate DFC structure
   DFC_PATTERN_INIT *patternInit = DFC_PATTERN_INIT_New();
 
-  // 2. [DFC] Add patternInit
   DFC_AddPattern(patternInit, (unsigned char *)pat1, strlen(pat1),
                  0 /*case-sensitive pattern*/, 0 /*Pattern ID*/);
   DFC_AddPattern(patternInit, (unsigned char *)pat2, strlen(pat2),
@@ -41,22 +38,26 @@ int main(void) {
   DFC_AddPattern(patternInit, (unsigned char *)pat4, strlen(pat4),
                  1 /*case-insensitive pattern*/, 3 /*Pattern ID*/);
 
-  // 3. [DFC] Build DFC structure
   DFC_STRUCTURE *dfc = DFC_New(patternInit->numPatterns);
   DFC_Compile(dfc, patternInit);
 
-  // 4. [DFC] SearpatternInit->numPatternsch
   printf("* Result:\n");
-  int res = DFC_Search();
+  int res = DFC_Search(printResult);
   printf("\n* Total match count: %d\n", res);
 
-  // 5. [DFC] Free DFC structure
   DFC_FreePatternsInit(patternInit);
-
   DFC_FreeInput();
   DFC_FreeStructure();
 
   DFC_ReleaseEnvironment();
 
   return 0;
+}
+
+void printResult(DFC_FIXED_PATTERN *pattern) {
+  printf("Matched %.*s ", pattern->pattern_length, pattern->original_pattern);
+  for (int i = 0; i < pattern->external_id_count; ++i) {
+    printf(" %d,", pattern->external_ids[i]);
+  }
+  printf("\n");
 }

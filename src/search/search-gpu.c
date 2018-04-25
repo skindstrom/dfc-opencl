@@ -12,7 +12,7 @@
 #include "search.h"
 #include "timer.h"
 
-extern int exactMatchingUponFiltering(uint8_t *result, int length);
+extern int exactMatchingUponFiltering(uint8_t *result, int length, DFC_PATTERNS *patterns, MatchFunction);
 
 void setKernelArgsNormalDesign(cl_kernel kernel, DfcOpenClBuffers *mem) {
   clSetKernelArg(kernel, 0, sizeof(int), &mem->inputLength);
@@ -76,32 +76,44 @@ void startKernelForQueue(cl_kernel kernel, cl_command_queue queue,
   }
 }
 
-int sumMatches(uint8_t *result, int inputLength) {
+int handleMatches(uint8_t *result, int inputLength, DFC_PATTERNS *patterns, MatchFunction onMatch) {
   VerifyResult *pidCounts = (VerifyResult *)result;
 
-  int sum = 0;
+  int matches = 0;
   for (int i = 0; i < inputLength; ++i) {
-    sum += pidCounts[i].matchCountSmallCt + pidCounts[i].matchCountLargeCt;
+    VerifyResult *res = &pidCounts[i];
+
+    for (int j = 0; j < res->matchCountSmallCt; ++j) {
+      onMatch(&patterns->dfcMatchList[res->matchesSmallCt[j]]);
+      ++matches;
+    }
+
+    for (int j = 0; j < res->matchCountLargeCt; ++j) {
+      onMatch(&patterns->dfcMatchList[res->matchesLargeCt[j]]);
+      ++matches;
+    }
   }
-  return sum;
+  return matches;
 }
 
-int handleResultsFromGpu(uint8_t *result, int inputLength) {
+int handleResultsFromGpu(uint8_t *result, int inputLength,
+                         DFC_PATTERNS *patterns, MatchFunction onMatch) {
   int matches;
   if (HETEROGENEOUS_DESIGN) {
     startTimer(TIMER_EXECUTE_HETEROGENEOUS);
-    matches = exactMatchingUponFiltering(result, inputLength);
+    matches = exactMatchingUponFiltering(result, inputLength, patterns, onMatch);
     stopTimer(TIMER_EXECUTE_HETEROGENEOUS);
   } else {
     startTimer(TIMER_PROCESS_MATCHES);
-    matches = sumMatches(result, inputLength);
+    matches = handleMatches(result, inputLength, patterns, onMatch);
     stopTimer(TIMER_PROCESS_MATCHES);
   }
 
   return matches;
 }
 
-int readResultWithoutMap(DfcOpenClBuffers *mem, cl_command_queue queue) {
+int readResultWithoutMap(DfcOpenClBuffers *mem, cl_command_queue queue,
+                         DFC_PATTERNS *patterns, MatchFunction onMatch) {
   uint8_t *output = calloc(1, sizeInBytesOfResultVector(mem->inputLength));
 
   startTimer(TIMER_READ_FROM_DEVICE);
@@ -116,14 +128,16 @@ int readResultWithoutMap(DfcOpenClBuffers *mem, cl_command_queue queue) {
     exit(OPENCL_COULD_NOT_READ_RESULTS);
   }
 
-  int matches = handleResultsFromGpu(output, mem->inputLength);
+  int matches =
+      handleResultsFromGpu(output, mem->inputLength, patterns, onMatch);
 
   free(output);
 
   return matches;
 }
 
-int readResultWithMap(DfcOpenClBuffers *mem, cl_command_queue queue) {
+int readResultWithMap(DfcOpenClBuffers *mem, cl_command_queue queue,
+                      DFC_PATTERNS *patterns, MatchFunction onMatch) {
   cl_int status;
 
   startTimer(TIMER_READ_FROM_DEVICE);
@@ -138,22 +152,24 @@ int readResultWithMap(DfcOpenClBuffers *mem, cl_command_queue queue) {
     exit(OPENCL_COULD_NOT_READ_RESULTS);
   }
 
-  int matches = handleResultsFromGpu(output, mem->inputLength);
+  int matches =
+      handleResultsFromGpu(output, mem->inputLength, patterns, onMatch);
 
   status = clEnqueueUnmapMemObject(queue, mem->result, output, 0, NULL, NULL);
 
   return matches;
 }
 
-int readResult(DfcOpenClBuffers *mem, cl_command_queue queue) {
+int readResult(DfcOpenClBuffers *mem, cl_command_queue queue,
+               DFC_PATTERNS *patterns, MatchFunction onMatch) {
   if (MAP_MEMORY) {
-    return readResultWithMap(mem, queue);
+    return readResultWithMap(mem, queue, patterns, onMatch);
   } else {
-    return readResultWithoutMap(mem, queue);
+    return readResultWithoutMap(mem, queue, patterns, onMatch);
   }
 }
 
-int searchGpu() {
+int searchGpu(MatchFunction onMatch) {
   prepareOpenClBuffersForSearch();
 
   setKernelArgs(DFC_OPENCL_ENVIRONMENT.kernel, &DFC_OPENCL_BUFFERS);
@@ -161,7 +177,9 @@ int searchGpu() {
                       DFC_OPENCL_ENVIRONMENT.queue,
                       DFC_HOST_MEMORY.inputLength);
 
-  int matches = readResult(&DFC_OPENCL_BUFFERS, DFC_OPENCL_ENVIRONMENT.queue);
+  // TODO: might be invalid to access patterns here if unmapped
+  int matches = readResult(&DFC_OPENCL_BUFFERS, DFC_OPENCL_ENVIRONMENT.queue,
+                           DFC_HOST_MEMORY.dfcStructure->patterns, onMatch);
 
   freeOpenClBuffers();
 
