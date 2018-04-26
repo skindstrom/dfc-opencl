@@ -124,7 +124,7 @@ int searchCpu(MatchFunction onMatch) {
 
   VerifyResult *result = malloc(sizeInBytesOfResultVector(inputLength));
 
-  for (int i = 0; i < inputLength; ++i) {
+  for (int i = 0; i < inputLength - 1; ++i) {
     int16_t data = input[i + 1] << 8 | input[i];
     int16_t byteIndex = BINDEX(data & DF_MASK);
     int16_t bitMask = BMASK(data & DF_MASK);
@@ -158,6 +158,8 @@ int searchCpu(MatchFunction onMatch) {
       ++matches;
     }
   }
+
+  free(result);
 
   return matches;
 }

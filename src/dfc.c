@@ -69,15 +69,9 @@ DFC_PATTERN_INIT *DFC_PATTERN_INIT_New(void) {
 }
 
 static void DFC_FreePattern(DFC_PATTERN *p) {
-  if (p->patrn != NULL) {
-    free(p->patrn);
-  }
-
-  if (p->casepatrn != NULL) {
-    free(p->casepatrn);
-  }
-
-  return;
+  free(p->patrn);
+  free(p->casepatrn);
+  free(p->sids);
 }
 
 void DFC_FreePatternsInit(DFC_PATTERN_INIT *patterns) {
@@ -92,6 +86,7 @@ void DFC_FreePatternsInit(DFC_PATTERN_INIT *patterns) {
   }
 
   free(patterns->init_hash);
+  free(patterns);
 }
 
 void DFC_FreeStructure() { freeDfcStructure(); }
