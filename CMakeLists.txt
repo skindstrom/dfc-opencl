@@ -4,10 +4,6 @@ project(OpenCL-DFC)
 set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -Wall -Wpedantic -Wextra -Werror")
 set(CMAKE_CXX_STANDARD 11)
 
-set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
-set (CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
-set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_STATIC_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
-
 set(EXT_PROJECTS_DIR external)
 
 set(OpenCL_VERSION 120)
@@ -24,7 +20,7 @@ add_definitions(-DCL_USE_DEPRECATED_OPENCL_1_2_APIS)
 # Feature flags
 # These SEARCH_WITH_GPU and HETEROGENEOUS_DESIGN are mutually exclusive
 set(DFC_SEARCH_WITH_GPU 0)
-set(DFC_HETEROGENEOUS_DESIGN 0)
+set(DFC_HETEROGENEOUS_DESIGN 1)
 
 set(DFC_MAP_MEMORY 0)
 set(DFC_USE_TEXTURE_MEMORY 0)

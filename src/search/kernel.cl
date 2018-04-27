@@ -38,6 +38,7 @@ void verifySmall(__global CompactTableSmallEntry *ct,
                  __global VerifyResult *result) {
   uchar hash = input[0];
   int matches = 0;
+
   for (int i = 0; i < (ct + hash)->pidCount; ++i) {
     PID_TYPE pid = (ct + hash)->pids[i];
 
@@ -47,13 +48,13 @@ void verifySmall(__global CompactTableSmallEntry *ct,
       --currentPos;
     }
 
-    if ((ct + hash)->pidCount > i && currentPos >= 0 &&
+    if (currentPos >= 0 &&
         inputLength - currentPos >= patternLength &&
         doesPatternMatch(input, (patterns + pid)->original_pattern,
                          patternLength,
                          (patterns + pid)->is_case_insensitive)) {
       result->matchesSmallCt[result->matchCountSmallCt] = pid;
-      ++result->matchCountSmallCt;
+      result->matchCountSmallCt += 1;
     }
   }
 }
@@ -86,7 +87,7 @@ void verifyLarge(__global CompactTableLarge *ct,
                              (patterns + pid)->original_pattern, patternLength,
                              (patterns + pid)->is_case_insensitive)) {
           result->matchesLargeCt[result->matchCountLargeCt] = pid;
-          ++result->matchCountLargeCt;
+          result->matchCountLargeCt += 1;
         }
       }
 
@@ -117,7 +118,7 @@ __kernel void search(int inputLength, __global uchar *input,
   uint i = (get_group_id(0) * get_local_size(0) + get_local_id(0)) *
            THREAD_GRANULARITY;
 
-  for (int j = 0; j < THREAD_GRANULARITY && i < inputLength; ++j, ++i) {
+  for (int j = 0; j < THREAD_GRANULARITY && i < inputLength - 1; ++j, ++i) {
     short data = *(input + i + 1) << 8 | *(input + i);
     short byteIndex = BINDEX(data & DF_MASK);
     short bitMask = BMASK(data & DF_MASK);
@@ -154,7 +155,7 @@ __kernel void search_with_image(int inputLength, __global uchar *input,
   uint i = (get_group_id(0) * get_local_size(0) + get_local_id(0)) *
            THREAD_GRANULARITY;
 
-  for (int j = 0; j < THREAD_GRANULARITY && i < inputLength; ++j, ++i) {
+  for (int j = 0; j < THREAD_GRANULARITY && i < inputLength - 1; ++j, ++i) {
     short data = *(input + i + 1) << 8 | *(input + i);
     short byteIndex = BINDEX(data & DF_MASK);
     short bitMask = BMASK(data & DF_MASK);
@@ -211,7 +212,7 @@ __kernel void search_with_local(int inputLength, __global uchar *input,
 
   barrier(CLK_LOCAL_MEM_FENCE);
 
-  for (int j = 0; j < THREAD_GRANULARITY && i < inputLength; ++j, ++i) {
+  for (int j = 0; j < THREAD_GRANULARITY && i < inputLength - 1; ++j, ++i) {
     uchar matches = 0;
     short data = *(input + i + 1) << 8 | *(input + i);
     short byteIndex = BINDEX(data & DF_MASK);
@@ -237,7 +238,7 @@ __kernel void filter(int inputLength, __global uchar *input,
   uint i = (get_group_id(0) * get_local_size(0) + get_local_id(0)) *
            THREAD_GRANULARITY;
 
-  for (int j = 0; j < THREAD_GRANULARITY && i < inputLength; ++j, ++i) {
+  for (int j = 0; j < THREAD_GRANULARITY && i < inputLength - 1; ++j, ++i) {
     short data = *(input + i + 1) << 8 | *(input + i);
     short byteIndex = BINDEX(data & DF_MASK);
     short bitMask = BMASK(data & DF_MASK);
@@ -262,7 +263,7 @@ __kernel void filter_with_image(int inputLength, __global uchar *input,
   uint i = (get_group_id(0) * get_local_size(0) + get_local_id(0)) *
            THREAD_GRANULARITY;
 
-  for (int j = 0; j < THREAD_GRANULARITY && i < inputLength; ++j, ++i) {
+  for (int j = 0; j < THREAD_GRANULARITY && i < inputLength - 1; ++j, ++i) {
     uchar matches = 0;
     short data = *(input + i + 1) << 8 | *(input + i);
     short byteIndex = BINDEX(data & DF_MASK);
@@ -302,7 +303,7 @@ __kernel void filter_with_local(int inputLength, __global uchar *input,
 
   barrier(CLK_LOCAL_MEM_FENCE);
 
-  for (int j = 0; j < THREAD_GRANULARITY && i < inputLength; ++j, ++i) {
+  for (int j = 0; j < THREAD_GRANULARITY && i < inputLength - 1; ++j, ++i) {
     short data = *(input + i + 1) << 8 | *(input + i);
     short byteIndex = BINDEX(data & DF_MASK);
     short bitMask = BMASK(data & DF_MASK);

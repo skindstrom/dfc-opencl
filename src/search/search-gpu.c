@@ -82,7 +82,7 @@ int handleMatches(uint8_t *result, int inputLength, DFC_PATTERNS *patterns,
   VerifyResult *pidCounts = (VerifyResult *)result;
 
   int matches = 0;
-  for (int i = 0; i < inputLength; ++i) {
+  for (int i = 0; i < inputLength - 1; ++i) {
     VerifyResult *res = &pidCounts[i];
 
     for (int j = 0; j < res->matchCountSmallCt; ++j) {

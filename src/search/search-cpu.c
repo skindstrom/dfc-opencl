@@ -42,7 +42,7 @@ static void verifySmall(CompactTableSmallEntry *ct, DFC_FIXED_PATTERN *patterns,
                         uint8_t *input, int currentPos, int inputLength,
                         VerifyResult *result) {
   uint8_t hash = input[0];
-  for (int i = 0; i < MAX_PID_PER_ENTRY; ++i) {
+  for (int i = 0; i < (ct + hash)->pidCount; ++i) {
     PID_TYPE pid = (ct + hash)->pids[i];
 
     int patternLength = (patterns + pid)->pattern_length;
@@ -51,7 +51,7 @@ static void verifySmall(CompactTableSmallEntry *ct, DFC_FIXED_PATTERN *patterns,
       --currentPos;
     }
 
-    if ((ct + hash)->pidCount > i && currentPos >= 0 &&
+    if (currentPos >= 0 &&
         inputLength - currentPos >= patternLength &&
         doesPatternMatch(input, (patterns + pid)->original_pattern,
                          patternLength,
@@ -145,7 +145,7 @@ int searchCpu(MatchFunction onMatch) {
   }
 
   int matches = 0;
-  for (int i = 0; i < inputLength; ++i) {
+  for (int i = 0; i < inputLength - 1; ++i) {
     VerifyResult *res = &result[i];
 
     for (int j = 0; j < res->matchCountSmallCt; ++j) {
@@ -237,7 +237,7 @@ int exactMatchingUponFiltering(uint8_t *result, int length,
 
   int matches = 0;
 
-  for (int i = 0; i < length; ++i) {
+  for (int i = 0; i < length - 1; ++i) {
     if (result[i] & 0x01) {
       matches += verifySmallRet(dfc->compactTableSmall, patterns->dfcMatchList,
                                 input + i, i, length, onMatch);

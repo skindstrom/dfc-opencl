@@ -22,8 +22,8 @@
 #define SMALL_DF_MIN_PATTERN_SIZE 1
 #define SMALL_DF_MAX_PATTERN_SIZE 3
 
-#define MAX_PID_PER_ENTRY 20
-#define MAX_ENTRIES_PER_BUCKET 20
+#define MAX_PID_PER_ENTRY 8
+#define MAX_ENTRIES_PER_BUCKET 32
 #define COMPACT_TABLE_SIZE_SMALL 0x100
 #define COMPACT_TABLE_SIZE_LARGE 0x1000
 
@@ -68,11 +68,11 @@ typedef struct _dfc_fixed_pattern {
 } DFC_FIXED_PATTERN;
 
 typedef struct VerifyResult_ {
-  uint8_t matchCountSmallCt;
   PID_TYPE matchesSmallCt[MAX_PID_PER_ENTRY];
-
-  uint8_t matchCountLargeCt;
   PID_TYPE matchesLargeCt[MAX_PID_PER_ENTRY];
+
+  int32_t matchCountSmallCt;
+  int32_t matchCountLargeCt;
 } VerifyResult;
 
 #endif

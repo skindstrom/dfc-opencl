@@ -9,10 +9,10 @@ DfcOpenClEnvironment DFC_OPENCL_ENVIRONMENT;
 
 int sizeInBytesOfResultVector(int inputLength) {
   if (HETEROGENEOUS_DESIGN) {
-    return inputLength;
+    return inputLength - 1;
   }
 
-  return inputLength * sizeof(VerifyResult);
+  return (inputLength - 1) * sizeof(VerifyResult);
 }
 
 cl_platform_id getPlatform() {
