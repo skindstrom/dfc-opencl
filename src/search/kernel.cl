@@ -127,12 +127,12 @@ __kernel void search(int inputLength, __global uchar *input,
     result[i].matchCountLargeCt = 0;
 
     if (dfSmall[byteIndex] & bitMask) {
-      verifySmall(ctSmall, patterns, input + i, i, inputLength, result + i);
+      verifySmall(ctSmall, patterns, input + i, i, inputLength, &result[i]);
     }
 
     if ((dfLarge[byteIndex] & bitMask) && i >= 2 &&
         isInHashDf(dfLargeHash, input + i)) {
-      verifyLarge(ctLarge, patterns, input + i, i, inputLength, result + i);
+      verifyLarge(ctLarge, patterns, input + i, i, inputLength, &result[i]);
     }
   }
 }
