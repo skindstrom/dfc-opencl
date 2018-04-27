@@ -51,8 +51,7 @@ static void verifySmall(CompactTableSmallEntry *ct, DFC_FIXED_PATTERN *patterns,
       --currentPos;
     }
 
-    if (currentPos >= 0 &&
-        inputLength - currentPos >= patternLength &&
+    if (currentPos >= 0 && inputLength - currentPos >= patternLength &&
         doesPatternMatch(input, (patterns + pid)->original_pattern,
                          patternLength,
                          (patterns + pid)->is_case_insensitive)) {

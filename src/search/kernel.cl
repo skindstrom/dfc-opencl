@@ -48,13 +48,12 @@ void verifySmall(__global CompactTableSmallEntry *ct,
       --currentPos;
     }
 
-    if (currentPos >= 0 &&
-        inputLength - currentPos >= patternLength &&
+    if (currentPos >= 0 && inputLength - currentPos >= patternLength &&
         doesPatternMatch(input, (patterns + pid)->original_pattern,
                          patternLength,
                          (patterns + pid)->is_case_insensitive)) {
       result->matchesSmallCt[result->matchCountSmallCt] = pid;
-      result->matchCountSmallCt += 1;
+      ++result->matchCountSmallCt;
     }
   }
 }
@@ -87,7 +86,7 @@ void verifyLarge(__global CompactTableLarge *ct,
                              (patterns + pid)->original_pattern, patternLength,
                              (patterns + pid)->is_case_insensitive)) {
           result->matchesLargeCt[result->matchCountLargeCt] = pid;
-          result->matchCountLargeCt += 1;
+          ++result->matchCountLargeCt;
         }
       }
 
@@ -127,12 +126,12 @@ __kernel void search(int inputLength, __global uchar *input,
     result[i].matchCountLargeCt = 0;
 
     if (dfSmall[byteIndex] & bitMask) {
-      verifySmall(ctSmall, patterns, input + i, i, inputLength, &result[i]);
+      verifySmall(ctSmall, patterns, input + i, i, inputLength, result + i);
     }
 
     if ((dfLarge[byteIndex] & bitMask) && i >= 2 &&
         isInHashDf(dfLargeHash, input + i)) {
-      verifyLarge(ctLarge, patterns, input + i, i, inputLength, &result[i]);
+      verifyLarge(ctLarge, patterns, input + i, i, inputLength, result + i);
     }
   }
 }
