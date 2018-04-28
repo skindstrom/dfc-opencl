@@ -2,7 +2,7 @@
 
 #include <sys/time.h>
 
-#define MAX_TIMERS 10
+#define MAX_TIMERS 20
 
 static struct timeval start[MAX_TIMERS];
 static struct timeval stop[MAX_TIMERS];
