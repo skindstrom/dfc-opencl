@@ -69,7 +69,6 @@ TEST_CASE("DFC") {
 
     DFC_FreePatternsInit(patternInit);
     DFC_FreeStructure();
-    
 
     REQUIRE(matchCount == 1);
     REQUIRE(matches.size() == 1);
@@ -90,7 +89,6 @@ TEST_CASE("DFC") {
 
     DFC_FreePatternsInit(patternInit);
     DFC_FreeStructure();
-    
 
     REQUIRE(matchCount == 0);
   }
@@ -109,7 +107,6 @@ TEST_CASE("DFC") {
 
     DFC_FreePatternsInit(patternInit);
     DFC_FreeStructure();
-    
 
     REQUIRE(matchCount == 2);
   }
@@ -127,7 +124,6 @@ TEST_CASE("DFC") {
 
     DFC_FreePatternsInit(patternInit);
     DFC_FreeStructure();
-    
 
     REQUIRE(matchCount == 0);
   }
@@ -146,7 +142,6 @@ TEST_CASE("DFC") {
 
     DFC_FreePatternsInit(patternInit);
     DFC_FreeStructure();
-    
 
     REQUIRE(matchCount == 1);
   }
@@ -164,7 +159,6 @@ TEST_CASE("DFC") {
 
     DFC_FreePatternsInit(patternInit);
     DFC_FreeStructure();
-    
 
     REQUIRE(matchCount == 0);
   }
@@ -182,7 +176,6 @@ TEST_CASE("DFC") {
 
     DFC_FreePatternsInit(patternInit);
     DFC_FreeStructure();
-    
 
     REQUIRE(matchCount == 1);
   }
@@ -201,7 +194,6 @@ TEST_CASE("DFC") {
 
     DFC_FreePatternsInit(patternInit);
     DFC_FreeStructure();
-    
 
     REQUIRE(matchCount == 1);
   }
@@ -220,7 +212,6 @@ TEST_CASE("DFC") {
 
     DFC_FreePatternsInit(patternInit);
     DFC_FreeStructure();
-    
 
     REQUIRE(matchCount == 2);
   }
@@ -239,14 +230,13 @@ TEST_CASE("DFC") {
 
     DFC_FreePatternsInit(patternInit);
     DFC_FreeStructure();
-    
 
     REQUIRE(matchCount == 2);
   }
 
   SECTION("2B pattern works") {
     PID_TYPE pid = 0;
-    
+
     input = "Attack";
 
     DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
@@ -259,7 +249,6 @@ TEST_CASE("DFC") {
 
     DFC_FreePatternsInit(patternInit);
     DFC_FreeStructure();
-    
 
     REQUIRE(matchCount == 2);
   }
@@ -278,7 +267,6 @@ TEST_CASE("DFC") {
 
     DFC_FreePatternsInit(patternInit);
     DFC_FreeStructure();
-    
 
     REQUIRE(matchCount == 2);
   }
@@ -296,7 +284,6 @@ TEST_CASE("DFC") {
 
     DFC_FreePatternsInit(patternInit);
     DFC_FreeStructure();
-    
 
     REQUIRE(matchCount == 2);
   }
@@ -315,7 +302,6 @@ TEST_CASE("DFC") {
 
     DFC_FreePatternsInit(patternInit);
     DFC_FreeStructure();
-    
 
     REQUIRE(matchCount == 2);
   }
@@ -334,7 +320,6 @@ TEST_CASE("DFC") {
 
     DFC_FreePatternsInit(patternInit);
     DFC_FreeStructure();
-    
 
     REQUIRE(matchCount == 2);
   }
@@ -353,7 +338,6 @@ TEST_CASE("DFC") {
 
     DFC_FreePatternsInit(patternInit);
     DFC_FreeStructure();
-    
 
     REQUIRE(matchCount == 2);
   }
@@ -372,7 +356,6 @@ TEST_CASE("DFC") {
 
     DFC_FreePatternsInit(patternInit);
     DFC_FreeStructure();
-    
 
     REQUIRE(matchCount == 2);
   }
@@ -391,7 +374,6 @@ TEST_CASE("DFC") {
 
     DFC_FreePatternsInit(patternInit);
     DFC_FreeStructure();
-    
 
     REQUIRE(matchCount == 2);
   }
@@ -410,7 +392,6 @@ TEST_CASE("DFC") {
 
     DFC_Compile(patternInit);
 
-    
     // 4 random passwords
     input = "blue twf skar23 hunter2 1spyder";
 
@@ -418,7 +399,6 @@ TEST_CASE("DFC") {
 
     DFC_FreePatternsInit(patternInit);
     DFC_FreeStructure();
-    
 
     /*
      * I didn't actually calculate,
@@ -447,7 +427,6 @@ TEST_CASE("DFC") {
 
     DFC_FreePatternsInit(patternInit);
     DFC_FreeStructure();
-    
 
     REQUIRE(matchCount == 0);
   }
@@ -466,7 +445,6 @@ TEST_CASE("DFC") {
 
     DFC_FreePatternsInit(patternInit);
     DFC_FreeStructure();
-    
 
     REQUIRE(matchCount == 0);
   }
@@ -484,7 +462,6 @@ TEST_CASE("DFC") {
 
     DFC_FreePatternsInit(patternInit);
     DFC_FreeStructure();
-    
 
     REQUIRE(matchCount == 1);
   }
@@ -503,7 +480,6 @@ TEST_CASE("DFC") {
 
     DFC_FreePatternsInit(patternInit);
     DFC_FreeStructure();
-    
 
     REQUIRE(matchCount == 2);
   }
@@ -522,7 +498,6 @@ TEST_CASE("DFC") {
 
     DFC_FreePatternsInit(patternInit);
     DFC_FreeStructure();
-    
 
     REQUIRE(matches.size() == 2);
 
@@ -547,7 +522,6 @@ TEST_CASE("DFC") {
 
     DFC_FreePatternsInit(patternInit);
     DFC_FreeStructure();
-    
 
     REQUIRE(matches.size() == 1);
     REQUIRE(matches[0].pattern == "attack");

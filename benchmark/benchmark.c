@@ -19,7 +19,6 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-
   data_file = fopen(argv[2], "rb");
   if (data_file == NULL) {
     fprintf(stderr, "Data file not found\n");
@@ -45,7 +44,8 @@ int main(int argc, char **argv) {
 
 int readDataFile(int to_read_count, char *buffer) {
   startTimer(TIMER_READ_DATA);
-  int actually_read_count = fread(buffer, sizeof(char), to_read_count, data_file);
+  int actually_read_count =
+      fread(buffer, sizeof(char), to_read_count, data_file);
   stopTimer(TIMER_READ_DATA);
 
   return actually_read_count;
@@ -104,9 +104,11 @@ void printTimers() {
   printf("OpenCL read from device: %f\n", readTimerMs(TIMER_READ_FROM_DEVICE));
   printf("\n");
 
-  printf("OpenCL executing kernel: %f\n",readTimerMs(TIMER_EXECUTE_KERNEL));
-  printf("CPU process matches (GPU version): %f\n", readTimerMs(TIMER_PROCESS_MATCHES));
-  printf("CPU process matches (Heterogeneous version): %f\n", readTimerMs(TIMER_EXECUTE_HETEROGENEOUS));
+  printf("OpenCL executing kernel: %f\n", readTimerMs(TIMER_EXECUTE_KERNEL));
+  printf("CPU process matches (GPU version): %f\n",
+         readTimerMs(TIMER_PROCESS_MATCHES));
+  printf("CPU process matches (Heterogeneous version): %f\n",
+         readTimerMs(TIMER_EXECUTE_HETEROGENEOUS));
   printf("\n");
 
   printf("Total search time: %f\n", readTimerMs(TIMER_SEARCH));

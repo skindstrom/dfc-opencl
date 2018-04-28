@@ -256,8 +256,7 @@ int searchCpu(ReadFunction read, MatchFunction onMatch) {
                                   readCount, onMatch);
       }
 
-      if (i < readCount - 3 &&
-          (dfc->directFilterLarge[byteIndex] & bitMask) &&
+      if (i < readCount - 3 && (dfc->directFilterLarge[byteIndex] & bitMask) &&
           isInHashDf(dfc->directFilterLargeHash, input + i)) {
         matches += verifyLargeRet(dfc->ctLargeBuckets, dfc->ctLargeEntries,
                                   dfc->ctLargePids, patterns->dfcMatchList,

@@ -6,9 +6,10 @@
 
 #include "dfc.h"
 
-#define INPUT ("This input includes an attack pattern. It might CRASH your machine.")
+#define INPUT \
+  ("This input includes an attack pattern. It might CRASH your machine.")
 
-int readInput(int maxRead, char* input);
+int readInput(int maxRead, char *input);
 void printResult(DFC_FIXED_PATTERN *pattern);
 
 int main(void) {
@@ -52,15 +53,14 @@ int main(void) {
   return 0;
 }
 
-
 bool didRead = 0;
-int readInput(int maxLength, char* input) {
+int readInput(int maxLength, char *input) {
   if (didRead) {
     return 0;
   }
 
   assert(maxLength >= (int)strlen(INPUT));
-  (void)(maxLength); // to make release build happy
+  (void)(maxLength);  // to make release build happy
   strcpy(input, INPUT);
   didRead = true;
 

@@ -62,7 +62,7 @@ void setupExecutionEnvironment();
 void releaseExecutionEnvironment();
 
 void allocateDfcStructure(DfcMemoryRequirements requirements);
-char* allocateInput(int size);
+char *allocateInput(int size);
 
 void freeDfcStructure();
 void freeDfcInput();
@@ -73,6 +73,6 @@ void freeOpenClBuffers();
 int sizeInBytesOfResultVector(int inputLength);
 
 char *getOwnershipOfInputBuffer();
-void writeInputBufferToDevice(char* buffer, int count);
+void writeInputBufferToDevice(char *buffer, int count);
 
 #endif

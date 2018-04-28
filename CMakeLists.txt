@@ -23,8 +23,12 @@ set(DFC_SEARCH_WITH_GPU 1)
 set(DFC_HETEROGENEOUS_DESIGN 0)
 
 set(DFC_MAP_MEMORY 0)
+
+set(DFC_VECTORIZE_KERNEL 1)
+
 set(DFC_USE_TEXTURE_MEMORY 0)
 set(DFC_USE_LOCAL_MEMORY 0)
+
 
 # Continous values
 set(DFC_WORK_GROUP_SIZE 128)
@@ -33,7 +37,6 @@ set(DFC_WORK_GROUP_SIZE 128)
 set(DFC_THREAD_GRANULARITY 16)
 
 set(DFC_INPUT_READ_CHUNK_BYTES 50000000)
-
 set(DFC_BLOCKING_DEVICE_ACCESS 1)
 
 #########################################
@@ -92,6 +95,10 @@ if(${DFC_USE_LOCAL_MEMORY})
   message("DFC: Using local memory for direct filters")
 endif()
 
+if(${DFC_VECTORIZE_KERNEL})
+  message("DFC: Vectorizing kernel!")
+endif()
+
 message("DFC: Using work groups of size ${DFC_WORK_GROUP_SIZE}")
 
 if(${DFC_SEARCH_WITH_GPU} OR ${DFC_HETEROGENEOUS_DESIGN})
@@ -113,6 +120,7 @@ target_compile_definitions(dfc PRIVATE
     USE_LOCAL_MEMORY=${DFC_USE_LOCAL_MEMORY}
     INPUT_READ_CHUNK_BYTES=${DFC_INPUT_READ_CHUNK_BYTES}
     BLOCKING_DEVICE_ACCESS=${DFC_BLOCKING_DEVICE_ACCESS}
+    VECTORIZE_KERNEL=${DFC_VECTORIZE_KERNEL}
     )
 
 add_subdirectory(${EXT_PROJECTS_DIR}/catch)

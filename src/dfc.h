@@ -61,7 +61,7 @@ void DFC_AddPattern(DFC_PATTERN_INIT *dfc, unsigned char *pat, int n,
 DFC_STRUCTURE *DFC_Compile(DFC_PATTERN_INIT *patterns);
 
 typedef void (*MatchFunction)(DFC_FIXED_PATTERN *pattern);
-typedef int (*ReadFunction)(int maxCount, char* inputBuffer);
+typedef int (*ReadFunction)(int maxCount, char *inputBuffer);
 
 int DFC_Search(ReadFunction read, MatchFunction onMatch);
 void DFC_PrintInfo(DFC_STRUCTURE *dfc);

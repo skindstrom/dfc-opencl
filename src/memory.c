@@ -120,6 +120,8 @@ void setKernelName(char *name) {
     strcpy(name, "filter_with_local");
   } else if (HETEROGENEOUS_DESIGN) {
     strcpy(name, "filter");
+  } else if (VECTORIZE_KERNEL) {
+    strcpy(name, "search_vec");
   } else if (USE_TEXTURE_MEMORY) {
     strcpy(name, "search_with_image");
   } else if (USE_LOCAL_MEMORY) {
@@ -484,9 +486,7 @@ void freeDfcPatternsOnHost() {
   free(DFC_HOST_MEMORY.dfcStructure->patterns);
 }
 
-void freeDfcInputOnHost() {
-  free(DFC_HOST_MEMORY.input);
-}
+void freeDfcInputOnHost() { free(DFC_HOST_MEMORY.input); }
 
 bool shouldUseMappedMemory() { return MAP_MEMORY && shouldUseOpenCl(); }
 
@@ -695,8 +695,8 @@ void writeOpenClBuffer(cl_command_queue queue, void *host, cl_mem buffer,
                        size_t size) {
   startTimer(TIMER_WRITE_TO_DEVICE);
 
-  cl_int errcode = clEnqueueWriteBuffer(queue, buffer, BLOCKING_DEVICE_ACCESS, 0, size,
-                                        host, 0, NULL, NULL);
+  cl_int errcode = clEnqueueWriteBuffer(queue, buffer, BLOCKING_DEVICE_ACCESS,
+                                        0, size, host, 0, NULL, NULL);
 
   stopTimer(TIMER_WRITE_TO_DEVICE);
 
@@ -716,8 +716,8 @@ void writeOpenClTextureBuffer(cl_command_queue queue, void *host, cl_mem buffer,
   startTimer(TIMER_WRITE_TO_DEVICE);
 
   cl_int errcode =
-      clEnqueueWriteImage(queue, buffer, BLOCKING_DEVICE_ACCESS, offset, imageSize, pitch,
-                          pitch, host, 0, NULL, NULL);
+      clEnqueueWriteImage(queue, buffer, BLOCKING_DEVICE_ACCESS, offset,
+                          imageSize, pitch, pitch, host, 0, NULL, NULL);
 
   stopTimer(TIMER_WRITE_TO_DEVICE);
 
@@ -788,9 +788,9 @@ cl_mem createMappedBuffer(cl_context context, int inputLength) {
 void prepareOpenClBuffersForSearch() {
   if (MAP_MEMORY) {
     unmapOpenClInputBuffers();
-    DFC_OPENCL_BUFFERS.result = createMappedBuffer(
-        DFC_OPENCL_ENVIRONMENT.context,
-        sizeInBytesOfResultVector(INPUT_READ_CHUNK_BYTES));
+    DFC_OPENCL_BUFFERS.result =
+        createMappedBuffer(DFC_OPENCL_ENVIRONMENT.context,
+                           sizeInBytesOfResultVector(INPUT_READ_CHUNK_BYTES));
   } else {
     DFC_OPENCL_BUFFERS = createOpenClBuffers(
         &DFC_OPENCL_ENVIRONMENT, DFC_HOST_MEMORY.dfcStructure->patterns,
