@@ -24,16 +24,16 @@ TEST_CASE("Parser") {
   DFC_PATTERN_INIT *init_struct = DFC_PATTERN_INIT_New();
 
   SECTION("Single text pattern") {
-    parse_file("../benchmark/test-files/single-text.txt", init_struct,
-               test_add_pattern);
+    parse_pattern_file("../benchmark/test-files/single-text.txt", init_struct,
+                       test_add_pattern);
 
     REQUIRE(patterns.size() == 1);
     REQUIRE(patterns[0].text == "test-pattern");
   }
 
   SECTION("Multiple text patterns") {
-    parse_file("../benchmark/test-files/multiple-text.txt", init_struct,
-               test_add_pattern);
+    parse_pattern_file("../benchmark/test-files/multiple-text.txt", init_struct,
+                       test_add_pattern);
 
     REQUIRE(patterns.size() == 3);
     REQUIRE(patterns[0].text == "test-pattern");
@@ -42,16 +42,16 @@ TEST_CASE("Parser") {
   }
 
   SECTION("Patterns id increments") {
-    parse_file("../benchmark/test-files/multiple-text.txt", init_struct,
-               test_add_pattern);
+    parse_pattern_file("../benchmark/test-files/multiple-text.txt", init_struct,
+                       test_add_pattern);
 
     REQUIRE(patterns[0].pattern_id == 0);
     REQUIRE(patterns[1].pattern_id == 1);
   }
 
   SECTION("Single hex pattern") {
-    parse_file("../benchmark/test-files/single-hex.txt", init_struct,
-               test_add_pattern);
+    parse_pattern_file("../benchmark/test-files/single-hex.txt", init_struct,
+                       test_add_pattern);
 
     REQUIRE(patterns.size() == 1);
     REQUIRE(isEqualHex(patterns[0].text[0], 0x40));
@@ -60,8 +60,8 @@ TEST_CASE("Parser") {
   }
 
   SECTION("Multiple hex patterns") {
-    parse_file("../benchmark/test-files/multiple-hex.txt", init_struct,
-               test_add_pattern);
+    parse_pattern_file("../benchmark/test-files/multiple-hex.txt", init_struct,
+                       test_add_pattern);
 
     REQUIRE(patterns.size() == 3);
 
@@ -77,8 +77,8 @@ TEST_CASE("Parser") {
   }
 
   SECTION("Mixed") {
-    parse_file("../benchmark/test-files/multiple-mixed.txt", init_struct,
-               test_add_pattern);
+    parse_pattern_file("../benchmark/test-files/multiple-mixed.txt",
+                       init_struct, test_add_pattern);
 
     REQUIRE(patterns.size() == 5);
 
@@ -95,8 +95,8 @@ TEST_CASE("Parser") {
   }
 
   SECTION("Inline hex") {
-    parse_file("../benchmark/test-files/inline-hex.txt", init_struct,
-               test_add_pattern);
+    parse_pattern_file("../benchmark/test-files/inline-hex.txt", init_struct,
+                       test_add_pattern);
 
     REQUIRE(patterns.size() == 1);
 

@@ -10,8 +10,12 @@ extern "C" {
 typedef void (*AddPattern)(DFC_PATTERN_INIT *, unsigned char *, int, int,
                            PID_TYPE);
 
-void parse_file(const char *file_name, DFC_PATTERN_INIT *pattern_init,
-                AddPattern add_pattern);
+typedef char *(*InputMalloc)(int);
+
+void parse_pattern_file(const char *file_name, DFC_PATTERN_INIT *pattern_init,
+                        AddPattern add_pattern);
+
+char *read_data_file(const char *file_name, InputMalloc allocator);
 
 #ifdef __cplusplus
 }

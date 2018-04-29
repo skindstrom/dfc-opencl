@@ -13,8 +13,28 @@ int parse_binary(char *token, unsigned char *buf, int size);
 char parse_hex(char *token);
 char char_to_binary(char x);
 
-void parse_file(const char *file_name, DFC_PATTERN_INIT *pattern_init,
-                AddPattern add_pattern) {
+char *read_data_file(const char *file_name, InputMalloc allocator) {
+  FILE *input_file = fopen(file_name, "rb");
+
+  if (input_file == NULL) {
+    fprintf(stderr, "Data file not found\n");
+    exit(1);
+  }
+
+  fseek(input_file, 0, SEEK_END);
+  int input_file_size = ftell(input_file);
+  rewind(input_file);
+
+  char *file_contents = allocator(input_file_size);
+  fread(file_contents, sizeof(char), input_file_size, input_file);
+
+  fclose(input_file);
+
+  return file_contents;
+}
+
+void parse_pattern_file(const char *file_name, DFC_PATTERN_INIT *pattern_init,
+                        AddPattern add_pattern) {
   FILE *file = fopen(file_name, "rt");
   if (!file) {
     fprintf(stderr, "Could not open pattern file");
