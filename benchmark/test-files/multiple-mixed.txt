@@ -1,0 +1,5 @@
+|AA BB|
+this is a string
+|00 22|
+again!
+haha

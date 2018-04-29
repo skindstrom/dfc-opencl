@@ -112,3 +112,4 @@ target_compile_definitions(dfc PRIVATE
 add_subdirectory(${EXT_PROJECTS_DIR}/catch)
 add_subdirectory(tests)
 add_subdirectory(example)
+add_subdirectory(benchmark)
