@@ -18,6 +18,8 @@
 #define TIMER_EXECUTE_HETEROGENEOUS 10
 #define TIMER_PROCESS_MATCHES 11
 
+#define TIMER_SEARCH 12
+
 #ifdef __cplusplus
 extern "C" {
 #endif
