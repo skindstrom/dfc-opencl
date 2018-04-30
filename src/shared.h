@@ -38,8 +38,7 @@
 
 #define DF_MASK (DF_SIZE - 1)
 
-#define GET_ENTRY_LARGE_CT(hash, x) \
-  ((ct + hash)->entries + x)
+#define GET_ENTRY_LARGE_CT(hash, x) ((ct + hash)->entries + x)
 
 #define TEXTURE_CHANNEL_BYTE_SIZE 16
 

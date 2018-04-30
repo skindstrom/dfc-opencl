@@ -43,12 +43,8 @@ void verifySmall(__global CompactTableSmallEntry *ct,
     PID_TYPE pid = (ct + hash)->pids[i];
 
     int patternLength = (patterns + pid)->pattern_length;
-    if (patternLength == 3) {
-      --input;
-      --currentPos;
-    }
 
-    if (currentPos >= 0 && inputLength - currentPos >= patternLength &&
+    if (inputLength - currentPos >= patternLength &&
         doesPatternMatch(input, (patterns + pid)->original_pattern,
                          patternLength,
                          (patterns + pid)->is_case_insensitive)) {
@@ -62,12 +58,6 @@ void verifyLarge(__global CompactTableLarge *ct,
                  __global DFC_FIXED_PATTERN *patterns, __global uchar *input,
                  int currentPos, int inputLength,
                  __global VerifyResult *result) {
-  /*
-   the last two bytes are used to match,
-   hence we are now at least 2 bytes into the pattern
-   */
-  input -= 2;
-  currentPos -= 2;
   uint bytePattern = input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
   uint hash = hashForLargeCompactTable(bytePattern);
 
@@ -78,11 +68,8 @@ void verifyLarge(__global CompactTableLarge *ct,
         PID_TYPE pid = GET_ENTRY_LARGE_CT(hash, multiplier)->pids[i];
 
         int patternLength = (patterns + pid)->pattern_length;
-        int startOfRelativeInput = currentPos - (patternLength - 4);
-
-        if (startOfRelativeInput >= 0 &&
-            inputLength - startOfRelativeInput >= patternLength &&
-            doesPatternMatch(input - (patternLength - 4),
+        if (inputLength - currentPos >= patternLength &&
+            doesPatternMatch(input,
                              (patterns + pid)->original_pattern, patternLength,
                              (patterns + pid)->is_case_insensitive)) {
           result->matchesLargeCt[result->matchCountLargeCt] = pid;
@@ -96,12 +83,6 @@ void verifyLarge(__global CompactTableLarge *ct,
 }
 
 bool isInHashDf(__global uchar *df, __global uchar *input) {
-  /*
-   the last two bytes are used to match,
-   hence we are now at least 2 bytes into the pattern
-   */
-  input -= 2;
-
   uint data = input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
   ushort byteIndex = directFilterHash(data);
   ushort bitMask = BMASK(data & DF_MASK);
@@ -129,7 +110,7 @@ __kernel void search(int inputLength, __global uchar *input,
       verifySmall(ctSmall, patterns, input + i, i, inputLength, result + i);
     }
 
-    if ((dfLarge[byteIndex] & bitMask) && i >= 2 &&
+    if ((dfLarge[byteIndex] & bitMask) && i < inputLength - 3 &&
         isInHashDf(dfLargeHash, input + i)) {
       verifyLarge(ctLarge, patterns, input + i, i, inputLength, result + i);
     }
@@ -171,15 +152,13 @@ __kernel void search_with_image(int inputLength, __global uchar *input,
 
     df = (img_read)read_imageui(dfLarge, SHIFT_BY_CHANNEL_SIZE(byteIndex));
     if ((df.scalar[byteIndex % TEXTURE_CHANNEL_BYTE_SIZE] & bitMask) &&
-        i >= 2 && isInHashDf(dfLargeHash, input + i)) {
+        i < inputLength - 3 && isInHashDf(dfLargeHash, input + i)) {
       verifyLarge(ctLarge, patterns, input + i, i, inputLength, result + i);
     }
   }
 }
 
 bool isInHashDfLocal(__local uchar *df, __global uchar *input) {
-  input -= 2;
-
   uint data = input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
   ushort byteIndex = directFilterHash(data);
   ushort bitMask = BMASK(data & DF_MASK);
@@ -224,7 +203,7 @@ __kernel void search_with_local(int inputLength, __global uchar *input,
       verifySmall(ctSmall, patterns, input + i, i, inputLength, result + i);
     }
 
-    if ((dfLarge[byteIndex] & bitMask) && i >= 2 &&
+    if ((dfLarge[byteIndex] & bitMask) && i < inputLength - 3 &&
         isInHashDf(dfLargeHash, input + i)) {
       verifyLarge(ctLarge, patterns, input + i, i, inputLength, result + i);
     }
@@ -248,7 +227,7 @@ __kernel void filter(int inputLength, __global uchar *input,
     result[i] = (dfSmall[byteIndex] & bitMask) > 0;
 
     // set the second bit
-    result[i] |= ((dfLarge[byteIndex] & bitMask) && i >= 2 &&
+    result[i] |= ((dfLarge[byteIndex] & bitMask) && i < inputLength - 3 &&
                   isInHashDf(dfLargeHash, input + i))
                  << 1;
   }
@@ -276,7 +255,7 @@ __kernel void filter_with_image(int inputLength, __global uchar *input,
     df = (img_read)read_imageui(dfLarge, SHIFT_BY_CHANNEL_SIZE(byteIndex));
     result[i] |=
         ((df.scalar[byteIndex % TEXTURE_CHANNEL_BYTE_SIZE] & bitMask) &&
-         i >= 2 && isInHashDf(dfLargeHash, input + i))
+         i < inputLength - 3 && isInHashDf(dfLargeHash, input + i))
         << 1;
   }
 }
@@ -313,7 +292,7 @@ __kernel void filter_with_local(int inputLength, __global uchar *input,
     result[i] = (dfSmallLocal[byteIndex] & bitMask) > 0;
 
     // set the second bit
-    result[i] |= ((dfLargeLocal[byteIndex] & bitMask) && i >= 2 &&
+    result[i] |= ((dfLargeLocal[byteIndex] & bitMask) && i < inputLength - 3 &&
                   isInHashDfLocal(dfLargeHashLocal, input + i))
                  << 1;
   }

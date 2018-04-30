@@ -274,14 +274,14 @@ void createTextureBufferAndMap(cl_context context, void **host, cl_mem *buffer,
 void allocateCompactTablesOnHost(DFC_STRUCTURE *dfc) {
   dfc->compactTableSmall =
       calloc(1, sizeof(CompactTableSmallEntry) * COMPACT_TABLE_SIZE_SMALL);
-  if(!dfc->compactTableSmall) {
+  if (!dfc->compactTableSmall) {
     fprintf(stderr, "Could not allocate small CT\n");
     exit(1);
   }
 
   dfc->compactTableLarge =
       calloc(1, sizeof(CompactTableLarge) * COMPACT_TABLE_SIZE_LARGE);
-  if(!dfc->compactTableLarge) {
+  if (!dfc->compactTableLarge) {
     fprintf(stderr, "Could not allocate large CT\n");
     exit(1);
   }

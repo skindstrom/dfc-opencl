@@ -46,12 +46,8 @@ static void verifySmall(CompactTableSmallEntry *ct, DFC_FIXED_PATTERN *patterns,
     PID_TYPE pid = (ct + hash)->pids[i];
 
     int patternLength = (patterns + pid)->pattern_length;
-    if (patternLength == 3) {
-      --input;
-      --currentPos;
-    }
 
-    if (currentPos >= 0 && inputLength - currentPos >= patternLength &&
+    if (inputLength - currentPos >= patternLength &&
         doesPatternMatch(input, (patterns + pid)->original_pattern,
                          patternLength,
                          (patterns + pid)->is_case_insensitive)) {
@@ -64,13 +60,6 @@ static void verifySmall(CompactTableSmallEntry *ct, DFC_FIXED_PATTERN *patterns,
 static void verifyLarge(CompactTableLarge *ct, DFC_FIXED_PATTERN *patterns,
                         uint8_t *input, int currentPos, int inputLength,
                         VerifyResult *result) {
-  /*
-   the last two bytes are used to match,
-   hence we are now at least 2 bytes into the pattern
-   */
-  input -= 2;
-  currentPos -= 2;
-
   uint32_t bytePattern =
       input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
   uint32_t hash = hashForLargeCompactTable(bytePattern);
@@ -82,12 +71,10 @@ static void verifyLarge(CompactTableLarge *ct, DFC_FIXED_PATTERN *patterns,
         PID_TYPE pid = GET_ENTRY_LARGE_CT(hash, multiplier)->pids[i];
 
         int patternLength = (patterns + pid)->pattern_length;
-        int startOfRelativeInput = currentPos - (patternLength - 4);
-        if (startOfRelativeInput >= 0 &&
-            inputLength - startOfRelativeInput >= patternLength) {
-          uint8_t *relativeInput = input - (patternLength - 4);
+        if (
+            inputLength - currentPos >= patternLength) {
           if (doesPatternMatch(
-                  relativeInput, (patterns + pid)->original_pattern,
+                  input, (patterns + pid)->original_pattern,
                   patternLength, (patterns + pid)->is_case_insensitive)) {
             result->matchesLargeCt[result->matchCountLargeCt] = pid;
             ++result->matchCountLargeCt;
@@ -105,7 +92,6 @@ static bool isInHashDf(uint8_t *df, uint8_t *input) {
    the last two bytes are used to match,
    hence we are now at least 2 bytes into the pattern
    */
-  input -= 2;
   uint32_t data = input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
   uint16_t byteIndex = directFilterHash(data);
   uint16_t bitMask = BMASK(data & DF_MASK);
@@ -134,7 +120,7 @@ int searchCpu(MatchFunction onMatch) {
                   inputLength, result + i);
     }
 
-    if (i >= 2 && (dfc->directFilterLarge[byteIndex] & bitMask) &&
+    if (i < inputLength - 3 && (dfc->directFilterLarge[byteIndex] & bitMask) &&
         isInHashDf(dfc->directFilterLargeHash, input + i)) {
       verifyLarge(dfc->compactTableLarge, patterns->dfcMatchList, input + i, i,
                   inputLength, result + i);
@@ -171,12 +157,8 @@ static int verifySmallRet(CompactTableSmallEntry *ct,
     PID_TYPE pid = (ct + hash)->pids[i];
 
     int patternLength = (patterns + pid)->pattern_length;
-    if (patternLength == 3) {
-      --input;
-      --currentPos;
-    }
 
-    if (currentPos >= 0 && inputLength - currentPos >= patternLength &&
+    if (inputLength - currentPos >= patternLength &&
         doesPatternMatch(input, (patterns + pid)->original_pattern,
                          patternLength,
                          (patterns + pid)->is_case_insensitive)) {
@@ -191,13 +173,6 @@ static int verifySmallRet(CompactTableSmallEntry *ct,
 static int verifyLargeRet(CompactTableLarge *ct, DFC_FIXED_PATTERN *patterns,
                           uint8_t *input, int currentPos, int inputLength,
                           MatchFunction onMatch) {
-  /*
-   the last two bytes are used to match,
-   hence we are now at least 2 bytes into the pattern
-   */
-  input -= 2;
-  currentPos -= 2;
-
   uint32_t bytePattern =
       input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
   uint32_t hash = hashForLargeCompactTable(bytePattern);
@@ -210,11 +185,8 @@ static int verifyLargeRet(CompactTableLarge *ct, DFC_FIXED_PATTERN *patterns,
         PID_TYPE pid = GET_ENTRY_LARGE_CT(hash, multiplier)->pids[i];
 
         int patternLength = (patterns + pid)->pattern_length;
-        int startOfRelativeInput = currentPos - (patternLength - 4);
-
-        if (startOfRelativeInput >= 0 &&
-            inputLength - startOfRelativeInput >= patternLength &&
-            doesPatternMatch(input - (patternLength - 4),
+        if (inputLength - currentPos >= patternLength &&
+            doesPatternMatch(input,
                              (patterns + pid)->original_pattern, patternLength,
                              (patterns + pid)->is_case_insensitive)) {
           onMatch(&patterns[pid]);

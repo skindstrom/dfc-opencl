@@ -362,9 +362,8 @@ static void addPatternToDirectFilter(uint8_t *directFilter,
 
 static void addLongerPatternToSmallDirectFilter(DFC_STRUCTURE *dfc,
                                                 DFC_PATTERN *pattern) {
-  uint8_t *lastCharactersOfPattern = pattern->casepatrn + ((pattern->n - 2));
   addPatternToDirectFilter(dfc->directFilterSmall, pattern->is_case_insensitive,
-                           lastCharactersOfPattern, 2);
+                           pattern->casepatrn, 2);
 }
 
 static void addPatternToSmallDirectFilter(DFC_STRUCTURE *dfc,
@@ -383,9 +382,8 @@ static void addPatternToLargeDirectFilter(DFC_STRUCTURE *dfc,
                                           DFC_PATTERN *pattern) {
   assert(pattern->n > SMALL_DF_MAX_PATTERN_SIZE);
 
-  uint8_t *lastCharactersOfPattern = pattern->casepatrn + ((pattern->n - 2));
   addPatternToDirectFilter(dfc->directFilterLarge, pattern->is_case_insensitive,
-                           lastCharactersOfPattern, 2);
+                           pattern->casepatrn, 2);
 }
 
 static void maskPatternIntoDirectFilterHash(uint8_t *df, uint8_t *pattern) {
@@ -402,14 +400,12 @@ static void addPatternToLargeDirectFilterHash(DFC_STRUCTURE *dfc,
   int patternLength = 4;
   assert(pattern->n >= patternLength);
 
-  uint8_t *lastCharactersOfPattern =
-      pattern->casepatrn + ((pattern->n - patternLength));
   if (pattern->is_case_insensitive) {
     int permutationCount = 2 << (patternLength - 1);
     uint8_t *patternPermutations =
         (uint8_t *)malloc(permutationCount * patternLength);
 
-    createPermutations(lastCharactersOfPattern, patternLength, permutationCount,
+    createPermutations(pattern->casepatrn, patternLength, permutationCount,
                        patternPermutations);
 
     for (int i = 0; i < permutationCount; ++i) {
@@ -421,7 +417,7 @@ static void addPatternToLargeDirectFilterHash(DFC_STRUCTURE *dfc,
     free(patternPermutations);
   } else {
     maskPatternIntoDirectFilterHash(dfc->directFilterLargeHash,
-                                    lastCharactersOfPattern);
+                                    pattern->casepatrn);
   }
 }
 
@@ -446,8 +442,7 @@ static void addPatternToSmallCompactTable(DFC_STRUCTURE *dfc,
   assert(pattern->n >= SMALL_DF_MIN_PATTERN_SIZE);
   assert(pattern->n <= SMALL_DF_MAX_PATTERN_SIZE);
 
-  uint8_t character = pattern->n == 1 ? pattern->casepatrn[0]
-                                      : pattern->casepatrn[pattern->n - 2];
+  uint8_t character = pattern->casepatrn[0];
   pushPatternToSmallCompactTable(dfc, character, pattern->iid);
 
   if (pattern->is_case_insensitive) {
@@ -459,7 +454,8 @@ static void addPatternToSmallCompactTable(DFC_STRUCTURE *dfc,
 static void getEmptyOrEqualLargeCompactTableEntry(
     uint32_t pattern, CompactTableLargeEntry **entry) {
   int entryCount = 0;
-  while (entryCount < MAX_ENTRIES_PER_BUCKET && (*entry)->pidCount && (*entry)->pattern != pattern) {
+  while (entryCount < MAX_ENTRIES_PER_BUCKET && (*entry)->pidCount &&
+         (*entry)->pattern != pattern) {
     ++(*entry);
     ++entryCount;
   }
@@ -509,16 +505,15 @@ static void addPatternToLargeCompactTable(DFC_STRUCTURE *dfc,
   int patternLength = SMALL_DF_MAX_PATTERN_SIZE + 1;
   assert(pattern->n >= patternLength);
 
-  uint8_t *lastCharactersOfPattern =
-      pattern->casepatrn + (pattern->n - patternLength);
+  uint8_t *firstCharactersOfPattern = pattern->casepatrn;
 
   if (pattern->is_case_insensitive) {
     int permutationCount = 2 << (patternLength - 1);
     uint8_t *patternPermutations =
         (uint8_t *)malloc(permutationCount * patternLength);
 
-    createPermutations(lastCharactersOfPattern, patternLength, permutationCount,
-                       patternPermutations);
+    createPermutations(firstCharactersOfPattern, patternLength,
+                       permutationCount, patternPermutations);
 
     for (int i = 0; i < permutationCount; ++i) {
       uint32_t data = patternPermutations[i * patternLength + 3] << 24 |
@@ -531,8 +526,8 @@ static void addPatternToLargeCompactTable(DFC_STRUCTURE *dfc,
     free(patternPermutations);
   } else {
     uint32_t data =
-        lastCharactersOfPattern[3] << 24 | lastCharactersOfPattern[2] << 16 |
-        lastCharactersOfPattern[1] << 8 | lastCharactersOfPattern[0];
+        firstCharactersOfPattern[3] << 24 | firstCharactersOfPattern[2] << 16 |
+        firstCharactersOfPattern[1] << 8 | firstCharactersOfPattern[0];
     pushPatternToLargeCompactTable(dfc, data, pattern->iid);
   }
 }
