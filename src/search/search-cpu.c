@@ -71,11 +71,10 @@ static void verifyLarge(CompactTableLarge *ct, DFC_FIXED_PATTERN *patterns,
         PID_TYPE pid = GET_ENTRY_LARGE_CT(hash, multiplier)->pids[i];
 
         int patternLength = (patterns + pid)->pattern_length;
-        if (
-            inputLength - currentPos >= patternLength) {
-          if (doesPatternMatch(
-                  input, (patterns + pid)->original_pattern,
-                  patternLength, (patterns + pid)->is_case_insensitive)) {
+        if (inputLength - currentPos >= patternLength) {
+          if (doesPatternMatch(input, (patterns + pid)->original_pattern,
+                               patternLength,
+                               (patterns + pid)->is_case_insensitive)) {
             result->matchesLargeCt[result->matchCountLargeCt] = pid;
             ++result->matchCountLargeCt;
           }
@@ -99,7 +98,7 @@ static bool isInHashDf(uint8_t *df, uint8_t *input) {
   return df[byteIndex] & bitMask;
 }
 
-int searchCpu(MatchFunction onMatch) {
+int searchCpuEmulateGpu(MatchFunction onMatch) {
   DFC_STRUCTURE *dfc = DFC_HOST_MEMORY.dfcStructure;
   DFC_PATTERNS *patterns = dfc->patterns;
   uint8_t *input = (uint8_t *)DFC_HOST_MEMORY.input;
@@ -190,8 +189,8 @@ static int verifyLargeRet(CompactTableLarge *ct, DFC_FIXED_PATTERN *patterns,
 
         int patternLength = (patterns + pid)->pattern_length;
         if (inputLength - currentPos >= patternLength &&
-            doesPatternMatch(input,
-                             (patterns + pid)->original_pattern, patternLength,
+            doesPatternMatch(input, (patterns + pid)->original_pattern,
+                             patternLength,
                              (patterns + pid)->is_case_insensitive)) {
           onMatch(&patterns[pid]);
           ++matches;
@@ -202,6 +201,34 @@ static int verifyLargeRet(CompactTableLarge *ct, DFC_FIXED_PATTERN *patterns,
 
   return matches;
 }
+
+int searchCpu(MatchFunction onMatch) {
+  DFC_STRUCTURE *dfc = DFC_HOST_MEMORY.dfcStructure;
+  DFC_PATTERNS *patterns = dfc->patterns;
+  uint8_t *input = (uint8_t *)DFC_HOST_MEMORY.input;
+  int inputLength = DFC_HOST_MEMORY.inputLength;
+
+  int matches = 0;
+  for (int i = 0; i < inputLength - 1; ++i) {
+    int16_t data = input[i + 1] << 8 | input[i];
+    int16_t byteIndex = BINDEX(data & DF_MASK);
+    int16_t bitMask = BMASK(data & DF_MASK);
+
+    if (dfc->directFilterSmall[byteIndex] & bitMask) {
+      matches += verifySmallRet(dfc->compactTableSmall, patterns->dfcMatchList,
+                                input + i, i, inputLength, onMatch);
+    }
+
+    if (i < inputLength - 3 && (dfc->directFilterLarge[byteIndex] & bitMask) &&
+        isInHashDf(dfc->directFilterLargeHash, input + i)) {
+      matches += verifyLargeRet(dfc->compactTableLarge, patterns->dfcMatchList,
+                                input + i, i, inputLength, onMatch);
+    }
+  }
+
+  return matches;
+}
+
 
 int exactMatchingUponFiltering(uint8_t *result, int length,
                                DFC_PATTERNS *patterns, MatchFunction onMatch) {

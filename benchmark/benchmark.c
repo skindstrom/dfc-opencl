@@ -71,9 +71,10 @@ int benchmarkSearch() {
 
 void printResult(DFC_FIXED_PATTERN *pattern) {
   (void)(pattern);
-  //printf("Matched %.*s ", pattern->pattern_length, pattern->original_pattern);
-  //for (int i = 0; i < pattern->external_id_count; ++i) {
+  // printf("Matched %.*s ", pattern->pattern_length,
+  // pattern->original_pattern); for (int i = 0; i < pattern->external_id_count;
+  // ++i) {
   //  printf(" %d,", pattern->external_ids[i]);
   //}
-  //printf("\n");
+  // printf("\n");
 }

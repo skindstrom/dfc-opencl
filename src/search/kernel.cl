@@ -69,8 +69,8 @@ void verifyLarge(__global CompactTableLarge *ct,
 
         int patternLength = (patterns + pid)->pattern_length;
         if (inputLength - currentPos >= patternLength &&
-            doesPatternMatch(input,
-                             (patterns + pid)->original_pattern, patternLength,
+            doesPatternMatch(input, (patterns + pid)->original_pattern,
+                             patternLength,
                              (patterns + pid)->is_case_insensitive)) {
           result->matchesLargeCt[result->matchCountLargeCt] = pid;
           ++result->matchCountLargeCt;
