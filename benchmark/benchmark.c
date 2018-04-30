@@ -18,7 +18,7 @@ int main(int argc, char **argv) {
 
   DFC_SetupEnvironment();
 
-  char* input = readDataFile(argv[2]);
+  char *input = readDataFile(argv[2]);
 
   DFC_PATTERN_INIT *init_struct = addPatterns(argv[1]);
   DFC_STRUCTURE *dfc = compilePatterns(init_struct);
@@ -35,7 +35,7 @@ int main(int argc, char **argv) {
 
 char *readDataFile(char *data_file) {
   startTimer(TIMER_READ_DATA);
-  char* input = read_data_file(data_file, DFC_NewInput);
+  char *input = read_data_file(data_file, DFC_NewInput);
   stopTimer(TIMER_READ_DATA);
 
   return input;

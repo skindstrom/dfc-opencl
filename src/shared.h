@@ -22,13 +22,16 @@
 #define SMALL_DF_MIN_PATTERN_SIZE 1
 #define SMALL_DF_MAX_PATTERN_SIZE 3
 
-#define MAX_PID_PER_ENTRY 8
-#define MAX_ENTRIES_PER_BUCKET 32
+#define MAX_PID_PER_ENTRY_SMALL_CT 50
+
+#define MAX_PID_PER_ENTRY_LARGE_CT 50
+#define MAX_ENTRIES_PER_BUCKET 50
+
 #define COMPACT_TABLE_SIZE_SMALL 0x100
 #define COMPACT_TABLE_SIZE_LARGE 0x1000
 
-#define MAX_EQUAL_PATTERNS 5
-#define MAX_PATTERN_LENGTH 25
+#define MAX_EQUAL_PATTERNS 50
+#define MAX_PATTERN_LENGTH 128
 
 #define BINDEX(x) ((x) >> 3)
 #define BMASK(x) (1 << ((x)&0x7))
@@ -36,20 +39,20 @@
 #define DF_MASK (DF_SIZE - 1)
 
 #define GET_ENTRY_LARGE_CT(hash, x) \
-  ((ct + hash)->entries + sizeof(CompactTableLargeEntry) * x)
+  ((ct + hash)->entries + x)
 
 #define TEXTURE_CHANNEL_BYTE_SIZE 16
 
 typedef struct CompactTableSmallEntry_ {
   uint8_t pattern;
-  uint8_t pidCount;
-  PID_TYPE pids[MAX_PID_PER_ENTRY];
+  int32_t pidCount;
+  PID_TYPE pids[MAX_PID_PER_ENTRY_SMALL_CT];
 } CompactTableSmallEntry;
 
 typedef struct CompactTableLargeEntry_ {
   uint32_t pattern;
-  uint8_t pidCount;
-  PID_TYPE pids[MAX_PID_PER_ENTRY];
+  int32_t pidCount;
+  PID_TYPE pids[MAX_PID_PER_ENTRY_LARGE_CT];
 } CompactTableLargeEntry;
 
 typedef struct CompactTableLarge_ {
@@ -68,8 +71,8 @@ typedef struct _dfc_fixed_pattern {
 } DFC_FIXED_PATTERN;
 
 typedef struct VerifyResult_ {
-  PID_TYPE matchesSmallCt[MAX_PID_PER_ENTRY];
-  PID_TYPE matchesLargeCt[MAX_PID_PER_ENTRY];
+  PID_TYPE matchesSmallCt[MAX_PID_PER_ENTRY_SMALL_CT];
+  PID_TYPE matchesLargeCt[MAX_PID_PER_ENTRY_LARGE_CT];
 
   int32_t matchCountSmallCt;
   int32_t matchCountLargeCt;

@@ -189,7 +189,7 @@ static inline DFC_PATTERN *DFC_InitHashLookup(DFC_PATTERN_INIT *ctx,
 
   DFC_PATTERN *t = ctx->init_hash[hash];
   for (; t != NULL; t = t->next) {
-    if (!strcmp((char *)t->casepatrn, (char *)pat)) return t;
+    if (!strncmp((char *)t->casepatrn, (char *)pat, patlen)) return t;
   }
 
   return NULL;
@@ -224,9 +224,11 @@ static inline int DFC_InitHashAdd(DFC_PATTERN_INIT *ctx, DFC_PATTERN *p) {
 static DFC_FIXED_PATTERN createFixed(DFC_PATTERN *original) {
   if (original->n >= MAX_PATTERN_LENGTH) {
     fprintf(stderr,
-            "Pattern \"%s\" is too long. Please remove it or increase "
+            "Pattern %d \"%s\" is too long with length %d. Please remove it or "
+            "increase "
             "MAX_PATTERN_LENGTH. (Currently %d)\n",
-            original->casepatrn, MAX_PATTERN_LENGTH);
+            original->iid, original->casepatrn, original->n,
+            MAX_PATTERN_LENGTH);
     exit(PATTERN_TOO_LARGE_EXIT_CODE);
   }
   if (original->sids_size >= MAX_EQUAL_PATTERNS) {
@@ -427,10 +429,10 @@ static void pushPatternToSmallCompactTable(DFC_STRUCTURE *dfc, uint8_t pattern,
                                            PID_TYPE pid) {
   CompactTableSmallEntry *entry = &dfc->compactTableSmall[pattern];
 
-  if (entry->pidCount == MAX_PID_PER_ENTRY) {
+  if (entry->pidCount == MAX_PID_PER_ENTRY_SMALL_CT) {
     fprintf(stderr,
             "Too many equal patterns in the small compact hash table."
-            "Please increase MAX_PID_PER_ENTRY");
+            "Please increase MAX_PID_PER_ENTRY_SMALL_CT");
     exit(TOO_MANY_PID_IN_SMALL_CT_EXIT_CODE);
   }
 
@@ -457,13 +459,12 @@ static void addPatternToSmallCompactTable(DFC_STRUCTURE *dfc,
 static void getEmptyOrEqualLargeCompactTableEntry(
     uint32_t pattern, CompactTableLargeEntry **entry) {
   int entryCount = 0;
-  while ((*entry)->pidCount && (*entry)->pattern != pattern &&
-         entryCount < MAX_ENTRIES_PER_BUCKET) {
-    *entry += sizeof(CompactTableLargeEntry);
+  while (entryCount < MAX_ENTRIES_PER_BUCKET && (*entry)->pidCount && (*entry)->pattern != pattern) {
+    ++(*entry);
     ++entryCount;
   }
 
-  if (entryCount == MAX_ENTRIES_PER_BUCKET) {
+  if (entryCount == MAX_ENTRIES_PER_BUCKET - 1) {
     fprintf(stderr,
             "Too many entries with the same hash in the large compact table."
             "Please increase MAX_ENTRIES_PER_BUCKET or update the hash "
@@ -471,10 +472,10 @@ static void getEmptyOrEqualLargeCompactTableEntry(
     exit(TOO_MANY_ENTRIES_IN_LARGE_CT_EXIT_CODE);
   }
 
-  if ((*entry)->pidCount == MAX_PID_PER_ENTRY) {
+  if ((*entry)->pidCount == MAX_PID_PER_ENTRY_LARGE_CT) {
     fprintf(stderr,
             "Too many equal patterns in the large compact hash table."
-            "Please increase MAX_PID_PER_ENTRY\n");
+            "Please increase MAX_PID_PER_ENTRY_LARGE_CT\n");
     exit(TOO_MANY_PID_IN_LARGE_CT_EXIT_CODE);
   }
 }

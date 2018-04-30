@@ -66,7 +66,8 @@ void null_terminate_line(char *line, int *len) {
 
 void parse_line(char *output_pattern, int *pattern_length) {
   unsigned char buf[PARSER_BUFFER_SIZE];
-  char *pattern = strdup(output_pattern);
+  char *duplicated_pattern = strdup(output_pattern);
+  char *pattern = duplicated_pattern;
   int size = 0;
 
   int should_parse_binary = false;
@@ -88,7 +89,7 @@ void parse_line(char *output_pattern, int *pattern_length) {
   memcpy(output_pattern, buf, size);
   *pattern_length = size;
 
-  free(pattern);
+  free(duplicated_pattern);
 }
 
 int parse_binary(char *token, unsigned char *buf, int size) {

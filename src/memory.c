@@ -190,7 +190,7 @@ void releaseExecutionEnvironment() {
 }
 
 void createBufferAndMap(cl_context context, void **host, cl_mem *buffer,
-                        int size) {
+                        size_t size) {
   cl_int errcode;
 
   startTimer(TIMER_WRITE_TO_DEVICE);
@@ -274,8 +274,17 @@ void createTextureBufferAndMap(cl_context context, void **host, cl_mem *buffer,
 void allocateCompactTablesOnHost(DFC_STRUCTURE *dfc) {
   dfc->compactTableSmall =
       calloc(1, sizeof(CompactTableSmallEntry) * COMPACT_TABLE_SIZE_SMALL);
+  if(!dfc->compactTableSmall) {
+    fprintf(stderr, "Could not allocate small CT\n");
+    exit(1);
+  }
+
   dfc->compactTableLarge =
       calloc(1, sizeof(CompactTableLarge) * COMPACT_TABLE_SIZE_LARGE);
+  if(!dfc->compactTableLarge) {
+    fprintf(stderr, "Could not allocate large CT\n");
+    exit(1);
+  }
 }
 
 void allocateDfcStructureWithMap() {
@@ -484,7 +493,7 @@ void freeDfcInput() {
   }
 }
 
-cl_mem createReadOnlyBuffer(cl_context context, int size) {
+cl_mem createReadOnlyBuffer(cl_context context, size_t size) {
   startTimer(TIMER_WRITE_TO_DEVICE);
 
   cl_int errcode;
@@ -607,7 +616,7 @@ DfcOpenClBuffers createOpenClBuffers(DfcOpenClEnvironment *environment,
 }
 
 void writeOpenClBuffer(cl_command_queue queue, void *host, cl_mem buffer,
-                       int size) {
+                       size_t size) {
   startTimer(TIMER_WRITE_TO_DEVICE);
 
   cl_int errcode = clEnqueueWriteBuffer(queue, buffer, CL_BLOCKING, 0, size,
@@ -616,7 +625,7 @@ void writeOpenClBuffer(cl_command_queue queue, void *host, cl_mem buffer,
   stopTimer(TIMER_WRITE_TO_DEVICE);
 
   if (errcode != CL_SUCCESS) {
-    fprintf(stderr, "Could not write to buffer");
+    fprintf(stderr, "Could not write to buffer: %d\n", errcode);
     exit(1);
   }
 }

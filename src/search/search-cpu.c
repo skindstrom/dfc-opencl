@@ -61,8 +61,6 @@ static void verifySmall(CompactTableSmallEntry *ct, DFC_FIXED_PATTERN *patterns,
   }
 }
 
-#define GET_ENTRY_LARGE_CT(hash, x) \
-  ((ct + hash)->entries + sizeof(CompactTableLargeEntry) * x)
 static void verifyLarge(CompactTableLarge *ct, DFC_FIXED_PATTERN *patterns,
                         uint8_t *input, int currentPos, int inputLength,
                         VerifyResult *result) {
