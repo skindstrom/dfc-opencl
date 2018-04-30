@@ -1,7 +1,3 @@
-/*********************************/
-/* Author  - Byungkwon Choi      */
-/* Contact - cbkbrad@kaist.ac.kr */
-/*********************************/
 #ifndef DFC_H
 #define DFC_H
 

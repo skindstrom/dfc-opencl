@@ -1,8 +1,3 @@
-/*********************************/
-/* Author  - Byungkwon Choi      */
-/* Contact - cbkbrad@kaist.ac.kr */
-/*********************************/
-
 #include <assert.h>
 
 #include "dfc.h"
