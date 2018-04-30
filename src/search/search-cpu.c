@@ -106,6 +106,10 @@ int searchCpu(MatchFunction onMatch) {
   int inputLength = DFC_HOST_MEMORY.inputLength;
 
   VerifyResult *result = malloc(sizeInBytesOfResultVector(inputLength));
+  if (!result) {
+    fprintf(stderr, "Could not allocate result vector\n");
+    exit(1);
+  }
 
   for (int i = 0; i < inputLength - 1; ++i) {
     int16_t data = input[i + 1] << 8 | input[i];

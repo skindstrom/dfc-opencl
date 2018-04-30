@@ -199,7 +199,7 @@ void createBufferAndMap(cl_context context, void **host, cl_mem *buffer,
                            size, NULL, &errcode);
 
   if (errcode != CL_SUCCESS) {
-    fprintf(stderr, "Could not create mapped DFC buffer");
+    fprintf(stderr, "Could not create mapped DFC buffer\n");
     exit(OPENCL_COULD_NOT_CREATE_MAPPED_DFC_BUFFER);
   }
 
@@ -210,7 +210,7 @@ void createBufferAndMap(cl_context context, void **host, cl_mem *buffer,
   stopTimer(TIMER_WRITE_TO_DEVICE);
 
   if (errcode != CL_SUCCESS) {
-    fprintf(stderr, "Could not map DFC buffer to host memory");
+    fprintf(stderr, "Could not map DFC buffer to host memory\n");
     exit(OPENCL_COULD_NOT_MAP_DFC_TO_HOST);
   }
 

@@ -7,7 +7,7 @@ char *readDataFile(char *data_file);
 DFC_PATTERN_INIT *addPatterns(char *pattern_file);
 DFC_STRUCTURE *compilePatterns(DFC_PATTERN_INIT *init_struct);
 
-int search();
+int benchmarkSearch();
 void printResult(DFC_FIXED_PATTERN *pattern);
 
 int main(int argc, char **argv) {
@@ -23,7 +23,7 @@ int main(int argc, char **argv) {
   DFC_PATTERN_INIT *init_struct = addPatterns(argv[1]);
   DFC_STRUCTURE *dfc = compilePatterns(init_struct);
 
-  int matchCount = search(dfc);
+  int matchCount = benchmarkSearch(dfc);
   printf("\n* Total match count: %d\n", matchCount);
 
   DFC_FreeStructure();
@@ -61,7 +61,7 @@ DFC_STRUCTURE *compilePatterns(DFC_PATTERN_INIT *init_struct) {
   return dfc;
 }
 
-int search() {
+int benchmarkSearch() {
   startTimer(TIMER_SEARCH);
   int matchCount = DFC_Search(printResult);
   stopTimer(TIMER_SEARCH);
@@ -70,9 +70,10 @@ int search() {
 }
 
 void printResult(DFC_FIXED_PATTERN *pattern) {
-  printf("Matched %.*s ", pattern->pattern_length, pattern->original_pattern);
-  for (int i = 0; i < pattern->external_id_count; ++i) {
-    printf(" %d,", pattern->external_ids[i]);
-  }
-  printf("\n");
+  (void)(pattern);
+  //printf("Matched %.*s ", pattern->pattern_length, pattern->original_pattern);
+  //for (int i = 0; i < pattern->external_id_count; ++i) {
+  //  printf(" %d,", pattern->external_ids[i]);
+  //}
+  //printf("\n");
 }
