@@ -30,6 +30,23 @@ static void setupCompactTables(DFC_STRUCTURE *dfc, DFC_PATTERN_INIT *patterns);
 
 static uint8_t toggleCharacterCase(uint8_t);
 
+typedef struct DynamicCtSmallEntry_ {
+  uint8_t pattern;
+  int32_t pidCount;
+  PID_TYPE *pids;
+} DynamicCtSmallEntry;
+
+typedef struct DynamicCtLargeEntry_ {
+  uint32_t pattern;
+  int32_t pidCount;
+  PID_TYPE *pids;
+} DynamicCtLargeEntry;
+
+typedef struct DynamicCtLarge_ {
+  int entryCount;
+  DynamicCtLargeEntry *entries;
+} DynamicCtLarge;
+
 void DFC_SetupEnvironment() { setupExecutionEnvironment(); }
 void DFC_ReleaseEnvironment() { releaseExecutionEnvironment(); }
 
@@ -425,62 +442,60 @@ static void addPatternToLargeDirectFilterHash(DFC_STRUCTURE *dfc,
   }
 }
 
-static void pushPatternToSmallCompactTable(DFC_STRUCTURE *dfc, uint8_t pattern,
-                                           PID_TYPE pid) {
-  CompactTableSmallEntry *entry = &dfc->compactTableSmall[pattern];
-
-  if (entry->pidCount == MAX_PID_PER_ENTRY_SMALL_CT) {
-    fprintf(stderr,
-            "Too many equal patterns in the small compact hash table."
-            "Please increase MAX_PID_PER_ENTRY_SMALL_CT");
-    exit(TOO_MANY_PID_IN_SMALL_CT_EXIT_CODE);
-  }
+static void pushPatternToSmallCompactTable(DynamicCtSmallEntry *ct,
+                                           uint8_t pattern, PID_TYPE pid) {
+  DynamicCtSmallEntry *entry = &ct[pattern];
 
   entry->pattern = pattern;
+  entry->pids = realloc(entry->pids, (entry->pidCount + 1) * sizeof(PID_TYPE));
+  if (!entry->pids) {
+    fprintf(stderr, "Could not allocate memory for dynamic CT");
+    exit(1);
+  }
+
   entry->pids[entry->pidCount] = pid;
   ++entry->pidCount;
 }
 
-static void addPatternToSmallCompactTable(DFC_STRUCTURE *dfc,
+static void addPatternToSmallCompactTable(DynamicCtSmallEntry *ct,
                                           DFC_PATTERN *pattern) {
   assert(pattern->n >= SMALL_DF_MIN_PATTERN_SIZE);
   assert(pattern->n <= SMALL_DF_MAX_PATTERN_SIZE);
 
   uint8_t character = pattern->casepatrn[0];
-  pushPatternToSmallCompactTable(dfc, character, pattern->iid);
+  pushPatternToSmallCompactTable(ct, character, pattern->iid);
 
   if (pattern->is_case_insensitive) {
-    pushPatternToSmallCompactTable(dfc, toggleCharacterCase(character),
+    pushPatternToSmallCompactTable(ct, toggleCharacterCase(character),
                                    pattern->iid);
   }
 }
 
-static void getEmptyOrEqualLargeCompactTableEntry(
-    uint32_t pattern, CompactTableLargeEntry **entry) {
-  int entryCount = 0;
-  while (entryCount < MAX_ENTRIES_PER_BUCKET && (*entry)->pidCount &&
-         (*entry)->pattern != pattern) {
-    ++(*entry);
-    ++entryCount;
+static DynamicCtLargeEntry *getEmptyOrEqualLargeCompactTableEntry(
+    uint32_t pattern, int *entryCount, DynamicCtLargeEntry **entry) {
+  int entryIndex = 0;
+  while (entryIndex < *entryCount && (*entry + entryIndex)->pidCount &&
+         (*entry + entryIndex)->pattern != pattern) {
+    ++entryIndex;
   }
 
-  if (entryCount == MAX_ENTRIES_PER_BUCKET - 1) {
-    fprintf(stderr,
-            "Too many entries with the same hash in the large compact table."
-            "Please increase MAX_ENTRIES_PER_BUCKET or update the hash "
-            "function\n");
-    exit(TOO_MANY_ENTRIES_IN_LARGE_CT_EXIT_CODE);
+  if (entryIndex == *entryCount) {
+    ++(*entryCount);
+    *entry = realloc(*entry, (*entryCount) * sizeof(CompactTableLargeEntry));
+
+    if (!*entry) {
+      fprintf(stderr, "Could not allocate dynamic large CT");
+      exit(1);
+    }
+
+    (*entry + entryIndex)->pidCount = 0;
+    (*entry + entryIndex)->pids = NULL;
   }
 
-  if ((*entry)->pidCount == MAX_PID_PER_ENTRY_LARGE_CT) {
-    fprintf(stderr,
-            "Too many equal patterns in the large compact hash table."
-            "Please increase MAX_PID_PER_ENTRY_LARGE_CT\n");
-    exit(TOO_MANY_PID_IN_LARGE_CT_EXIT_CODE);
-  }
+  return *entry + entryIndex;
 }
 
-static bool hasPid(CompactTableLargeEntry *entry, PID_TYPE pid) {
+static bool hasPid(DynamicCtLargeEntry *entry, PID_TYPE pid) {
   for (int i = 0; i < entry->pidCount; ++i) {
     if (entry->pids[i] == pid) {
       return true;
@@ -490,21 +505,29 @@ static bool hasPid(CompactTableLargeEntry *entry, PID_TYPE pid) {
   return false;
 }
 
-static void pushPatternToLargeCompactTable(DFC_STRUCTURE *dfc, uint32_t pattern,
+static void pushPatternToLargeCompactTable(DynamicCtLarge *ct, uint32_t pattern,
                                            PID_TYPE pid) {
   uint32_t hash = hashForLargeCompactTable(pattern);
-  CompactTableLargeEntry *entry = dfc->compactTableLarge[hash].entries;
-
-  getEmptyOrEqualLargeCompactTableEntry(pattern, &entry);
+  DynamicCtLarge *bucket = &ct[hash];
+  DynamicCtLargeEntry *entry = getEmptyOrEqualLargeCompactTableEntry(
+      pattern, &bucket->entryCount, &bucket->entries);
 
   if (!hasPid(entry, pid)) {
     entry->pattern = pattern;
+    entry->pids =
+        realloc(entry->pids, (entry->pidCount + 1) * sizeof(PID_TYPE));
+
+    if (!entry->pids) {
+      fprintf(stderr, "Could not allocate memory for large dynamic CT");
+      exit(1);
+    }
+
     entry->pids[entry->pidCount] = pid;
     ++entry->pidCount;
   }
 }
 
-static void addPatternToLargeCompactTable(DFC_STRUCTURE *dfc,
+static void addPatternToLargeCompactTable(DynamicCtLarge *ct,
                                           DFC_PATTERN *pattern) {
   int patternLength = SMALL_DF_MAX_PATTERN_SIZE + 1;
   assert(pattern->n >= patternLength);
@@ -524,7 +547,7 @@ static void addPatternToLargeCompactTable(DFC_STRUCTURE *dfc,
                       patternPermutations[i * patternLength + 2] << 16 |
                       patternPermutations[i * patternLength + 1] << 8 |
                       patternPermutations[i * patternLength + 0];
-      pushPatternToLargeCompactTable(dfc, data, pattern->iid);
+      pushPatternToLargeCompactTable(ct, data, pattern->iid);
     }
 
     free(patternPermutations);
@@ -532,20 +555,86 @@ static void addPatternToLargeCompactTable(DFC_STRUCTURE *dfc,
     uint32_t data =
         firstCharactersOfPattern[3] << 24 | firstCharactersOfPattern[2] << 16 |
         firstCharactersOfPattern[1] << 8 | firstCharactersOfPattern[0];
-    pushPatternToLargeCompactTable(dfc, data, pattern->iid);
+    pushPatternToLargeCompactTable(ct, data, pattern->iid);
   }
 }
 
+static void toStaticSmallCt(CompactTableSmallEntry *staticCt,
+                            DynamicCtSmallEntry *dynamicCt) {
+  for (int i = 0; i < COMPACT_TABLE_SIZE_SMALL; ++i) {
+    DynamicCtSmallEntry *dynamicEntry = dynamicCt + i;
+    CompactTableSmallEntry *staticEntry = staticCt + i;
+
+    staticEntry->pattern = dynamicEntry->pattern;
+    staticEntry->pidCount = dynamicEntry->pidCount;
+    for (int j = 0; j < dynamicEntry->pidCount; ++j) {
+      staticEntry->pids[j] = dynamicEntry->pids[j];
+    }
+  }
+}
+
+static void freeDynamicSmallCt(DynamicCtSmallEntry *ct) {
+  for (int i = 0; i < COMPACT_TABLE_SIZE_SMALL; ++i) {
+    DynamicCtSmallEntry *entry = ct + i;
+    free(entry->pids);
+  }
+  free(ct);
+}
+
+static void toStaticLargeCt(CompactTableLarge *staticCt,
+                            DynamicCtLarge *dynamicCt) {
+  for (int i = 0; i < COMPACT_TABLE_SIZE_LARGE; ++i) {
+    DynamicCtLarge *dynamicBucket = dynamicCt + i;
+    CompactTableLarge *staticBucket = staticCt + i;
+
+    for (int j = 0; j < dynamicBucket->entryCount; ++j) {
+      DynamicCtLargeEntry *dynamicEntry = dynamicBucket->entries + j;
+      CompactTableLargeEntry *staticEntry = staticBucket->entries + j;
+
+      staticEntry->pattern = dynamicEntry->pattern;
+      staticEntry->pidCount = dynamicEntry->pidCount;
+      for (int k = 0; k < dynamicEntry->pidCount; ++k) {
+        staticEntry->pids[k] = dynamicEntry->pids[k];
+      }
+    }
+  }
+}
+
+static void freeDynamicLargeCt(DynamicCtLarge *ct) {
+  for (int i = 0; i < COMPACT_TABLE_SIZE_LARGE; ++i) {
+    DynamicCtLarge *bucket = ct + i;
+    for (int j = 0; j < bucket->entryCount; ++j) {
+      DynamicCtLargeEntry *entry = bucket->entries + j;
+      free(entry->pids);
+    }
+
+    free(bucket->entries);
+  }
+
+  free(ct);
+}
+
 static void setupCompactTables(DFC_STRUCTURE *dfc, DFC_PATTERN_INIT *patterns) {
+  DynamicCtSmallEntry *smallCt =
+      calloc(1, COMPACT_TABLE_SIZE_SMALL * sizeof(DynamicCtSmallEntry));
+  DynamicCtLarge *largeCt =
+      calloc(1, COMPACT_TABLE_SIZE_LARGE * sizeof(DynamicCtLarge));
+
   for (DFC_PATTERN *plist = patterns->dfcPatterns; plist != NULL;
        plist = plist->next) {
     if (plist->n >= SMALL_DF_MIN_PATTERN_SIZE &&
         plist->n <= SMALL_DF_MAX_PATTERN_SIZE) {
-      addPatternToSmallCompactTable(dfc, plist);
+      addPatternToSmallCompactTable(smallCt, plist);
     } else {
-      addPatternToLargeCompactTable(dfc, plist);
+      addPatternToLargeCompactTable(largeCt, plist);
     }
   }
+
+  toStaticSmallCt(dfc->compactTableSmall, smallCt);
+  freeDynamicSmallCt(smallCt);
+
+  toStaticLargeCt(dfc->compactTableLarge, largeCt);
+  freeDynamicLargeCt(largeCt);
 }
 
 static uint8_t toggleCharacterCase(uint8_t character) {
