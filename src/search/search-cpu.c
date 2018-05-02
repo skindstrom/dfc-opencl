@@ -61,18 +61,22 @@ static void verifySmall(CompactTableSmallEntry *ct, PID_TYPE *pids,
   }
 }
 
-static void verifyLarge(CompactTableLarge *ct, DFC_FIXED_PATTERN *patterns,
-                        uint8_t *input, int currentPos, int inputLength,
-                        VerifyResult *result) {
+static void verifyLarge(CompactTableLargeBucket *buckets,
+                        CompactTableLargeEntry *entries, PID_TYPE *pids,
+                        DFC_FIXED_PATTERN *patterns, uint8_t *input,
+                        int currentPos, int inputLength, VerifyResult *result) {
   uint32_t bytePattern =
       input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
   uint32_t hash = hashForLargeCompactTable(bytePattern);
 
-  uint8_t multiplier = 0;
-  for (; GET_ENTRY_LARGE_CT(hash, multiplier)->pidCount; ++multiplier) {
-    if (GET_ENTRY_LARGE_CT(hash, multiplier)->pattern == bytePattern) {
-      for (int i = 0; i < GET_ENTRY_LARGE_CT(hash, multiplier)->pidCount; ++i) {
-        PID_TYPE pid = GET_ENTRY_LARGE_CT(hash, multiplier)->pids[i];
+  int32_t entryOffset = (buckets + hash)->entryOffset;
+
+  for (int i = 0; i < (buckets + hash)->entryCount; ++i) {
+    if ((entries + entryOffset + i)->pattern == bytePattern) {
+      int32_t pidOffset = (entries + entryOffset + i)->pidOffset;
+
+      for (int j = 0; j < (entries + entryOffset + i)->pidCount; ++j) {
+        PID_TYPE pid = pids[pidOffset + j];
 
         int patternLength = (patterns + pid)->pattern_length;
         if (inputLength - currentPos >= patternLength) {
@@ -129,8 +133,9 @@ int searchCpuEmulateGpu(MatchFunction onMatch) {
 
     if (i < inputLength - 3 && (dfc->directFilterLarge[byteIndex] & bitMask) &&
         isInHashDf(dfc->directFilterLargeHash, input + i)) {
-      verifyLarge(dfc->compactTableLarge, patterns->dfcMatchList, input + i, i,
-                  inputLength, result + i);
+      verifyLarge(dfc->ctLargeBuckets, dfc->ctLargeEntries, dfc->ctLargePids,
+                  patterns->dfcMatchList, input + i, i, inputLength,
+                  result + i);
     }
   }
 
@@ -181,29 +186,36 @@ static int verifySmallRet(CompactTableSmallEntry *ct, PID_TYPE *pids,
   return matches;
 }
 
-static int verifyLargeRet(CompactTableLarge *ct, DFC_FIXED_PATTERN *patterns,
-                          uint8_t *input, int currentPos, int inputLength,
+static int verifyLargeRet(CompactTableLargeBucket *buckets,
+                          CompactTableLargeEntry *entries, PID_TYPE *pids,
+                          DFC_FIXED_PATTERN *patterns, uint8_t *input,
+                          int currentPos, int inputLength,
                           MatchFunction onMatch) {
   uint32_t bytePattern =
       input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
   uint32_t hash = hashForLargeCompactTable(bytePattern);
+  int32_t entryOffset = (buckets + hash)->entryOffset;
 
   int matches = 0;
-  uint8_t multiplier = 0;
-  for (; GET_ENTRY_LARGE_CT(hash, multiplier)->pidCount; ++multiplier) {
-    if (GET_ENTRY_LARGE_CT(hash, multiplier)->pattern == bytePattern) {
-      for (int i = 0; i < GET_ENTRY_LARGE_CT(hash, multiplier)->pidCount; ++i) {
-        PID_TYPE pid = GET_ENTRY_LARGE_CT(hash, multiplier)->pids[i];
+  for (int i = 0; i < (buckets + hash)->entryCount; ++i) {
+    if ((entries + entryOffset + i)->pattern == bytePattern) {
+      int32_t pidOffset = (entries + entryOffset + i)->pidOffset;
+
+      for (int j = 0; j < (entries + entryOffset + i)->pidCount; ++j) {
+        PID_TYPE pid = pids[pidOffset + j];
 
         int patternLength = (patterns + pid)->pattern_length;
-        if (inputLength - currentPos >= patternLength &&
-            doesPatternMatch(input, (patterns + pid)->original_pattern,
-                             patternLength,
-                             (patterns + pid)->is_case_insensitive)) {
-          onMatch(&patterns[pid]);
-          ++matches;
+        if (inputLength - currentPos >= patternLength) {
+          if (doesPatternMatch(input, (patterns + pid)->original_pattern,
+                               patternLength,
+                               (patterns + pid)->is_case_insensitive)) {
+            onMatch(&patterns[pid]);
+            ++matches;
+          }
         }
       }
+
+      break;
     }
   }
 
@@ -230,7 +242,8 @@ int searchCpu(MatchFunction onMatch) {
 
     if (i < inputLength - 3 && (dfc->directFilterLarge[byteIndex] & bitMask) &&
         isInHashDf(dfc->directFilterLargeHash, input + i)) {
-      matches += verifyLargeRet(dfc->compactTableLarge, patterns->dfcMatchList,
+      matches += verifyLargeRet(dfc->ctLargeBuckets, dfc->ctLargeEntries,
+                                dfc->ctLargePids, patterns->dfcMatchList,
                                 input + i, i, inputLength, onMatch);
     }
   }
@@ -253,7 +266,8 @@ int exactMatchingUponFiltering(uint8_t *result, int length,
     }
 
     if (result[i] & 0x02) {
-      matches += verifyLargeRet(dfc->compactTableLarge, patterns->dfcMatchList,
+      matches += verifyLargeRet(dfc->ctLargeBuckets, dfc->ctLargeEntries,
+                                dfc->ctLargePids, patterns->dfcMatchList,
                                 input + i, i, length, onMatch);
     }
   }

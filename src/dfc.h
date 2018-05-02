@@ -51,7 +51,9 @@ typedef struct {
   CompactTableSmallEntry *ctSmallEntries;
   PID_TYPE *ctSmallPids;
 
-  CompactTableLarge *compactTableLarge;
+  CompactTableLargeBucket *ctLargeBuckets;
+  CompactTableLargeEntry *ctLargeEntries;
+  PID_TYPE *ctLargePids;
 } DFC_STRUCTURE;
 
 void DFC_AddPattern(DFC_PATTERN_INIT *dfc, unsigned char *pat, int n,

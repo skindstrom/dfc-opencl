@@ -22,7 +22,9 @@ typedef struct {
   cl_mem ctSmallEntries;
   cl_mem ctSmallPids;
 
-  cl_mem ctLarge;
+  cl_mem ctLargeBuckets;
+  cl_mem ctLargeEntries;
+  cl_mem ctLargePids;
 
   cl_mem result;
 } DfcOpenClBuffers;
@@ -49,7 +51,11 @@ typedef struct {
 
 typedef struct {
   int patternCount;
+
   int ctSmallPidCount;
+
+  int ctLargeEntryCount;
+  int ctLargePidCount;
 } DfcMemoryRequirements;
 
 extern DfcHostMemory DFC_HOST_MEMORY;

@@ -288,10 +288,23 @@ void allocateCompactTablesOnHost(DFC_STRUCTURE *dfc,
     exit(1);
   }
 
-  dfc->compactTableLarge =
-      calloc(1, sizeof(CompactTableLarge) * COMPACT_TABLE_SIZE_LARGE);
-  if (!dfc->compactTableLarge) {
+  dfc->ctLargeBuckets =
+      calloc(1, sizeof(CompactTableLargeBucket) * COMPACT_TABLE_SIZE_LARGE);
+  if (!dfc->ctLargeBuckets) {
     fprintf(stderr, "Could not allocate large CT\n");
+    exit(1);
+  }
+
+  dfc->ctLargeEntries = calloc(
+      1, sizeof(CompactTableLargeEntry) * requirements.ctLargeEntryCount);
+  if (!dfc->ctLargeEntries) {
+    fprintf(stderr, "Could not allocate large CT entries\n");
+    exit(1);
+  }
+
+  dfc->ctLargePids = calloc(1, sizeof(PID_TYPE) * requirements.ctLargePidCount);
+  if (!dfc->ctLargeEntries) {
+    fprintf(stderr, "Could not allocate large CT pids\n");
     exit(1);
   }
 }
@@ -319,16 +332,24 @@ void allocateDfcStructureWithMap(DfcMemoryRequirements requirements) {
     allocateCompactTablesOnHost(dfc, requirements);
   } else {
     createBufferAndMap(
-        context, (void *)&dfc->ctSmallEntries, &DFC_OPENCL_BUFFERS.ctSmallEntries,
+        context, (void *)&dfc->ctSmallEntries,
+        &DFC_OPENCL_BUFFERS.ctSmallEntries,
         COMPACT_TABLE_SIZE_SMALL * sizeof(CompactTableSmallEntry));
-    createBufferAndMap(
-        context, (void *)&dfc->ctSmallPids, &DFC_OPENCL_BUFFERS.ctSmallPids,
-        requirements.ctSmallPidCount * sizeof(PID_TYPE));
-    
+    createBufferAndMap(context, (void *)&dfc->ctSmallPids,
+                       &DFC_OPENCL_BUFFERS.ctSmallPids,
+                       requirements.ctSmallPidCount * sizeof(PID_TYPE));
 
-    createBufferAndMap(context, (void *)&dfc->compactTableLarge,
-                       &DFC_OPENCL_BUFFERS.ctLarge,
-                       COMPACT_TABLE_SIZE_LARGE * sizeof(CompactTableLarge));
+    createBufferAndMap(
+        context, (void *)&dfc->ctLargeBuckets,
+        &DFC_OPENCL_BUFFERS.ctLargeBuckets,
+        COMPACT_TABLE_SIZE_LARGE * sizeof(CompactTableLargeBucket));
+    createBufferAndMap(
+        context, (void *)&dfc->ctLargeEntries,
+        &DFC_OPENCL_BUFFERS.ctLargeEntries,
+        requirements.ctLargeEntryCount * sizeof(CompactTableLargeEntry));
+    createBufferAndMap(context, (void *)&dfc->ctLargePids,
+                       &DFC_OPENCL_BUFFERS.ctLargePids,
+                       requirements.ctLargePidCount * sizeof(PID_TYPE));
   }
 
   DFC_HOST_MEMORY.dfcStructure = dfc;
@@ -382,7 +403,10 @@ void unmapOpenClInputBuffers() {
     unmapOpenClBuffer(queue, dfc->ctSmallEntries, buffers->ctSmallEntries);
     unmapOpenClBuffer(queue, dfc->ctSmallPids, buffers->ctSmallPids);
 
-    unmapOpenClBuffer(queue, dfc->compactTableLarge, buffers->ctLarge);
+    unmapOpenClBuffer(queue, dfc->ctLargeBuckets, buffers->ctLargeBuckets);
+    unmapOpenClBuffer(queue, dfc->ctLargeEntries, buffers->ctLargeEntries);
+    unmapOpenClBuffer(queue, dfc->ctLargePids, buffers->ctLargePids);
+
     unmapOpenClBuffer(queue,
                       DFC_HOST_MEMORY.dfcStructure->patterns->dfcMatchList,
                       DFC_OPENCL_BUFFERS.patterns);
@@ -427,7 +451,9 @@ void freeDfcStructureOnHost() {
   free(dfc->ctSmallEntries);
   free(dfc->ctSmallPids);
 
-  free(dfc->compactTableLarge);
+  free(dfc->ctLargeBuckets);
+  free(dfc->ctLargeEntries);
+  free(dfc->ctLargePids);
 
   free(dfc);
 
@@ -441,7 +467,9 @@ void freeDfcStructureWithMap() {
     free(dfc->ctSmallEntries);
     free(dfc->ctSmallPids);
 
-    free(dfc->compactTableLarge);
+    free(dfc->ctLargeBuckets);
+    free(dfc->ctLargeEntries);
+    free(dfc->ctLargePids);
   }
 
   free(dfc);
@@ -613,7 +641,10 @@ DfcOpenClBuffers createOpenClBuffers(DfcOpenClEnvironment *environment,
   cl_mem ctSmallEntries = NULL;
   cl_mem ctSmallPids = NULL;
 
-  cl_mem ctLarge = NULL;
+  cl_mem ctLargeBuckets = NULL;
+  cl_mem ctLargeEntries = NULL;
+  cl_mem ctLargePids = NULL;
+
   cl_mem patterns = NULL;
   if (!HETEROGENEOUS_DESIGN) {
     ctSmallEntries = createReadOnlyBuffer(
@@ -621,8 +652,14 @@ DfcOpenClBuffers createOpenClBuffers(DfcOpenClEnvironment *environment,
     ctSmallPids = createReadOnlyBuffer(
         context, requirements.ctSmallPidCount * sizeof(PID_TYPE));
 
-    ctLarge = createReadOnlyBuffer(
-        context, sizeof(CompactTableLarge) * COMPACT_TABLE_SIZE_LARGE);
+    ctLargeBuckets = createReadOnlyBuffer(
+        context, sizeof(CompactTableLargeBucket) * COMPACT_TABLE_SIZE_LARGE);
+    ctLargeEntries =
+        createReadOnlyBuffer(context, sizeof(CompactTableLargeEntry) *
+                                          requirements.ctLargeEntryCount);
+    ctLargePids = createReadOnlyBuffer(
+        context, sizeof(PID_TYPE) * requirements.ctLargePidCount);
+
     patterns = createReadOnlyBuffer(
         context, sizeof(DFC_FIXED_PATTERN) * dfcPatterns->numPatterns);
   }
@@ -641,7 +678,10 @@ DfcOpenClBuffers createOpenClBuffers(DfcOpenClEnvironment *environment,
 
                              .dfLarge = dfLarge,
                              .dfLargeHash = dfLargeHash,
-                             .ctLarge = ctLarge,
+
+                             .ctLargeBuckets = ctLargeBuckets,
+                             .ctLargeEntries = ctLargeEntries,
+                             .ctLargePids = ctLargePids,
 
                              .result = result};
 
@@ -685,7 +725,8 @@ void writeOpenClTextureBuffer(cl_command_queue queue, void *host, cl_mem buffer,
 }
 
 void writeOpenClBuffers(DfcOpenClBuffers *deviceMemory, cl_command_queue queue,
-                        DfcHostMemory *hostMemory, DfcMemoryRequirements requirements) {
+                        DfcHostMemory *hostMemory,
+                        DfcMemoryRequirements requirements) {
   writeOpenClBuffer(queue, hostMemory->input, deviceMemory->input,
                     deviceMemory->inputLength);
 
@@ -706,18 +747,25 @@ void writeOpenClBuffers(DfcOpenClBuffers *deviceMemory, cl_command_queue queue,
 
   if (!HETEROGENEOUS_DESIGN) {
     writeOpenClBuffer(
-       queue, hostMemory->dfcStructure->ctSmallEntries,
-       deviceMemory->ctSmallEntries,
-       sizeof(CompactTableSmallEntry) * COMPACT_TABLE_SIZE_SMALL);
-    writeOpenClBuffer(
-       queue, hostMemory->dfcStructure->ctSmallPids,
-       deviceMemory->ctSmallPids,
-       requirements.ctSmallPidCount * sizeof(PID_TYPE)
-       );
+        queue, hostMemory->dfcStructure->ctSmallEntries,
+        deviceMemory->ctSmallEntries,
+        sizeof(CompactTableSmallEntry) * COMPACT_TABLE_SIZE_SMALL);
+    writeOpenClBuffer(queue, hostMemory->dfcStructure->ctSmallPids,
+                      deviceMemory->ctSmallPids,
+                      requirements.ctSmallPidCount * sizeof(PID_TYPE));
 
-    writeOpenClBuffer(queue, hostMemory->dfcStructure->compactTableLarge,
-                      deviceMemory->ctLarge,
-                      sizeof(CompactTableLarge) * COMPACT_TABLE_SIZE_LARGE);
+    writeOpenClBuffer(
+        queue, hostMemory->dfcStructure->ctLargeBuckets,
+        deviceMemory->ctLargeBuckets,
+        sizeof(CompactTableLargeBucket) * COMPACT_TABLE_SIZE_LARGE);
+    writeOpenClBuffer(
+        queue, hostMemory->dfcStructure->ctLargeEntries,
+        deviceMemory->ctLargeEntries,
+        sizeof(CompactTableLargeEntry) * requirements.ctLargeEntryCount);
+    writeOpenClBuffer(queue, hostMemory->dfcStructure->ctLargePids,
+                      deviceMemory->ctLargePids,
+                      sizeof(PID_TYPE) * requirements.ctLargePidCount);
+
     writeOpenClBuffer(queue, hostMemory->dfcStructure->patterns->dfcMatchList,
                       deviceMemory->patterns,
                       hostMemory->dfcStructure->patterns->numPatterns *
@@ -764,7 +812,10 @@ void freeOpenClBuffers() {
     clReleaseMemObject(DFC_OPENCL_BUFFERS.ctSmallEntries);
     clReleaseMemObject(DFC_OPENCL_BUFFERS.ctSmallPids);
 
-    clReleaseMemObject(DFC_OPENCL_BUFFERS.ctLarge);
+    clReleaseMemObject(DFC_OPENCL_BUFFERS.ctLargeBuckets);
+    clReleaseMemObject(DFC_OPENCL_BUFFERS.ctLargeEntries);
+    clReleaseMemObject(DFC_OPENCL_BUFFERS.ctLargePids);
+
     clReleaseMemObject(DFC_OPENCL_BUFFERS.patterns);
   }
 

@@ -51,12 +51,13 @@ typedef struct CompactTableSmallEntry_ {
 typedef struct CompactTableLargeEntry_ {
   uint32_t pattern;
   int32_t pidCount;
-  PID_TYPE pids[MAX_PID_PER_ENTRY_LARGE_CT];
+  int32_t pidOffset;
 } CompactTableLargeEntry;
 
-typedef struct CompactTableLarge_ {
-  CompactTableLargeEntry entries[MAX_ENTRIES_PER_BUCKET];
-} CompactTableLarge;
+typedef struct CompactTableLargeBucket_ {
+  int32_t entryCount;
+  int32_t entryOffset;
+} CompactTableLargeBucket;
 
 typedef struct _dfc_fixed_pattern {
   int32_t pattern_length;

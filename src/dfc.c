@@ -167,6 +167,25 @@ int countNumberOfPidsInSmallCt(DynamicCtSmallEntry *ct) {
   return count;
 }
 
+int countNumberOfEntriesInLargeCt(DynamicCtLarge *ct) {
+  int count = 0;
+  for (int i = 0; i < COMPACT_TABLE_SIZE_LARGE; ++i) {
+    count += ct[i].entryCount;
+  }
+  return count;
+}
+
+int countNumberOfPidsInLargeCt(DynamicCtLarge *ct) {
+  int count = 0;
+  for (int i = 0; i < COMPACT_TABLE_SIZE_LARGE; ++i) {
+    for (int j = 0; j < ct[i].entryCount; ++j) {
+      count += ct[i].entries[j].pidCount;
+    }
+  }
+
+  return count;
+}
+
 static void flattenSmallCt(DynamicCtSmallEntry *dynamicCt,
                            CompactTableSmallEntry *staticCt, PID_TYPE *pids) {
   int offset = 0;
@@ -193,21 +212,32 @@ static void freeDynamicSmallCt(DynamicCtSmallEntry *ct) {
   free(ct);
 }
 
-static void toStaticLargeCt(CompactTableLarge *staticCt,
-                            DynamicCtLarge *dynamicCt) {
+static void flattenLargeCt(DynamicCtLarge *dynamicCt,
+                           CompactTableLargeBucket *staticCt,
+                           CompactTableLargeEntry *entries, PID_TYPE *pids) {
+  int entryOffset = 0;
+  int pidOffset = 0;
   for (int i = 0; i < COMPACT_TABLE_SIZE_LARGE; ++i) {
     DynamicCtLarge *dynamicBucket = dynamicCt + i;
-    CompactTableLarge *staticBucket = staticCt + i;
+    CompactTableLargeBucket *staticBucket = staticCt + i;
 
+    staticBucket->entryOffset = entryOffset;
+    staticBucket->entryCount = dynamicBucket->entryCount;
     for (int j = 0; j < dynamicBucket->entryCount; ++j) {
       DynamicCtLargeEntry *dynamicEntry = dynamicBucket->entries + j;
-      CompactTableLargeEntry *staticEntry = staticBucket->entries + j;
+      CompactTableLargeEntry *staticEntry =
+          entries + staticBucket->entryOffset + j;
 
       staticEntry->pattern = dynamicEntry->pattern;
       staticEntry->pidCount = dynamicEntry->pidCount;
+      staticEntry->pidOffset = pidOffset;
+
       for (int k = 0; k < dynamicEntry->pidCount; ++k) {
-        staticEntry->pids[k] = dynamicEntry->pids[k];
+        pids[pidOffset] = dynamicEntry->pids[k];
+        ++pidOffset;
       }
+
+      ++entryOffset;
     }
   }
 }
@@ -238,9 +268,14 @@ DFC_STRUCTURE *DFC_Compile(DFC_PATTERN_INIT *patterns) {
 
   {
     int ctSmallPidCount = countNumberOfPidsInSmallCt(ctSmall);
+    int ctLargeEntryCount = countNumberOfEntriesInLargeCt(ctLarge);
+    int ctLargePidCount = countNumberOfPidsInLargeCt(ctLarge);
 
-    DfcMemoryRequirements requirements = {.patternCount = patterns->numPatterns,
-                                          .ctSmallPidCount = ctSmallPidCount};
+    DfcMemoryRequirements requirements = {
+        .patternCount = patterns->numPatterns,
+        .ctSmallPidCount = ctSmallPidCount,
+        .ctLargeEntryCount = ctLargeEntryCount,
+        .ctLargePidCount = ctLargePidCount};
     allocateDfcStructure(requirements);
   }
 
@@ -250,7 +285,9 @@ DFC_STRUCTURE *DFC_Compile(DFC_PATTERN_INIT *patterns) {
   setupMatchList(patterns, dfc->patterns);
 
   flattenSmallCt(ctSmall, dfc->ctSmallEntries, dfc->ctSmallPids);
-  toStaticLargeCt(dfc->compactTableLarge, ctLarge);
+  flattenLargeCt(ctLarge, dfc->ctLargeBuckets, dfc->ctLargeEntries,
+                 dfc->ctLargePids);
+
   freeDynamicSmallCt(ctSmall);
   freeDynamicLargeCt(ctLarge);
 
@@ -568,7 +605,7 @@ static DynamicCtLargeEntry *getEmptyOrEqualLargeCompactTableEntry(
 
   if (entryIndex == *entryCount) {
     ++(*entryCount);
-    *entry = realloc(*entry, (*entryCount) * sizeof(CompactTableLargeEntry));
+    *entry = realloc(*entry, (*entryCount) * sizeof(DynamicCtLargeEntry));
 
     if (!*entry) {
       fprintf(stderr, "Could not allocate dynamic large CT");

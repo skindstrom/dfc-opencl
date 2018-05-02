@@ -28,9 +28,11 @@ void setKernelArgsNormalDesign(cl_kernel kernel, DfcOpenClBuffers *mem) {
   clSetKernelArg(kernel, 6, sizeof(cl_mem), &mem->ctSmallEntries);
   clSetKernelArg(kernel, 7, sizeof(cl_mem), &mem->ctSmallPids);
 
-  clSetKernelArg(kernel, 8, sizeof(cl_mem), &mem->ctLarge);
+  clSetKernelArg(kernel, 8, sizeof(cl_mem), &mem->ctLargeBuckets);
+  clSetKernelArg(kernel, 9, sizeof(cl_mem), &mem->ctLargeEntries);
+  clSetKernelArg(kernel, 10, sizeof(cl_mem), &mem->ctLargePids);
 
-  clSetKernelArg(kernel, 9, sizeof(cl_mem), &mem->result);
+  clSetKernelArg(kernel, 11, sizeof(cl_mem), &mem->result);
 }
 
 void setKernelArgsHetDesign(cl_kernel kernel, DfcOpenClBuffers *mem) {
