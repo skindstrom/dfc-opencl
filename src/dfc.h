@@ -48,7 +48,9 @@ typedef struct {
   // Indexed by hashing more bytes of the input
   uint8_t *directFilterLargeHash;
 
-  CompactTableSmallEntry *compactTableSmall;
+  CompactTableSmallEntry *ctSmallEntries;
+  PID_TYPE *ctSmallPids;
+
   CompactTableLarge *compactTableLarge;
 } DFC_STRUCTURE;
 

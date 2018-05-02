@@ -38,12 +38,16 @@ static bool doesPatternMatch(uint8_t *start, uint8_t *pattern, int length,
   return !my_strncmp(start, pattern, length);
 }
 
-static void verifySmall(CompactTableSmallEntry *ct, DFC_FIXED_PATTERN *patterns,
-                        uint8_t *input, int currentPos, int inputLength,
-                        VerifyResult *result) {
+static void verifySmall(CompactTableSmallEntry *ct, PID_TYPE *pids,
+                        DFC_FIXED_PATTERN *patterns, uint8_t *input,
+                        int currentPos, int inputLength, VerifyResult *result) {
   uint8_t hash = input[0];
+
+  int offset = (ct + hash)->offset;
+  pids += offset;
+
   for (int i = 0; i < (ct + hash)->pidCount; ++i) {
-    PID_TYPE pid = (ct + hash)->pids[i];
+    PID_TYPE pid = pids[i];
 
     int patternLength = (patterns + pid)->pattern_length;
 
@@ -119,8 +123,8 @@ int searchCpuEmulateGpu(MatchFunction onMatch) {
     result[i].matchCountLargeCt = 0;
 
     if (dfc->directFilterSmall[byteIndex] & bitMask) {
-      verifySmall(dfc->compactTableSmall, patterns->dfcMatchList, input + i, i,
-                  inputLength, result + i);
+      verifySmall(dfc->ctSmallEntries, dfc->ctSmallPids, patterns->dfcMatchList,
+                  input + i, i, inputLength, result + i);
     }
 
     if (i < inputLength - 3 && (dfc->directFilterLarge[byteIndex] & bitMask) &&
@@ -150,14 +154,18 @@ int searchCpuEmulateGpu(MatchFunction onMatch) {
   return matches;
 }
 
-static int verifySmallRet(CompactTableSmallEntry *ct,
+static int verifySmallRet(CompactTableSmallEntry *ct, PID_TYPE *pids,
                           DFC_FIXED_PATTERN *patterns, uint8_t *input,
                           int currentPos, int inputLength,
                           MatchFunction onMatch) {
   uint8_t hash = input[0];
+
+  int offset = (ct + hash)->offset;
+  pids += offset;
+
   int matches = 0;
   for (int i = 0; i < (ct + hash)->pidCount; ++i) {
-    PID_TYPE pid = (ct + hash)->pids[i];
+    PID_TYPE pid = pids[i];
 
     int patternLength = (patterns + pid)->pattern_length;
 
@@ -215,8 +223,9 @@ int searchCpu(MatchFunction onMatch) {
     int16_t bitMask = BMASK(data & DF_MASK);
 
     if (dfc->directFilterSmall[byteIndex] & bitMask) {
-      matches += verifySmallRet(dfc->compactTableSmall, patterns->dfcMatchList,
-                                input + i, i, inputLength, onMatch);
+      matches += verifySmallRet(dfc->ctSmallEntries, dfc->ctSmallPids,
+                                patterns->dfcMatchList, input + i, i,
+                                inputLength, onMatch);
     }
 
     if (i < inputLength - 3 && (dfc->directFilterLarge[byteIndex] & bitMask) &&
@@ -238,8 +247,9 @@ int exactMatchingUponFiltering(uint8_t *result, int length,
 
   for (int i = 0; i < length - 1; ++i) {
     if (result[i] & 0x01) {
-      matches += verifySmallRet(dfc->compactTableSmall, patterns->dfcMatchList,
-                                input + i, i, length, onMatch);
+      matches +=
+          verifySmallRet(dfc->ctSmallEntries, dfc->ctSmallPids,
+                         patterns->dfcMatchList, input + i, i, length, onMatch);
     }
 
     if (result[i] & 0x02) {

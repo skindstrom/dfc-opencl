@@ -33,14 +33,16 @@ bool doesPatternMatch(__global uchar *start, __global uchar *pattern,
 }
 
 void verifySmall(__global CompactTableSmallEntry *ct,
+                  __global PID_TYPE *pids,
                  __global DFC_FIXED_PATTERN *patterns, __global uchar *input,
                  int currentPos, int inputLength,
                  __global VerifyResult *result) {
   uchar hash = input[0];
-  int matches = 0;
+  pids += (ct + hash)->offset;
 
+  int matches = 0;
   for (int i = 0; i < (ct + hash)->pidCount; ++i) {
-    PID_TYPE pid = (ct + hash)->pids[i];
+    PID_TYPE pid = pids[i];
 
     int patternLength = (patterns + pid)->pattern_length;
 
@@ -93,7 +95,9 @@ bool isInHashDf(__global uchar *df, __global uchar *input) {
 __kernel void search(int inputLength, __global uchar *input,
                      __global DFC_FIXED_PATTERN *patterns,
                      __global uchar *dfSmall, __global uchar *dfLarge,
-                     __global uchar *dfLargeHash, __global uchar *ctSmall,
+                     __global uchar *dfLargeHash, 
+                     __global CompactTableSmallEntry *ctSmallEntries,
+                     __global PID_TYPE *ctSmallPids,
                      __global uchar *ctLarge, __global VerifyResult *result) {
   uint i = (get_group_id(0) * get_local_size(0) + get_local_id(0)) *
            THREAD_GRANULARITY;
@@ -107,7 +111,7 @@ __kernel void search(int inputLength, __global uchar *input,
     result[i].matchCountLargeCt = 0;
 
     if (dfSmall[byteIndex] & bitMask) {
-      verifySmall(ctSmall, patterns, input + i, i, inputLength, result + i);
+      verifySmall(ctSmallEntries, ctSmallPids, patterns, input + i, i, inputLength, result + i);
     }
 
     if ((dfLarge[byteIndex] & bitMask) && i < inputLength - 3 &&
@@ -129,7 +133,8 @@ __kernel void search_with_image(int inputLength, __global uchar *input,
                                 __read_only image1d_t dfSmall,
                                 __read_only image1d_t dfLarge,
                                 __global uchar *dfLargeHash,
-                                __global uchar *ctSmall,
+                                __global CompactTableSmallEntry *ctSmallEntries,
+                                __global PID_TYPE *ctSmallPids,
                                 __global uchar *ctLarge,
                                 __global VerifyResult *result) {
   uint i = (get_group_id(0) * get_local_size(0) + get_local_id(0)) *
@@ -147,7 +152,7 @@ __kernel void search_with_image(int inputLength, __global uchar *input,
     img_read df =
         (img_read)read_imageui(dfSmall, SHIFT_BY_CHANNEL_SIZE(byteIndex));
     if (df.scalar[byteIndex % TEXTURE_CHANNEL_BYTE_SIZE] & bitMask) {
-      verifySmall(ctSmall, patterns, input + i, i, inputLength, result + i);
+      verifySmall(ctSmallEntries, ctSmallPids, patterns, input + i, i, inputLength, result + i);
     }
 
     df = (img_read)read_imageui(dfLarge, SHIFT_BY_CHANNEL_SIZE(byteIndex));
@@ -171,7 +176,8 @@ __kernel void search_with_local(int inputLength, __global uchar *input,
                                 __global uchar *dfSmall,
                                 __global uchar *dfLarge,
                                 __global uchar *dfLargeHash,
-                                __global uchar *ctSmall,
+                                __global CompactTableSmallEntry *ctSmallEntries,
+                                __global PID_TYPE *ctSmallPids,
                                 __global uchar *ctLarge,
                                 __global VerifyResult *result) {
   uint i = (get_group_id(0) * get_local_size(0) + get_local_id(0)) *
@@ -200,7 +206,7 @@ __kernel void search_with_local(int inputLength, __global uchar *input,
     result[i].matchCountLargeCt = 0;
 
     if (dfSmall[byteIndex] & bitMask) {
-      verifySmall(ctSmall, patterns, input + i, i, inputLength, result + i);
+      verifySmall(ctSmallEntries, ctSmallPids, patterns, input + i, i, inputLength, result + i);
     }
 
     if ((dfLarge[byteIndex] & bitMask) && i < inputLength - 3 &&

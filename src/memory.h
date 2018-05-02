@@ -19,7 +19,9 @@ typedef struct {
   cl_mem dfLarge;
   cl_mem dfLargeHash;
 
-  cl_mem ctSmall;
+  cl_mem ctSmallEntries;
+  cl_mem ctSmallPids;
+
   cl_mem ctLarge;
 
   cl_mem result;
@@ -45,12 +47,17 @@ typedef struct {
   DFC_STRUCTURE *dfcStructure;
 } DfcHostMemory;
 
+typedef struct {
+  int patternCount;
+  int ctSmallPidCount;
+} DfcMemoryRequirements;
+
 extern DfcHostMemory DFC_HOST_MEMORY;
 
 void setupExecutionEnvironment();
 void releaseExecutionEnvironment();
 
-void allocateDfcStructure(int numPatterns);
+void allocateDfcStructure(DfcMemoryRequirements requirements);
 void allocateInput(int size);
 
 void freeDfcStructure();

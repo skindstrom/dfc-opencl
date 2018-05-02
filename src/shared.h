@@ -45,7 +45,7 @@
 typedef struct CompactTableSmallEntry_ {
   uint8_t pattern;
   int32_t pidCount;
-  PID_TYPE pids[MAX_PID_PER_ENTRY_SMALL_CT];
+  int32_t offset;
 } CompactTableSmallEntry;
 
 typedef struct CompactTableLargeEntry_ {
