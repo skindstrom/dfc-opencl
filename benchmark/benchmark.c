@@ -21,9 +21,9 @@ int main(int argc, char **argv) {
   char *input = readDataFile(argv[2]);
 
   DFC_PATTERN_INIT *init_struct = addPatterns(argv[1]);
-  DFC_STRUCTURE *dfc = compilePatterns(init_struct);
+  compilePatterns(init_struct);
 
-  int matchCount = benchmarkSearch(dfc);
+  int matchCount = benchmarkSearch();
   printf("\n* Total match count: %d\n", matchCount);
 
   DFC_FreeStructure();
@@ -52,10 +52,8 @@ DFC_PATTERN_INIT *addPatterns(char *pattern_file) {
 }
 
 DFC_STRUCTURE *compilePatterns(DFC_PATTERN_INIT *init_struct) {
-  DFC_STRUCTURE *dfc = DFC_New(init_struct->numPatterns);
-
   startTimer(TIMER_COMPILE_DFC);
-  DFC_Compile(dfc, init_struct);
+  DFC_STRUCTURE *dfc = DFC_Compile(init_struct);
   stopTimer(TIMER_COMPILE_DFC);
 
   return dfc;

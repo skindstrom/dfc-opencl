@@ -229,7 +229,6 @@ int searchCpu(MatchFunction onMatch) {
   return matches;
 }
 
-
 int exactMatchingUponFiltering(uint8_t *result, int length,
                                DFC_PATTERNS *patterns, MatchFunction onMatch) {
   DFC_STRUCTURE *dfc = DFC_HOST_MEMORY.dfcStructure;

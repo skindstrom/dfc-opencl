@@ -49,8 +49,7 @@ TEST_CASE("DFC") {
     DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
     addCaseSensitivePattern(patternInit, input, pid);
 
-    DFC_STRUCTURE* dfc = DFC_New(patternInit->numPatterns);
-    DFC_Compile(dfc, patternInit);
+    DFC_Compile(patternInit);
 
     auto matchCount = DFC_Search(onMatch);
 
@@ -72,8 +71,7 @@ TEST_CASE("DFC") {
     DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
     addCaseSensitivePattern(patternInit, pattern, pid);
 
-    DFC_STRUCTURE* dfc = DFC_New(patternInit->numPatterns);
-    DFC_Compile(dfc, patternInit);
+    DFC_Compile(patternInit);
 
     auto matchCount = DFC_Search(onMatch);
 
@@ -93,8 +91,7 @@ TEST_CASE("DFC") {
     addCaseSensitivePattern(patternInit, "at", pid);
     addCaseSensitivePattern(patternInit, "ck", pid + 1);
 
-    DFC_STRUCTURE* dfc = DFC_New(patternInit->numPatterns);
-    DFC_Compile(dfc, patternInit);
+    DFC_Compile(patternInit);
 
     auto matchCount = DFC_Search(onMatch);
 
@@ -113,8 +110,7 @@ TEST_CASE("DFC") {
     DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
     addCaseSensitivePattern(patternInit, "attack123", pid);
 
-    DFC_STRUCTURE* dfc = DFC_New(patternInit->numPatterns);
-    DFC_Compile(dfc, patternInit);
+    DFC_Compile(patternInit);
 
     auto matchCount = DFC_Search(onMatch);
 
@@ -134,8 +130,7 @@ TEST_CASE("DFC") {
     addCaseSensitivePattern(patternInit, "attack", pid);
     addCaseSensitivePattern(patternInit, "attack", pid + 1);
 
-    DFC_STRUCTURE* dfc = DFC_New(patternInit->numPatterns);
-    DFC_Compile(dfc, patternInit);
+    DFC_Compile(patternInit);
 
     auto matchCount = DFC_Search(onMatch);
 
@@ -154,8 +149,7 @@ TEST_CASE("DFC") {
     DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
     addCaseSensitivePattern(patternInit, "Attack", pid);
 
-    DFC_STRUCTURE* dfc = DFC_New(patternInit->numPatterns);
-    DFC_Compile(dfc, patternInit);
+    DFC_Compile(patternInit);
 
     auto matchCount = DFC_Search(onMatch);
 
@@ -174,8 +168,7 @@ TEST_CASE("DFC") {
     DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
     addCaseInSensitivePattern(patternInit, "Attack", pid);
 
-    DFC_STRUCTURE* dfc = DFC_New(patternInit->numPatterns);
-    DFC_Compile(dfc, patternInit);
+    DFC_Compile(patternInit);
 
     auto matchCount = DFC_Search(onMatch);
 
@@ -195,8 +188,7 @@ TEST_CASE("DFC") {
     addCaseSensitivePattern(patternInit, "at", pid);
     addCaseInSensitivePattern(patternInit, "Tk", pid + 1);
 
-    DFC_STRUCTURE* dfc = DFC_New(patternInit->numPatterns);
-    DFC_Compile(dfc, patternInit);
+    DFC_Compile(patternInit);
 
     auto matchCount = DFC_Search(onMatch);
 
@@ -216,8 +208,7 @@ TEST_CASE("DFC") {
     addCaseSensitivePattern(patternInit, "at", pid);
     addCaseInSensitivePattern(patternInit, "At", pid + 1);
 
-    DFC_STRUCTURE* dfc = DFC_New(patternInit->numPatterns);
-    DFC_Compile(dfc, patternInit);
+    DFC_Compile(patternInit);
 
     auto matchCount = DFC_Search(onMatch);
 
@@ -237,8 +228,7 @@ TEST_CASE("DFC") {
     addCaseSensitivePattern(patternInit, "A", pid);
     addCaseInSensitivePattern(patternInit, "k", pid + 1);
 
-    DFC_STRUCTURE* dfc = DFC_New(patternInit->numPatterns);
-    DFC_Compile(dfc, patternInit);
+    DFC_Compile(patternInit);
 
     auto matchCount = DFC_Search(onMatch);
 
@@ -258,8 +248,7 @@ TEST_CASE("DFC") {
     addCaseSensitivePattern(patternInit, "At", pid);
     addCaseInSensitivePattern(patternInit, "ck", pid + 1);
 
-    DFC_STRUCTURE* dfc = DFC_New(patternInit->numPatterns);
-    DFC_Compile(dfc, patternInit);
+    DFC_Compile(patternInit);
 
     auto matchCount = DFC_Search(onMatch);
 
@@ -279,8 +268,7 @@ TEST_CASE("DFC") {
     addCaseSensitivePattern(patternInit, "Att", pid);
     addCaseInSensitivePattern(patternInit, "ack", pid + 1);
 
-    DFC_STRUCTURE* dfc = DFC_New(patternInit->numPatterns);
-    DFC_Compile(dfc, patternInit);
+    DFC_Compile(patternInit);
 
     auto matchCount = DFC_Search(onMatch);
 
@@ -299,8 +287,7 @@ TEST_CASE("DFC") {
     addCaseSensitivePattern(patternInit, "Atta", pid);
     addCaseInSensitivePattern(patternInit, "tack", pid + 1);
 
-    DFC_STRUCTURE* dfc = DFC_New(patternInit->numPatterns);
-    DFC_Compile(dfc, patternInit);
+    DFC_Compile(patternInit);
 
     auto matchCount = DFC_Search(onMatch);
 
@@ -320,8 +307,7 @@ TEST_CASE("DFC") {
     addCaseSensitivePattern(patternInit, "Attac", pid);
     addCaseInSensitivePattern(patternInit, "ttack", pid + 1);
 
-    DFC_STRUCTURE* dfc = DFC_New(patternInit->numPatterns);
-    DFC_Compile(dfc, patternInit);
+    DFC_Compile(patternInit);
 
     auto matchCount = DFC_Search(onMatch);
 
@@ -341,8 +327,7 @@ TEST_CASE("DFC") {
     addCaseSensitivePattern(patternInit, "Attack", pid);
     addCaseInSensitivePattern(patternInit, "attack", pid + 1);
 
-    DFC_STRUCTURE* dfc = DFC_New(patternInit->numPatterns);
-    DFC_Compile(dfc, patternInit);
+    DFC_Compile(patternInit);
 
     auto matchCount = DFC_Search(onMatch);
 
@@ -362,8 +347,7 @@ TEST_CASE("DFC") {
     addCaseSensitivePattern(patternInit, "Attacks", pid);
     addCaseInSensitivePattern(patternInit, "d CRASH", pid + 1);
 
-    DFC_STRUCTURE* dfc = DFC_New(patternInit->numPatterns);
-    DFC_Compile(dfc, patternInit);
+    DFC_Compile(patternInit);
 
     auto matchCount = DFC_Search(onMatch);
 
@@ -383,8 +367,7 @@ TEST_CASE("DFC") {
     addCaseSensitivePattern(patternInit, "Attacker", pid);
     addCaseInSensitivePattern(patternInit, "nd CRASH", pid + 1);
 
-    DFC_STRUCTURE* dfc = DFC_New(patternInit->numPatterns);
-    DFC_Compile(dfc, patternInit);
+    DFC_Compile(patternInit);
 
     auto matchCount = DFC_Search(onMatch);
 
@@ -404,8 +387,7 @@ TEST_CASE("DFC") {
     addCaseSensitivePattern(patternInit, "This is a very long", pid);
     addCaseInSensitivePattern(patternInit, "is a VERY long input", pid + 1);
 
-    DFC_STRUCTURE* dfc = DFC_New(patternInit->numPatterns);
-    DFC_Compile(dfc, patternInit);
+    DFC_Compile(patternInit);
 
     auto matchCount = DFC_Search(onMatch);
 
@@ -428,8 +410,7 @@ TEST_CASE("DFC") {
       addCaseSensitivePattern(patternInit, patterns[i], i);
     }
 
-    DFC_STRUCTURE* dfc = DFC_New(patternInit->numPatterns);
-    DFC_Compile(dfc, patternInit);
+    DFC_Compile(patternInit);
 
     char* input = DFC_NewInput(100);
     // 4 random passwords
@@ -464,8 +445,7 @@ TEST_CASE("DFC") {
     DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
     addCaseSensitivePattern(patternInit, pattern, pid);
 
-    DFC_STRUCTURE* dfc = DFC_New(patternInit->numPatterns);
-    DFC_Compile(dfc, patternInit);
+    DFC_Compile(patternInit);
 
     auto matchCount = DFC_Search(onMatch);
 
@@ -486,8 +466,7 @@ TEST_CASE("DFC") {
     DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
     addCaseSensitivePattern(patternInit, pattern, pid);
 
-    DFC_STRUCTURE* dfc = DFC_New(patternInit->numPatterns);
-    DFC_Compile(dfc, patternInit);
+    DFC_Compile(patternInit);
 
     auto matchCount = DFC_Search(onMatch);
 
@@ -506,8 +485,7 @@ TEST_CASE("DFC") {
     DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
     addCaseSensitivePattern(patternInit, "Attack", pid);
 
-    DFC_STRUCTURE* dfc = DFC_New(patternInit->numPatterns);
-    DFC_Compile(dfc, patternInit);
+    DFC_Compile(patternInit);
 
     auto matchCount = DFC_Search(onMatch);
 
@@ -527,8 +505,7 @@ TEST_CASE("DFC") {
     addCaseSensitivePattern(patternInit, "Attack", pid);
     addCaseSensitivePattern(patternInit, "ttack", pid);
 
-    DFC_STRUCTURE* dfc = DFC_New(patternInit->numPatterns);
-    DFC_Compile(dfc, patternInit);
+    DFC_Compile(patternInit);
 
     auto matchCount = DFC_Search(onMatch);
 
@@ -548,8 +525,7 @@ TEST_CASE("DFC") {
     addCaseSensitivePattern(patternInit, "at", pid);
     addCaseSensitivePattern(patternInit, "ck", pid + 1);
 
-    DFC_STRUCTURE* dfc = DFC_New(patternInit->numPatterns);
-    DFC_Compile(dfc, patternInit);
+    DFC_Compile(patternInit);
 
     DFC_Search(onMatch);
 
@@ -575,8 +551,7 @@ TEST_CASE("DFC") {
     addCaseSensitivePattern(patternInit, "attack", pid);
     addCaseSensitivePattern(patternInit, "attack", pid + 1);
 
-    DFC_STRUCTURE* dfc = DFC_New(patternInit->numPatterns);
-    DFC_Compile(dfc, patternInit);
+    DFC_Compile(patternInit);
 
     auto matchCount = DFC_Search(onMatch);
 

@@ -38,8 +38,7 @@ int main(void) {
   DFC_AddPattern(patternInit, (unsigned char *)pat4, strlen(pat4),
                  1 /*case-insensitive pattern*/, 3 /*Pattern ID*/);
 
-  DFC_STRUCTURE *dfc = DFC_New(patternInit->numPatterns);
-  DFC_Compile(dfc, patternInit);
+  DFC_Compile(patternInit);
 
   printf("* Result:\n");
   int res = DFC_Search(printResult);

@@ -54,7 +54,7 @@ typedef struct {
 
 void DFC_AddPattern(DFC_PATTERN_INIT *dfc, unsigned char *pat, int n,
                     int is_case_insensitive, PID_TYPE sid);
-void DFC_Compile(DFC_STRUCTURE *dfc, DFC_PATTERN_INIT *patterns);
+DFC_STRUCTURE *DFC_Compile(DFC_PATTERN_INIT *patterns);
 
 typedef void (*MatchFunction)(DFC_FIXED_PATTERN *pattern);
 
@@ -68,7 +68,6 @@ int DFC_Search(MatchFunction onMatch);
 void DFC_PrintInfo(DFC_STRUCTURE *dfc);
 
 char *DFC_NewInput(int size);
-DFC_STRUCTURE *DFC_New(int numPatterns);
 DFC_PATTERN_INIT *DFC_PATTERN_INIT_New();
 
 void DFC_FreeInput();

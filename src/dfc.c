@@ -143,7 +143,9 @@ void DFC_AddPattern(DFC_PATTERN_INIT *dfc, unsigned char *pat, int n,
   }
 }
 
-void DFC_Compile(DFC_STRUCTURE *dfc, DFC_PATTERN_INIT *patterns) {
+DFC_STRUCTURE *DFC_Compile(DFC_PATTERN_INIT *patterns) {
+  DFC_STRUCTURE *dfc = DFC_New(patterns->numPatterns);
+
   startTimer(TIMER_COMPILE_DFC);
 
   setupMatchList(patterns, dfc->patterns);
@@ -151,6 +153,8 @@ void DFC_Compile(DFC_STRUCTURE *dfc, DFC_PATTERN_INIT *patterns) {
   setupCompactTables(dfc, patterns);
 
   stopTimer(TIMER_COMPILE_DFC);
+
+  return dfc;
 }
 
 int DFC_Search(MatchFunction onMatch) { return search(onMatch); }
