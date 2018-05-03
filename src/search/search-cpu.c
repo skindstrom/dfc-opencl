@@ -110,56 +110,63 @@ static bool isInHashDf(uint8_t *df, uint8_t *input) {
   return df[byteIndex] & bitMask;
 }
 
-int searchCpuEmulateGpu(MatchFunction onMatch) {
+int searchCpuEmulateGpu(ReadFunction read, MatchFunction onMatch) {
   DFC_STRUCTURE *dfc = DFC_HOST_MEMORY.dfcStructure;
   DFC_PATTERNS *patterns = dfc->patterns;
-  uint8_t *input = (uint8_t *)DFC_HOST_MEMORY.input;
-  int inputLength = DFC_HOST_MEMORY.inputLength;
 
-  VerifyResult *result = malloc(sizeInBytesOfResultVector(inputLength));
+  uint8_t *input = (uint8_t *)allocateInput(INPUT_READ_CHUNK_BYTES);
+
+  VerifyResult *result =
+      malloc(sizeInBytesOfResultVector(INPUT_READ_CHUNK_BYTES));
   if (!result) {
     fprintf(stderr, "Could not allocate result vector\n");
     exit(1);
   }
 
-  for (int i = 0; i < inputLength - 1; ++i) {
-    int16_t data = input[i + 1] << 8 | input[i];
-    int16_t byteIndex = BINDEX(data & DF_MASK);
-    int16_t bitMask = BMASK(data & DF_MASK);
-
-    result[i].matchCount = 0;
-
-    if (dfc->directFilterSmall[byteIndex] & bitMask) {
-      verifySmall(dfc->ctSmallEntries, dfc->ctSmallPids, patterns->dfcMatchList,
-                  input + i, i, inputLength, result + i);
-    }
-
-    if (i < inputLength - 3 && (dfc->directFilterLarge[byteIndex] & bitMask) &&
-        isInHashDf(dfc->directFilterLargeHash, input + i)) {
-      verifyLarge(dfc->ctLargeBuckets, dfc->ctLargeEntries, dfc->ctLargePids,
-                  patterns->dfcMatchList, input + i, i, inputLength,
-                  result + i);
-    }
-  }
-
   int matches = 0;
-  for (int i = 0; i < inputLength - 1; ++i) {
-    VerifyResult *res = &result[i];
+  int readCount = 0;
+  // read 1 byte less to allow matching of 1-byte patterns without accessing
+  // invalid memory at the very last character
+  while ((readCount = read(INPUT_READ_CHUNK_BYTES - 1, (char *)input))) {
+    for (int i = 0; i < readCount; ++i) {
+      int16_t data = input[i + 1] << 8 | input[i];
+      int16_t byteIndex = BINDEX(data & DF_MASK);
+      int16_t bitMask = BMASK(data & DF_MASK);
 
-    for (int j = 0; j < res->matchCount && j < MAX_MATCHES; ++j) {
-      onMatch(&patterns->dfcMatchList[res->matches[j]]);
-      ++matches;
+      result[i].matchCount = 0;
+
+      if (dfc->directFilterSmall[byteIndex] & bitMask) {
+        verifySmall(dfc->ctSmallEntries, dfc->ctSmallPids,
+                    patterns->dfcMatchList, input + i, i, readCount,
+                    result + i);
+      }
+
+      if (i < readCount - 3 && (dfc->directFilterLarge[byteIndex] & bitMask) &&
+          isInHashDf(dfc->directFilterLargeHash, input + i)) {
+        verifyLarge(dfc->ctLargeBuckets, dfc->ctLargeEntries, dfc->ctLargePids,
+                    patterns->dfcMatchList, input + i, i, readCount,
+                    result + i);
+      }
     }
+    for (int i = 0; i < readCount; ++i) {
+      VerifyResult *res = &result[i];
 
-    if (res->matchCount >= MAX_MATCHES) {
-      printf(
-          "%d patterns matched at position %d, but space was only allocated "
-          "for %d patterns\n",
-          res->matchCount, i, MAX_MATCHES);
+      for (int j = 0; j < res->matchCount && j < MAX_MATCHES; ++j) {
+        onMatch(&patterns->dfcMatchList[res->matches[j]]);
+        ++matches;
+      }
+
+      if (res->matchCount >= MAX_MATCHES) {
+        printf(
+            "%d patterns matched at position %d, but space was only allocated "
+            "for %d patterns\n",
+            res->matchCount, i, MAX_MATCHES);
+      }
     }
   }
 
   free(result);
+  freeDfcInput();
 
   return matches;
 }
@@ -227,31 +234,39 @@ static int verifyLargeRet(CompactTableLargeBucket *buckets,
   return matches;
 }
 
-int searchCpu(MatchFunction onMatch) {
+int searchCpu(ReadFunction read, MatchFunction onMatch) {
   DFC_STRUCTURE *dfc = DFC_HOST_MEMORY.dfcStructure;
   DFC_PATTERNS *patterns = dfc->patterns;
-  uint8_t *input = (uint8_t *)DFC_HOST_MEMORY.input;
-  int inputLength = DFC_HOST_MEMORY.inputLength;
+
+  uint8_t *input = (uint8_t *)allocateInput(INPUT_READ_CHUNK_BYTES);
 
   int matches = 0;
-  for (int i = 0; i < inputLength - 1; ++i) {
-    int16_t data = input[i + 1] << 8 | input[i];
-    int16_t byteIndex = BINDEX(data & DF_MASK);
-    int16_t bitMask = BMASK(data & DF_MASK);
+  int readCount = 0;
+  // read 1 byte less to allow matching of 1-byte patterns without accessing
+  // invalid memory at the very last character
+  while ((readCount = read(INPUT_READ_CHUNK_BYTES - 1, (char *)input))) {
+    for (int i = 0; i < readCount; ++i) {
+      int16_t data = input[i + 1] << 8 | input[i];
+      int16_t byteIndex = BINDEX(data & DF_MASK);
+      int16_t bitMask = BMASK(data & DF_MASK);
 
-    if (dfc->directFilterSmall[byteIndex] & bitMask) {
-      matches += verifySmallRet(dfc->ctSmallEntries, dfc->ctSmallPids,
-                                patterns->dfcMatchList, input + i, i,
-                                inputLength, onMatch);
-    }
+      if (dfc->directFilterSmall[byteIndex] & bitMask) {
+        matches += verifySmallRet(dfc->ctSmallEntries, dfc->ctSmallPids,
+                                  patterns->dfcMatchList, input + i, i,
+                                  readCount, onMatch);
+      }
 
-    if (i < inputLength - 3 && (dfc->directFilterLarge[byteIndex] & bitMask) &&
-        isInHashDf(dfc->directFilterLargeHash, input + i)) {
-      matches += verifyLargeRet(dfc->ctLargeBuckets, dfc->ctLargeEntries,
-                                dfc->ctLargePids, patterns->dfcMatchList,
-                                input + i, i, inputLength, onMatch);
+      if (i < readCount - 3 &&
+          (dfc->directFilterLarge[byteIndex] & bitMask) &&
+          isInHashDf(dfc->directFilterLargeHash, input + i)) {
+        matches += verifyLargeRet(dfc->ctLargeBuckets, dfc->ctLargeEntries,
+                                  dfc->ctLargePids, patterns->dfcMatchList,
+                                  input + i, i, readCount, onMatch);
+      }
     }
   }
+
+  freeDfcInput();
 
   return matches;
 }
@@ -263,7 +278,7 @@ int exactMatchingUponFiltering(uint8_t *result, int length,
 
   int matches = 0;
 
-  for (int i = 0; i < length - 1; ++i) {
+  for (int i = 0; i < length; ++i) {
     if (result[i] & 0x01) {
       matches +=
           verifySmallRet(dfc->ctSmallEntries, dfc->ctSmallPids,

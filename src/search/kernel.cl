@@ -113,7 +113,7 @@ __kernel void search(int inputLength, __global uchar *input,
   uint i = (get_group_id(0) * get_local_size(0) + get_local_id(0)) *
            THREAD_GRANULARITY;
 
-  for (int j = 0; j < THREAD_GRANULARITY && i < inputLength - 1; ++j, ++i) {
+  for (int j = 0; j < THREAD_GRANULARITY && i < inputLength; ++j, ++i) {
     short data = *(input + i + 1) << 8 | *(input + i);
     short byteIndex = BINDEX(data & DF_MASK);
     short bitMask = BMASK(data & DF_MASK);
@@ -152,7 +152,7 @@ __kernel void search_with_image(
   uint i = (get_group_id(0) * get_local_size(0) + get_local_id(0)) *
            THREAD_GRANULARITY;
 
-  for (int j = 0; j < THREAD_GRANULARITY && i < inputLength - 1; ++j, ++i) {
+  for (int j = 0; j < THREAD_GRANULARITY && i < inputLength; ++j, ++i) {
     short data = *(input + i + 1) << 8 | *(input + i);
     short byteIndex = BINDEX(data & DF_MASK);
     short bitMask = BMASK(data & DF_MASK);
@@ -209,7 +209,7 @@ __kernel void search_with_local(
 
   barrier(CLK_LOCAL_MEM_FENCE);
 
-  for (int j = 0; j < THREAD_GRANULARITY && i < inputLength - 1; ++j, ++i) {
+  for (int j = 0; j < THREAD_GRANULARITY && i < inputLength; ++j, ++i) {
     uchar matches = 0;
     short data = *(input + i + 1) << 8 | *(input + i);
     short byteIndex = BINDEX(data & DF_MASK);
@@ -236,7 +236,7 @@ __kernel void filter(int inputLength, __global uchar *input,
   uint i = (get_group_id(0) * get_local_size(0) + get_local_id(0)) *
            THREAD_GRANULARITY;
 
-  for (int j = 0; j < THREAD_GRANULARITY && i < inputLength - 1; ++j, ++i) {
+  for (int j = 0; j < THREAD_GRANULARITY && i < inputLength; ++j, ++i) {
     short data = *(input + i + 1) << 8 | *(input + i);
     short byteIndex = BINDEX(data & DF_MASK);
     short bitMask = BMASK(data & DF_MASK);
@@ -261,7 +261,7 @@ __kernel void filter_with_image(int inputLength, __global uchar *input,
   uint i = (get_group_id(0) * get_local_size(0) + get_local_id(0)) *
            THREAD_GRANULARITY;
 
-  for (int j = 0; j < THREAD_GRANULARITY && i < inputLength - 1; ++j, ++i) {
+  for (int j = 0; j < THREAD_GRANULARITY && i < inputLength; ++j, ++i) {
     uchar matches = 0;
     short data = *(input + i + 1) << 8 | *(input + i);
     short byteIndex = BINDEX(data & DF_MASK);
@@ -301,7 +301,7 @@ __kernel void filter_with_local(int inputLength, __global uchar *input,
 
   barrier(CLK_LOCAL_MEM_FENCE);
 
-  for (int j = 0; j < THREAD_GRANULARITY && i < inputLength - 1; ++j, ++i) {
+  for (int j = 0; j < THREAD_GRANULARITY && i < inputLength; ++j, ++i) {
     short data = *(input + i + 1) << 8 | *(input + i);
     short byteIndex = BINDEX(data & DF_MASK);
     short bitMask = BMASK(data & DF_MASK);

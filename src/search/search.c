@@ -1,12 +1,12 @@
 #include "search.h"
 
-extern int searchCpu(MatchFunction);
-extern int searchCpuEmulateGpu(MatchFunction);
-extern int searchGpu(MatchFunction);
+extern int searchCpu(ReadFunction, MatchFunction);
+extern int searchCpuEmulateGpu(ReadFunction, MatchFunction);
+extern int searchGpu(ReadFunction, MatchFunction);
 
-int search(MatchFunction onMatch) {
+int search(ReadFunction read, MatchFunction onMatch) {
   if (SEARCH_WITH_GPU || HETEROGENEOUS_DESIGN) {
-    return searchGpu(onMatch);
+    return searchGpu(read, onMatch);
   }
-  return searchCpu(onMatch);
+  return searchCpu(read, onMatch);
 }

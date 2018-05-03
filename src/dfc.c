@@ -53,11 +53,6 @@ static uint8_t toggleCharacterCase(uint8_t);
 void DFC_SetupEnvironment() { setupExecutionEnvironment(); }
 void DFC_ReleaseEnvironment() { releaseExecutionEnvironment(); }
 
-char *DFC_NewInput(int size) {
-  allocateInput(size);
-  return DFC_HOST_MEMORY.input;
-}
-
 DFC_PATTERN_INIT *DFC_PATTERN_INIT_New(void) {
   DFC_PATTERN_INIT *p;
 
@@ -296,7 +291,9 @@ DFC_STRUCTURE *DFC_Compile(DFC_PATTERN_INIT *patterns) {
   return dfc;
 }
 
-int DFC_Search(MatchFunction onMatch) { return search(onMatch); }
+int DFC_Search(ReadFunction read, MatchFunction onMatch) {
+  return search(read, onMatch);
+}
 
 static void *DFC_REALLOC(void *p, uint16_t n, dfcDataType type) {
   switch (type) {

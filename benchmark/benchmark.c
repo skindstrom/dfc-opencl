@@ -3,12 +3,14 @@
 #include "parser.h"
 #include "timer.h"
 
-char *readDataFile(char *data_file);
+int readDataFile(int to_read_count, char *buffer);
 DFC_PATTERN_INIT *addPatterns(char *pattern_file);
 DFC_STRUCTURE *compilePatterns(DFC_PATTERN_INIT *init_struct);
 
 int benchmarkSearch();
 void printResult(DFC_FIXED_PATTERN *pattern);
+
+FILE *data_file;
 
 int main(int argc, char **argv) {
   if (argc != 3) {
@@ -16,10 +18,14 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+
+  data_file = fopen(argv[2], "rb");
+  if (data_file == NULL) {
+    fprintf(stderr, "Data file not found\n");
+    exit(1);
+  }
+
   DFC_SetupEnvironment();
-
-  char *input = readDataFile(argv[2]);
-
   DFC_PATTERN_INIT *init_struct = addPatterns(argv[1]);
   compilePatterns(init_struct);
 
@@ -27,18 +33,19 @@ int main(int argc, char **argv) {
   printf("\n* Total match count: %d\n", matchCount);
 
   DFC_FreeStructure();
-  DFC_FreeInput(input);
   DFC_FreePatternsInit(init_struct);
 
   DFC_ReleaseEnvironment();
+
+  fclose(data_file);
 }
 
-char *readDataFile(char *data_file) {
+int readDataFile(int to_read_count, char *buffer) {
   startTimer(TIMER_READ_DATA);
-  char *input = read_data_file(data_file, DFC_NewInput);
+  int actually_read_count = fread(buffer, sizeof(char), to_read_count, data_file);
   stopTimer(TIMER_READ_DATA);
 
-  return input;
+  return actually_read_count;
 }
 
 DFC_PATTERN_INIT *addPatterns(char *pattern_file) {
@@ -61,7 +68,7 @@ DFC_STRUCTURE *compilePatterns(DFC_PATTERN_INIT *init_struct) {
 
 int benchmarkSearch() {
   startTimer(TIMER_SEARCH);
-  int matchCount = DFC_Search(printResult);
+  int matchCount = DFC_Search(readDataFile, printResult);
   stopTimer(TIMER_SEARCH);
 
   return matchCount;

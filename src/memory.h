@@ -10,7 +10,6 @@
 #endif
 
 typedef struct {
-  int inputLength;
   cl_mem input;
 
   cl_mem patterns;
@@ -44,7 +43,6 @@ extern DfcOpenClEnvironment DFC_OPENCL_ENVIRONMENT;
 void unmapOpenClInputBuffers();
 
 typedef struct {
-  int inputLength;
   char *input;
   DFC_STRUCTURE *dfcStructure;
 } DfcHostMemory;
@@ -64,7 +62,7 @@ void setupExecutionEnvironment();
 void releaseExecutionEnvironment();
 
 void allocateDfcStructure(DfcMemoryRequirements requirements);
-void allocateInput(int size);
+char* allocateInput(int size);
 
 void freeDfcStructure();
 void freeDfcInput();
@@ -73,5 +71,8 @@ void prepareOpenClBuffersForSearch();
 void freeOpenClBuffers();
 
 int sizeInBytesOfResultVector(int inputLength);
+
+char *getOwnershipOfInputBuffer();
+void writeInputBufferToDevice(char* buffer, int count);
 
 #endif

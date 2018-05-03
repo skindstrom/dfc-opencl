@@ -3,6 +3,6 @@
 
 #include "dfc.h"
 
-int search(MatchFunction onMatch);
+int search(ReadFunction read, MatchFunction onMatch);
 
 #endif

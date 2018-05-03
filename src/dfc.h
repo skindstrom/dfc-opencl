@@ -61,20 +61,13 @@ void DFC_AddPattern(DFC_PATTERN_INIT *dfc, unsigned char *pat, int n,
 DFC_STRUCTURE *DFC_Compile(DFC_PATTERN_INIT *patterns);
 
 typedef void (*MatchFunction)(DFC_FIXED_PATTERN *pattern);
+typedef int (*ReadFunction)(int maxCount, char* inputBuffer);
 
-/**
- * Accessing the input, DFC_STRUCTURE or DFC_PATTERNS is not safe after a call
- * to DFC_SEARCH The reason is that when MAP_MEMORY is used, the host memory has
- * to be unmapped to ensure that any write made on the host is also seen by the
- * device. Unmapping will cause the previous pointers to be invalidated
- */
-int DFC_Search(MatchFunction onMatch);
+int DFC_Search(ReadFunction read, MatchFunction onMatch);
 void DFC_PrintInfo(DFC_STRUCTURE *dfc);
 
-char *DFC_NewInput(int size);
 DFC_PATTERN_INIT *DFC_PATTERN_INIT_New();
 
-void DFC_FreeInput();
 void DFC_FreePatternsInit(DFC_PATTERN_INIT *patterns);
 void DFC_FreeStructure();
 

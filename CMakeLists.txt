@@ -19,7 +19,7 @@ add_definitions(-DCL_USE_DEPRECATED_OPENCL_1_2_APIS)
 
 # Feature flags
 # These SEARCH_WITH_GPU and HETEROGENEOUS_DESIGN are mutually exclusive
-set(DFC_SEARCH_WITH_GPU 0)
+set(DFC_SEARCH_WITH_GPU 1)
 set(DFC_HETEROGENEOUS_DESIGN 0)
 
 set(DFC_MAP_MEMORY 0)
@@ -31,6 +31,8 @@ set(DFC_WORK_GROUP_SIZE 32)
 # the amount positions in the input that gets checked per thread
 # higher value = more work per thread = fewer threads
 set(DFC_THREAD_GRANULARITY 10)
+
+set(DFC_INPUT_READ_CHUNK_BYTES 1024)
 
 #########################################
 
@@ -107,6 +109,7 @@ target_compile_definitions(dfc PRIVATE
     THREAD_GRANULARITY=${DFC_THREAD_GRANULARITY}
     USE_TEXTURE_MEMORY=${DFC_USE_TEXTURE_MEMORY}
     USE_LOCAL_MEMORY=${DFC_USE_LOCAL_MEMORY}
+    INPUT_READ_CHUNK_BYTES=${DFC_INPUT_READ_CHUNK_BYTES}
     )
 
 add_subdirectory(${EXT_PROJECTS_DIR}/catch)

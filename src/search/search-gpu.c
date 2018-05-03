@@ -15,8 +15,9 @@
 extern int exactMatchingUponFiltering(uint8_t *result, int length,
                                       DFC_PATTERNS *patterns, MatchFunction);
 
-void setKernelArgsNormalDesign(cl_kernel kernel, DfcOpenClBuffers *mem) {
-  clSetKernelArg(kernel, 0, sizeof(int), &mem->inputLength);
+void setKernelArgsNormalDesign(cl_kernel kernel, DfcOpenClBuffers *mem,
+                               int readCount) {
+  clSetKernelArg(kernel, 0, sizeof(int), &readCount);
   clSetKernelArg(kernel, 1, sizeof(cl_mem), &mem->input);
 
   clSetKernelArg(kernel, 2, sizeof(cl_mem), &mem->patterns);
@@ -35,8 +36,9 @@ void setKernelArgsNormalDesign(cl_kernel kernel, DfcOpenClBuffers *mem) {
   clSetKernelArg(kernel, 11, sizeof(cl_mem), &mem->result);
 }
 
-void setKernelArgsHetDesign(cl_kernel kernel, DfcOpenClBuffers *mem) {
-  clSetKernelArg(kernel, 0, sizeof(int), &mem->inputLength);
+void setKernelArgsHetDesign(cl_kernel kernel, DfcOpenClBuffers *mem,
+                            int readCount) {
+  clSetKernelArg(kernel, 0, sizeof(int), &readCount);
   clSetKernelArg(kernel, 1, sizeof(cl_mem), &mem->input);
 
   clSetKernelArg(kernel, 2, sizeof(cl_mem), &mem->dfSmall);
@@ -46,11 +48,11 @@ void setKernelArgsHetDesign(cl_kernel kernel, DfcOpenClBuffers *mem) {
   clSetKernelArg(kernel, 5, sizeof(cl_mem), &mem->result);
 }
 
-void setKernelArgs(cl_kernel kernel, DfcOpenClBuffers *mem) {
+void setKernelArgs(cl_kernel kernel, DfcOpenClBuffers *mem, int readCount) {
   if (HETEROGENEOUS_DESIGN) {
-    setKernelArgsHetDesign(kernel, mem);
+    setKernelArgsHetDesign(kernel, mem, readCount);
   } else {
-    setKernelArgsNormalDesign(kernel, mem);
+    setKernelArgsNormalDesign(kernel, mem, readCount);
   }
 }
 
@@ -86,7 +88,7 @@ int handleMatches(uint8_t *result, int inputLength, DFC_PATTERNS *patterns,
   VerifyResult *pidCounts = (VerifyResult *)result;
 
   int matches = 0;
-  for (int i = 0; i < inputLength - 1; ++i) {
+  for (int i = 0; i < inputLength; ++i) {
     VerifyResult *res = &pidCounts[i];
 
     for (int j = 0; j < res->matchCount && j < MAX_MATCHES; ++j) {
@@ -122,13 +124,14 @@ int handleResultsFromGpu(uint8_t *result, int inputLength,
 }
 
 int readResultWithoutMap(DfcOpenClBuffers *mem, cl_command_queue queue,
-                         DFC_PATTERNS *patterns, MatchFunction onMatch) {
-  uint8_t *output = calloc(1, sizeInBytesOfResultVector(mem->inputLength));
+                         DFC_PATTERNS *patterns, int readCount,
+                         MatchFunction onMatch) {
+  uint8_t *output = calloc(1, sizeInBytesOfResultVector(readCount + 1));
 
   startTimer(TIMER_READ_FROM_DEVICE);
   int status = clEnqueueReadBuffer(queue, mem->result, CL_BLOCKING, 0,
-                                   sizeInBytesOfResultVector(mem->inputLength),
-                                   output, 0, NULL, NULL);
+                                   sizeInBytesOfResultVector(readCount + 1), output,
+                                   0, NULL, NULL);
   stopTimer(TIMER_READ_FROM_DEVICE);
 
   if (status != CL_SUCCESS) {
@@ -137,8 +140,7 @@ int readResultWithoutMap(DfcOpenClBuffers *mem, cl_command_queue queue,
     exit(OPENCL_COULD_NOT_READ_RESULTS);
   }
 
-  int matches =
-      handleResultsFromGpu(output, mem->inputLength, patterns, onMatch);
+  int matches = handleResultsFromGpu(output, readCount, patterns, onMatch);
 
   free(output);
 
@@ -146,13 +148,14 @@ int readResultWithoutMap(DfcOpenClBuffers *mem, cl_command_queue queue,
 }
 
 int readResultWithMap(DfcOpenClBuffers *mem, cl_command_queue queue,
-                      DFC_PATTERNS *patterns, MatchFunction onMatch) {
+                      DFC_PATTERNS *patterns, int readCount,
+                      MatchFunction onMatch) {
   cl_int status;
 
   startTimer(TIMER_READ_FROM_DEVICE);
   uint8_t *output = clEnqueueMapBuffer(
-      queue, mem->result, CL_BLOCKING, CL_MAP_READ | CL_MAP_WRITE, 0,
-      sizeInBytesOfResultVector(mem->inputLength), 0, NULL, NULL, &status);
+      queue, mem->result, CL_BLOCKING, CL_MAP_READ, 0,
+      sizeInBytesOfResultVector(readCount + 1), 0, NULL, NULL, &status);
   stopTimer(TIMER_READ_FROM_DEVICE);
 
   if (status != CL_SUCCESS) {
@@ -161,8 +164,7 @@ int readResultWithMap(DfcOpenClBuffers *mem, cl_command_queue queue,
     exit(OPENCL_COULD_NOT_READ_RESULTS);
   }
 
-  int matches =
-      handleResultsFromGpu(output, mem->inputLength, patterns, onMatch);
+  int matches = handleResultsFromGpu(output, readCount, patterns, onMatch);
 
   status = clEnqueueUnmapMemObject(queue, mem->result, output, 0, NULL, NULL);
 
@@ -170,25 +172,46 @@ int readResultWithMap(DfcOpenClBuffers *mem, cl_command_queue queue,
 }
 
 int readResult(DfcOpenClBuffers *mem, cl_command_queue queue,
-               DFC_PATTERNS *patterns, MatchFunction onMatch) {
+               DFC_PATTERNS *patterns, int readCount, MatchFunction onMatch) {
   if (MAP_MEMORY) {
-    return readResultWithMap(mem, queue, patterns, onMatch);
+    return readResultWithMap(mem, queue, patterns, readCount, onMatch);
   } else {
-    return readResultWithoutMap(mem, queue, patterns, onMatch);
+    return readResultWithoutMap(mem, queue, patterns, readCount, onMatch);
   }
 }
 
-int searchGpu(MatchFunction onMatch) {
+int performSearch(ReadFunction read, MatchFunction onMatch) {
+  char *input = allocateInput(INPUT_READ_CHUNK_BYTES);
+
+  int matches = 0;
+  int readCount = 0;
+  // read 1 byte less to allow matching of 1-byte patterns without accessing
+  // invalid memory at the very last character
+  while ((readCount = read(INPUT_READ_CHUNK_BYTES - 1, input))) {
+    writeInputBufferToDevice(input, readCount);
+
+    setKernelArgs(DFC_OPENCL_ENVIRONMENT.kernel, &DFC_OPENCL_BUFFERS,
+                  readCount);
+    startKernelForQueue(DFC_OPENCL_ENVIRONMENT.kernel,
+                        DFC_OPENCL_ENVIRONMENT.queue, readCount);
+
+    matches +=
+        readResult(&DFC_OPENCL_BUFFERS, DFC_OPENCL_ENVIRONMENT.queue,
+                   DFC_HOST_MEMORY.dfcStructure->patterns, readCount, onMatch);
+
+    input = getOwnershipOfInputBuffer();
+  }
+  // should be nop since readCount == 0. Needed to make sure that buffer is not
+  // owned
+  writeInputBufferToDevice(input, readCount);
+
+  return matches;
+}
+
+int searchGpu(ReadFunction read, MatchFunction onMatch) {
   prepareOpenClBuffersForSearch();
 
-  setKernelArgs(DFC_OPENCL_ENVIRONMENT.kernel, &DFC_OPENCL_BUFFERS);
-  startKernelForQueue(DFC_OPENCL_ENVIRONMENT.kernel,
-                      DFC_OPENCL_ENVIRONMENT.queue,
-                      DFC_HOST_MEMORY.inputLength);
-
-  // TODO: might be invalid to access patterns here if unmapped
-  int matches = readResult(&DFC_OPENCL_BUFFERS, DFC_OPENCL_ENVIRONMENT.queue,
-                           DFC_HOST_MEMORY.dfcStructure->patterns, onMatch);
+  int matches = performSearch(read, onMatch);
 
   freeOpenClBuffers();
 

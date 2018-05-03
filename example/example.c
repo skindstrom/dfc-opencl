@@ -1,18 +1,18 @@
 /* Microbenchmark for DFC */
 
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "dfc.h"
 
+#define INPUT ("This input includes an attack pattern. It might CRASH your machine.")
+
+int readInput(int maxRead, char* input);
 void printResult(DFC_FIXED_PATTERN *pattern);
 
 int main(void) {
   DFC_SetupEnvironment();
-
-  char *buf = DFC_NewInput(200);
-  strcpy(buf,
-         "This input includes an attack pattern. It might CRASH your machine.");
 
   char *pat1 = "attack";
   char *pat2 = "crash";
@@ -20,7 +20,7 @@ int main(void) {
   char *pat4 = "ATTACK";
 
   printf("\n* Text & Patterns Info\n");
-  printf(" - (Text) %s\n", buf);
+  printf(" - (Text) %s\n", INPUT);
   printf(" - (Pattern) ID: 0, pat: %s, case-sensitive\n", pat1);
   printf(" - (Pattern) ID: 1, pat: %s, case-insensitive\n", pat2);
   printf(" - (Pattern) ID: 2, pat: %s, case-insensitive\n", pat3);
@@ -41,16 +41,29 @@ int main(void) {
   DFC_Compile(patternInit);
 
   printf("* Result:\n");
-  int res = DFC_Search(printResult);
+  int res = DFC_Search(readInput, printResult);
   printf("\n* Total match count: %d\n", res);
 
   DFC_FreePatternsInit(patternInit);
-  DFC_FreeInput();
   DFC_FreeStructure();
 
   DFC_ReleaseEnvironment();
 
   return 0;
+}
+
+
+bool didRead = 0;
+int readInput(int maxLength, char* input) {
+  if (didRead) {
+    return 0;
+  }
+
+  assert(maxLength >= (int)strlen(INPUT));
+  strcpy(input, INPUT);
+  didRead = true;
+
+  return strlen(INPUT);
 }
 
 void printResult(DFC_FIXED_PATTERN *pattern) {
