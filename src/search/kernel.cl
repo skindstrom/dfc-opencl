@@ -49,8 +49,10 @@ void verifySmall(__global CompactTableSmallEntry *ct, __global PID_TYPE *pids,
         doesPatternMatch(input, (patterns + pid)->original_pattern,
                          patternLength,
                          (patterns + pid)->is_case_insensitive)) {
-      result->matchesSmallCt[result->matchCountSmallCt] = pid;
-      ++result->matchCountSmallCt;
+      if (result->matchCount < MAX_MATCHES) {
+        result->matches[result->matchCount] = pid;
+      }
+      ++result->matchCount;
     }
   }
 }
@@ -77,8 +79,10 @@ void verifyLarge(__global CompactTableLargeBucket *buckets,
           if (doesPatternMatch(input, (patterns + pid)->original_pattern,
                                patternLength,
                                (patterns + pid)->is_case_insensitive)) {
-            result->matchesLargeCt[result->matchCountLargeCt] = pid;
-            ++result->matchCountLargeCt;
+            if (result->matchCount < MAX_MATCHES) {
+              result->matches[result->matchCount] = pid;
+            }
+            ++result->matchCount;
           }
         }
       }
@@ -114,8 +118,7 @@ __kernel void search(int inputLength, __global uchar *input,
     short byteIndex = BINDEX(data & DF_MASK);
     short bitMask = BMASK(data & DF_MASK);
 
-    result[i].matchCountSmallCt = 0;
-    result[i].matchCountLargeCt = 0;
+    result[i].matchCount = 0;
 
     if (dfSmall[byteIndex] & bitMask) {
       verifySmall(ctSmallEntries, ctSmallPids, patterns, input + i, i,
@@ -154,8 +157,7 @@ __kernel void search_with_image(
     short byteIndex = BINDEX(data & DF_MASK);
     short bitMask = BMASK(data & DF_MASK);
 
-    result[i].matchCountSmallCt = 0;
-    result[i].matchCountLargeCt = 0;
+    result[i].matchCount = 0;
 
     // divide by 16 as we actually just want a single byte, but we're getting 16
     img_read df =
@@ -213,8 +215,7 @@ __kernel void search_with_local(
     short byteIndex = BINDEX(data & DF_MASK);
     short bitMask = BMASK(data & DF_MASK);
 
-    result[i].matchCountSmallCt = 0;
-    result[i].matchCountLargeCt = 0;
+    result[i].matchCount = 0;
 
     if (dfSmall[byteIndex] & bitMask) {
       verifySmall(ctSmallEntries, ctSmallPids, patterns, input + i, i,

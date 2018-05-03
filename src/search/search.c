@@ -8,5 +8,5 @@ int search(MatchFunction onMatch) {
   if (SEARCH_WITH_GPU || HETEROGENEOUS_DESIGN) {
     return searchGpu(onMatch);
   }
-  return searchCpuEmulateGpu(onMatch);
+  return searchCpu(onMatch);
 }

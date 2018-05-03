@@ -89,14 +89,16 @@ int handleMatches(uint8_t *result, int inputLength, DFC_PATTERNS *patterns,
   for (int i = 0; i < inputLength - 1; ++i) {
     VerifyResult *res = &pidCounts[i];
 
-    for (int j = 0; j < res->matchCountSmallCt; ++j) {
-      onMatch(&patterns->dfcMatchList[res->matchesSmallCt[j]]);
+    for (int j = 0; j < res->matchCount && j < MAX_MATCHES; ++j) {
+      onMatch(&patterns->dfcMatchList[res->matches[j]]);
       ++matches;
     }
 
-    for (int j = 0; j < res->matchCountLargeCt; ++j) {
-      onMatch(&patterns->dfcMatchList[res->matchesLargeCt[j]]);
-      ++matches;
+    if (res->matchCount >= MAX_MATCHES) {
+      printf(
+          "%d patterns matched at position %d, but space was only allocated "
+          "for %d patterns\n",
+          res->matchCount, i, MAX_MATCHES);
     }
   }
   return matches;

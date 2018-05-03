@@ -55,8 +55,10 @@ static void verifySmall(CompactTableSmallEntry *ct, PID_TYPE *pids,
         doesPatternMatch(input, (patterns + pid)->original_pattern,
                          patternLength,
                          (patterns + pid)->is_case_insensitive)) {
-      result->matchesSmallCt[result->matchCountSmallCt] = pid;
-      ++result->matchCountSmallCt;
+      if (result->matchCount < MAX_MATCHES) {
+        result->matches[result->matchCount] = pid;
+      }
+      ++result->matchCount;
     }
   }
 }
@@ -83,8 +85,10 @@ static void verifyLarge(CompactTableLargeBucket *buckets,
           if (doesPatternMatch(input, (patterns + pid)->original_pattern,
                                patternLength,
                                (patterns + pid)->is_case_insensitive)) {
-            result->matchesLargeCt[result->matchCountLargeCt] = pid;
-            ++result->matchCountLargeCt;
+            if (result->matchCount < MAX_MATCHES) {
+              result->matches[result->matchCount] = pid;
+            }
+            ++result->matchCount;
           }
         }
       }
@@ -123,8 +127,7 @@ int searchCpuEmulateGpu(MatchFunction onMatch) {
     int16_t byteIndex = BINDEX(data & DF_MASK);
     int16_t bitMask = BMASK(data & DF_MASK);
 
-    result[i].matchCountSmallCt = 0;
-    result[i].matchCountLargeCt = 0;
+    result[i].matchCount = 0;
 
     if (dfc->directFilterSmall[byteIndex] & bitMask) {
       verifySmall(dfc->ctSmallEntries, dfc->ctSmallPids, patterns->dfcMatchList,
@@ -143,14 +146,16 @@ int searchCpuEmulateGpu(MatchFunction onMatch) {
   for (int i = 0; i < inputLength - 1; ++i) {
     VerifyResult *res = &result[i];
 
-    for (int j = 0; j < res->matchCountSmallCt; ++j) {
-      onMatch(&patterns->dfcMatchList[res->matchesSmallCt[j]]);
+    for (int j = 0; j < res->matchCount && j < MAX_MATCHES; ++j) {
+      onMatch(&patterns->dfcMatchList[res->matches[j]]);
       ++matches;
     }
 
-    for (int j = 0; j < res->matchCountLargeCt; ++j) {
-      onMatch(&patterns->dfcMatchList[res->matchesLargeCt[j]]);
-      ++matches;
+    if (res->matchCount >= MAX_MATCHES) {
+      printf(
+          "%d patterns matched at position %d, but space was only allocated "
+          "for %d patterns\n",
+          res->matchCount, i, MAX_MATCHES);
     }
   }
 
