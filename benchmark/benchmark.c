@@ -9,6 +9,7 @@ DFC_STRUCTURE *compilePatterns(DFC_PATTERN_INIT *init_struct);
 
 int benchmarkSearch();
 void printResult(DFC_FIXED_PATTERN *pattern);
+void printTimers();
 
 FILE *data_file;
 
@@ -38,6 +39,8 @@ int main(int argc, char **argv) {
   DFC_ReleaseEnvironment();
 
   fclose(data_file);
+
+  printTimers();
 }
 
 int readDataFile(int to_read_count, char *buffer) {
@@ -82,4 +85,29 @@ void printResult(DFC_FIXED_PATTERN *pattern) {
   //  printf(" %d,", pattern->external_ids[i]);
   //}
   // printf("\n");
+}
+
+void printTimers() {
+  printf("\n");
+  printf("Environment setup: %f\n", readTimerMs(TIMER_ENVIRONMENT_SETUP));
+  printf("Environment teardown: %f\n", readTimerMs(TIMER_ENVIRONMENT_TEARDOWN));
+  printf("\n");
+
+  printf("Adding patterns: %f\n", readTimerMs(TIMER_ADD_PATTERNS));
+  printf("Reading data from file: %f\n", readTimerMs(TIMER_READ_DATA));
+  printf("\n");
+
+  printf("DFC Preprocessing: %f\n", readTimerMs(TIMER_COMPILE_DFC));
+  printf("\n");
+
+  printf("OpenCL write to device: %f\n", readTimerMs(TIMER_WRITE_TO_DEVICE));
+  printf("OpenCL read from device: %f\n", readTimerMs(TIMER_READ_FROM_DEVICE));
+  printf("\n");
+
+  printf("OpenCL executing kernel: %f\n",readTimerMs(TIMER_EXECUTE_KERNEL));
+  printf("CPU process matches (GPU version): %f\n", readTimerMs(TIMER_PROCESS_MATCHES));
+  printf("CPU process matches (Heterogeneous version): %f\n", readTimerMs(TIMER_EXECUTE_HETEROGENEOUS));
+  printf("\n");
+
+  printf("Total search time: %f\n", readTimerMs(TIMER_SEARCH));
 }
