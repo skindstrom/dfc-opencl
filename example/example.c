@@ -60,6 +60,7 @@ int readInput(int maxLength, char* input) {
   }
 
   assert(maxLength >= (int)strlen(INPUT));
+  (void)(maxLength); // to make release build happy
   strcpy(input, INPUT);
   didRead = true;
 
