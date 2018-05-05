@@ -695,7 +695,7 @@ void writeOpenClBuffer(cl_command_queue queue, void *host, cl_mem buffer,
                        size_t size) {
   startTimer(TIMER_WRITE_TO_DEVICE);
 
-  cl_int errcode = clEnqueueWriteBuffer(queue, buffer, CL_BLOCKING, 0, size,
+  cl_int errcode = clEnqueueWriteBuffer(queue, buffer, BLOCKING_DEVICE_ACCESS, 0, size,
                                         host, 0, NULL, NULL);
 
   stopTimer(TIMER_WRITE_TO_DEVICE);
@@ -716,7 +716,7 @@ void writeOpenClTextureBuffer(cl_command_queue queue, void *host, cl_mem buffer,
   startTimer(TIMER_WRITE_TO_DEVICE);
 
   cl_int errcode =
-      clEnqueueWriteImage(queue, buffer, CL_BLOCKING, offset, imageSize, pitch,
+      clEnqueueWriteImage(queue, buffer, BLOCKING_DEVICE_ACCESS, offset, imageSize, pitch,
                           pitch, host, 0, NULL, NULL);
 
   stopTimer(TIMER_WRITE_TO_DEVICE);

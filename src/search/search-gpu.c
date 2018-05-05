@@ -74,7 +74,9 @@ void startKernelForQueue(cl_kernel kernel, cl_command_queue queue,
   startTimer(TIMER_EXECUTE_KERNEL);
   int status = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &globalGroupSize,
                                       &localGroupSize, 0, NULL, NULL);
-  clFinish(queue);  // only necessary for timing
+  if (BLOCKING_DEVICE_ACCESS) {
+    clFinish(queue);  // only necessary for timing
+  }
   stopTimer(TIMER_EXECUTE_KERNEL);
 
   if (status != CL_SUCCESS) {

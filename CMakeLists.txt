@@ -27,12 +27,14 @@ set(DFC_USE_TEXTURE_MEMORY 0)
 set(DFC_USE_LOCAL_MEMORY 0)
 
 # Continous values
-set(DFC_WORK_GROUP_SIZE 32)
+set(DFC_WORK_GROUP_SIZE 128)
 # the amount positions in the input that gets checked per thread
 # higher value = more work per thread = fewer threads
-set(DFC_THREAD_GRANULARITY 10)
+set(DFC_THREAD_GRANULARITY 16)
 
-set(DFC_INPUT_READ_CHUNK_BYTES 1024)
+set(DFC_INPUT_READ_CHUNK_BYTES 50000000)
+
+set(DFC_BLOCKING_DEVICE_ACCESS 1)
 
 #########################################
 
@@ -110,6 +112,7 @@ target_compile_definitions(dfc PRIVATE
     USE_TEXTURE_MEMORY=${DFC_USE_TEXTURE_MEMORY}
     USE_LOCAL_MEMORY=${DFC_USE_LOCAL_MEMORY}
     INPUT_READ_CHUNK_BYTES=${DFC_INPUT_READ_CHUNK_BYTES}
+    BLOCKING_DEVICE_ACCESS=${DFC_BLOCKING_DEVICE_ACCESS}
     )
 
 add_subdirectory(${EXT_PROJECTS_DIR}/catch)
