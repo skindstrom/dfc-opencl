@@ -118,6 +118,8 @@ void setKernelName(char *name) {
     strcpy(name, "filter_with_image");
   } else if (HETEROGENEOUS_DESIGN && USE_LOCAL_MEMORY) {
     strcpy(name, "filter_with_local");
+  } else if (HETEROGENEOUS_DESIGN && VECTORIZE_KERNEL) {
+    strcpy(name, "filter_vec");
   } else if (HETEROGENEOUS_DESIGN) {
     strcpy(name, "filter");
   } else if (VECTORIZE_KERNEL) {

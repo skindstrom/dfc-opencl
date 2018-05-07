@@ -385,3 +385,50 @@ __kernel void filter_with_local(int inputLength, __global uchar *input,
                  << 1;
   }
 }
+
+typedef union {
+  uchar8 vector;
+  uchar scalar[8];
+} UChar8;
+
+__kernel void filter_vec(int inputLength, __global uchar *input,
+                         __global uchar *dfSmall, __global uchar *dfLarge,
+                         __global uchar *dfLargeHash, __global uchar *result) {
+  uint i = (get_group_id(0) * get_local_size(0) + get_local_id(0)) *
+           THREAD_GRANULARITY;
+
+  for (int j = 0; j < THREAD_GRANULARITY && i < inputLength; ++j, i += 8) {
+    uchar8 dataThis = vload8(i >> 3, input);
+    uchar8 dataNext = vload8((i >> 3) + 1, input);
+    uchar16 shuffleMask =
+        (uchar16)(0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 0);
+    Vec8 overlappingData = (Vec8)shuffle(dataThis, shuffleMask);
+    overlappingData.vector_raw.sf = dataNext.s0;
+
+    overlappingData.vector = overlappingData.vector & (short8)(DF_MASK);
+    short8 bitMasks = BMASK_VEC(overlappingData.vector);
+    Vec8 bitIndices = (Vec8)BINDEX_VEC(overlappingData.vector);
+
+    Vec8 dfGatherSmall;
+    Vec8 dfGatherLarge;
+
+    for (int k = 0; k < 8; ++k) {
+      dfGatherSmall.scalar[k] = dfSmall[bitIndices.scalar[k]];
+      dfGatherLarge.scalar[k] = dfLarge[bitIndices.scalar[k]];
+    }
+
+    UChar8 filterResultSmall = (UChar8)convert_uchar8(dfGatherSmall.vector & bitMasks);
+    UChar8 filterResultLarge = (UChar8)convert_uchar8(dfGatherLarge.vector & bitMasks);
+
+    UChar8 resultVector = (UChar8)convert_uchar8(filterResultSmall.vector > (uchar)0);
+
+    for (int k = 0; k < 8 && i + k < inputLength; ++k) {
+      resultVector.scalar[k] |=
+          (filterResultLarge.scalar[k] && i + k < inputLength - 3 &&
+           isInHashDf(dfLargeHash, input + i + k))
+          << 1;
+    }
+
+    vstore8(resultVector.vector, i >> 3, result);
+  }
+}
