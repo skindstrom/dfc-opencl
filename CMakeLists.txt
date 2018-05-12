@@ -58,6 +58,13 @@ if (${DFC_VECTORIZE_KERNEL} AND (${DFC_USE_LOCAL_MEMORY} OR ${DFC_USE_TEXTURE_ME
   message( FATAL_ERROR "DFC: VECTORIZE_KERNEL is mutually exclusive with USE_TEXTURE_MEMORY and USE_LOCAL_MEMORY")
 endif()
 
+set(TIMER_HEADERS
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/timer.h
+)
+set(TIMER_SOURCES
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/timer.c
+)
+
 
 set(DFC_HEADERS
   ${CMAKE_CURRENT_SOURCE_DIR}/src/dfc.h
@@ -67,7 +74,6 @@ set(DFC_HEADERS
   ${CMAKE_CURRENT_SOURCE_DIR}/src/shared.h
   ${CMAKE_CURRENT_SOURCE_DIR}/src/shared-functions.h
   ${CMAKE_CURRENT_SOURCE_DIR}/src/memory.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/timer.h
 )
 set(DFC_SOURCES
       ${CMAKE_CURRENT_SOURCE_DIR}/src/dfc.c
@@ -76,7 +82,6 @@ set(DFC_SOURCES
       ${CMAKE_CURRENT_SOURCE_DIR}/src/search/search.c
       ${CMAKE_CURRENT_SOURCE_DIR}/src/search/search-gpu.c
       ${CMAKE_CURRENT_SOURCE_DIR}/src/search/search-cpu.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/timer.c
 )
 
 if(${DFC_SEARCH_WITH_GPU})
@@ -111,9 +116,11 @@ endif()
 
 set(DFC_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
+add_library(dfc-timer SHARED ${TIMER_HEADERS} ${TIMER_SOURCES})
+
 add_library(dfc SHARED ${DFC_HEADERS} ${DFC_SOURCES})
 target_include_directories(dfc PUBLIC ${DFC_INCLUDE_DIR} ${OpenCL_INCLUDE_DIRS})
-target_link_libraries(dfc ${OpenCL_LIBRARIES} -lm)
+target_link_libraries(dfc dfc-timer ${OpenCL_LIBRARIES} -lm)
 target_compile_definitions(dfc PRIVATE
     SEARCH_WITH_GPU=${DFC_SEARCH_WITH_GPU}
     HETEROGENEOUS_DESIGN=${DFC_HETEROGENEOUS_DESIGN}
@@ -130,4 +137,3 @@ target_compile_definitions(dfc PRIVATE
 add_subdirectory(${EXT_PROJECTS_DIR}/catch)
 add_subdirectory(tests)
 add_subdirectory(example)
-add_subdirectory(benchmark)
