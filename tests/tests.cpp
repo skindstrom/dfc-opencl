@@ -32,7 +32,7 @@ int readInput(int maxLength, int maxPatternLength, char* inputBuffer) {
 
   REQUIRE(maxPatternLength == MAX_PATTERN_LENGTH);
   REQUIRE(maxLength >= input.size());
-  strcpy(inputBuffer, input.data());
+  memcpy(inputBuffer, input.data(), input.size());
   didRead = true;
 
   return input.size();
@@ -528,6 +528,73 @@ TEST_CASE("DFC") {
     REQUIRE(matches[0].pattern == "attack");
     REQUIRE(matches[0].ids[0] == 0);
     REQUIRE(matches[0].ids[1] == 1);
+  }
+
+  SECTION("Matches binary pattern without null") {
+    PID_TYPE pid = 0;
+    char binary_input[3] = {0x05, 0x10, 0x20};
+    input = std::string(binary_input, 3);
+
+    DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
+    addCaseSensitivePattern(patternInit, input, pid);
+
+    DFC_Compile(patternInit);
+
+    auto matchCount = DFC_Search(readInput, onMatch);
+
+    DFC_FreePatternsInit(patternInit);
+    DFC_FreeStructure();
+
+    REQUIRE(matchCount == 1);
+    REQUIRE(matches.size() == 1);
+    REQUIRE(matches[0].pattern[0] == binary_input[0]);
+    REQUIRE(matches[0].pattern[1] == binary_input[1]);
+    REQUIRE(matches[0].pattern[2] == binary_input[2]);
+  }
+
+  SECTION("Matches input with null character") {
+    PID_TYPE pid = 0;
+    
+    input = "start0end";
+    input[5] = 0x00;
+
+    DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
+    addCaseSensitivePattern(patternInit, "start", pid);
+    addCaseSensitivePattern(patternInit, "end", pid);
+
+    DFC_Compile(patternInit);
+
+    auto matchCount = DFC_Search(readInput, onMatch);
+
+    DFC_FreePatternsInit(patternInit);
+    DFC_FreeStructure();
+
+    REQUIRE(matchCount == 2);
+    REQUIRE(matches.size() == 2);
+    REQUIRE(matches[0].pattern == "start");
+    REQUIRE(matches[1].pattern == "end");
+  }
+
+  SECTION("Matches binary pattern with null") {
+    PID_TYPE pid = 0;
+    char binary_input[3] = {0x05, 0x00, 0x20};
+    input = std::string(binary_input, 3);
+
+    DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
+    addCaseSensitivePattern(patternInit, input, pid);
+
+    DFC_Compile(patternInit);
+
+    auto matchCount = DFC_Search(readInput, onMatch);
+
+    DFC_FreePatternsInit(patternInit);
+    DFC_FreeStructure();
+
+    REQUIRE(matchCount == 1);
+    REQUIRE(matches.size() == 1);
+    REQUIRE(matches[0].pattern[0] == binary_input[0]);
+    REQUIRE(matches[0].pattern[1] == binary_input[1]);
+    REQUIRE(matches[0].pattern[2] == binary_input[2]);
   }
 
   DFC_ReleaseEnvironment();
