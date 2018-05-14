@@ -417,10 +417,13 @@ __kernel void filter_vec(int inputLength, __global uchar *input,
       dfGatherLarge.scalar[k] = dfLarge[bitIndices.scalar[k]];
     }
 
-    UChar8 filterResultSmall = (UChar8)convert_uchar8(dfGatherSmall.vector & bitMasks);
-    UChar8 filterResultLarge = (UChar8)convert_uchar8(dfGatherLarge.vector & bitMasks);
+    UChar8 filterResultSmall =
+        (UChar8)convert_uchar8(dfGatherSmall.vector & bitMasks);
+    UChar8 filterResultLarge =
+        (UChar8)convert_uchar8(dfGatherLarge.vector & bitMasks);
 
-    UChar8 resultVector = (UChar8)convert_uchar8(filterResultSmall.vector > (uchar)0);
+    UChar8 resultVector =
+        (UChar8)convert_uchar8(filterResultSmall.vector > (uchar)0);
 
     for (int k = 0; k < 8 && i + k < inputLength; ++k) {
       resultVector.scalar[k] |=

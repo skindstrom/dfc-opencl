@@ -19,10 +19,10 @@ add_definitions(-DCL_USE_DEPRECATED_OPENCL_1_2_APIS)
 
 # Feature flags
 # These SEARCH_WITH_GPU and HETEROGENEOUS_DESIGN are mutually exclusive
-set(DFC_SEARCH_WITH_GPU 0)
-set(DFC_HETEROGENEOUS_DESIGN 1)
+set(DFC_SEARCH_WITH_GPU 1)
+set(DFC_HETEROGENEOUS_DESIGN 0)
 
-set(DFC_MAP_MEMORY 1)
+set(DFC_MAP_MEMORY 0)
 
 set(DFC_VECTORIZE_KERNEL 0)
 
@@ -114,7 +114,7 @@ if(${DFC_SEARCH_WITH_GPU} OR ${DFC_HETEROGENEOUS_DESIGN})
 message("DFC: Each GPU thread will perform filtering at ${DFC_THREAD_GRANULARITY} positions of the input")
 endif()
 
-set(DFC_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
+set(DFC_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/src)
 
 add_library(dfc-timer SHARED ${TIMER_HEADERS} ${TIMER_SOURCES})
 

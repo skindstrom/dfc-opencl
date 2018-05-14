@@ -705,3 +705,4 @@ static uint8_t toggleCharacterCase(uint8_t character) {
   }
   return character;
 }
+
