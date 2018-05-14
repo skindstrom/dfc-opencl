@@ -25,11 +25,12 @@ struct Pattern {
 
 std::string input;
 bool didRead = 0;
-int readInput(int maxLength, char* inputBuffer) {
+int readInput(int maxLength, int maxPatternLength, char* inputBuffer) {
   if (didRead) {
     return 0;
   }
 
+  REQUIRE(maxPatternLength == MAX_PATTERN_LENGTH);
   REQUIRE(maxLength >= input.size());
   strcpy(inputBuffer, input.data());
   didRead = true;

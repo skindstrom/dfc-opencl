@@ -9,7 +9,7 @@
 #define INPUT \
   ("This input includes an attack pattern. It might CRASH your machine.")
 
-int readInput(int maxRead, char *input);
+int readInput(int maxRead, int maxPatternLength, char *input);
 void printResult(DFC_FIXED_PATTERN *pattern);
 
 int main(void) {
@@ -54,11 +54,12 @@ int main(void) {
 }
 
 bool didRead = 0;
-int readInput(int maxLength, char *input) {
+int readInput(int maxLength, int maxPatternLength, char *input) {
   if (didRead) {
     return 0;
   }
 
+  assert(maxPatternLength == MAX_PATTERN_LENGTH);
   assert(maxLength >= (int)strlen(INPUT));
   (void)(maxLength);  // to make release build happy
   strcpy(input, INPUT);

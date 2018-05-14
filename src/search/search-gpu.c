@@ -189,7 +189,7 @@ int performSearch(ReadFunction read, MatchFunction onMatch) {
   int readCount = 0;
   // read 1 byte less to allow matching of 1-byte patterns without accessing
   // invalid memory at the very last character
-  while ((readCount = read(INPUT_READ_CHUNK_BYTES - 1, input))) {
+  while ((readCount = read(INPUT_READ_CHUNK_BYTES - 1, MAX_PATTERN_LENGTH, input))) {
     writeInputBufferToDevice(input, readCount);
 
     setKernelArgs(DFC_OPENCL_ENVIRONMENT.kernel, &DFC_OPENCL_BUFFERS,
