@@ -61,6 +61,7 @@ int readInput(int maxLength, int maxPatternLength, char *input) {
 
   assert(maxPatternLength == MAX_PATTERN_LENGTH);
   assert(maxLength >= (int)strlen(INPUT));
+  (void)(maxPatternLength);  // to make release build happy
   (void)(maxLength);  // to make release build happy
   strcpy(input, INPUT);
   didRead = true;
