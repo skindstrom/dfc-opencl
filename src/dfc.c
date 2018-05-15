@@ -329,7 +329,9 @@ static inline DFC_PATTERN *DFC_InitHashLookup(DFC_PATTERN_INIT *ctx,
 
   DFC_PATTERN *t = ctx->init_hash[hash];
   for (; t != NULL; t = t->next) {
-    if (!strncmp((char *)t->casepatrn, (char *)pat, patlen)) return t;
+    if (t->n == patlen && memcmp(t->casepatrn, pat, patlen) == 0) {
+      return t;
+    }
   }
 
   return NULL;

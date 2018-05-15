@@ -597,6 +597,55 @@ TEST_CASE("DFC") {
     REQUIRE(matches[0].pattern[2] == binary_input[2]);
   }
 
+  SECTION("Matches binary pattern with only null") {
+    PID_TYPE pid = 0;
+    char binary_pattern[3] = {0x00, 0x00, 0x00};
+    std::string binary_pattern_string(binary_pattern, 3);
+    input = "start" + binary_pattern_string + "end";
+
+    DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
+    addCaseSensitivePattern(patternInit, binary_pattern_string, pid);
+
+    DFC_Compile(patternInit);
+
+    auto matchCount = DFC_Search(readInput, onMatch);
+
+    DFC_FreePatternsInit(patternInit);
+    DFC_FreeStructure();
+
+    REQUIRE(matchCount == 1);
+    REQUIRE(matches.size() == 1);
+    REQUIRE(matches[0].pattern[0] == binary_pattern[0]);
+    REQUIRE(matches[0].pattern[1] == binary_pattern[1]);
+    REQUIRE(matches[0].pattern[2] == binary_pattern[2]);
+  }
+
+  SECTION("Null pattern with same prefix does not override") {
+    PID_TYPE pid = 0;
+    char binary_pattern[3] = {0x00, 0x00, 0x00};
+    std::string binary_pattern_string_long(binary_pattern, 3);
+    std::string binary_pattern_string_short(binary_pattern, 2);
+
+    input = binary_pattern_string_short;
+
+    DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
+    // long first!
+    addCaseSensitivePattern(patternInit, binary_pattern_string_long, pid);
+    addCaseSensitivePattern(patternInit, binary_pattern_string_short, pid);
+
+    DFC_Compile(patternInit);
+
+    auto matchCount = DFC_Search(readInput, onMatch);
+
+    DFC_FreePatternsInit(patternInit);
+    DFC_FreeStructure();
+
+    REQUIRE(matchCount == 1);
+    REQUIRE(matches.size() == 1);
+    REQUIRE(matches[0].pattern[0] == 0x00);
+    REQUIRE(matches[0].pattern[1] == 0x00);
+  }
+
   DFC_ReleaseEnvironment();
 }
 
