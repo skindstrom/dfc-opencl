@@ -250,9 +250,9 @@ __kernel void search_vec(int inputLength, __global uchar *input,
                          __global PID_TYPE *ctLargePids,
                          __global VerifyResult *result) {
   uint i = (get_group_id(0) * get_local_size(0) + get_local_id(0)) *
-           THREAD_GRANULARITY * 8;
+           THREAD_GRANULARITY;
 
-  for (int j = 0; j < THREAD_GRANULARITY && i < inputLength; ++j, i += 8) {
+  for (int j = 0; j < THREAD_GRANULARITY && i < inputLength; j += 8, ++i) {
     result[i].matchCount = 0;
 
     uchar8 dataThis = vload8(i >> 3, input);
@@ -395,9 +395,9 @@ __kernel void filter_vec(int inputLength, __global uchar *input,
                          __global uchar *dfSmall, __global uchar *dfLarge,
                          __global uchar *dfLargeHash, __global uchar *result) {
   uint i = (get_group_id(0) * get_local_size(0) + get_local_id(0)) *
-           THREAD_GRANULARITY * 8;
+           THREAD_GRANULARITY;
 
-  for (int j = 0; j < THREAD_GRANULARITY && i < inputLength; ++j, i += 8) {
+  for (int j = 0; j < THREAD_GRANULARITY && i < inputLength; j += 8, ++i) {
     uchar8 dataThis = vload8(i >> 3, input);
     uchar8 dataNext = vload8((i >> 3) + 1, input);
     uchar16 shuffleMask =
