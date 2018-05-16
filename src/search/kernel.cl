@@ -250,7 +250,7 @@ __kernel void search_vec(int inputLength, __global uchar *input,
                          __global PID_TYPE *ctLargePids,
                          __global VerifyResult *result) {
   uint i = (get_group_id(0) * get_local_size(0) + get_local_id(0)) *
-           THREAD_GRANULARITY;
+           THREAD_GRANULARITY * 8;
 
   for (int j = 0; j < THREAD_GRANULARITY && i < inputLength; ++j, i += 8) {
     result[i].matchCount = 0;
@@ -395,7 +395,7 @@ __kernel void filter_vec(int inputLength, __global uchar *input,
                          __global uchar *dfSmall, __global uchar *dfLarge,
                          __global uchar *dfLargeHash, __global uchar *result) {
   uint i = (get_group_id(0) * get_local_size(0) + get_local_id(0)) *
-           THREAD_GRANULARITY;
+           THREAD_GRANULARITY * 8;
 
   for (int j = 0; j < THREAD_GRANULARITY && i < inputLength; ++j, i += 8) {
     uchar8 dataThis = vload8(i >> 3, input);
