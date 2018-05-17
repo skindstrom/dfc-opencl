@@ -11,9 +11,14 @@
 #include "memory.h"
 #include "search.h"
 #include "timer.h"
+#include "shared-internal.h"
+
 
 extern int exactMatchingUponFiltering(uint8_t *result, int length,
                                       DFC_PATTERNS *patterns, MatchFunction);
+int getThreadCountForBytes(int size) {
+  return ceil(size / (float)(THREAD_GRANULARITY));
+}
 
 void setKernelArgsNormalDesign(cl_kernel kernel, DfcOpenClBuffers *mem,
                                int readCount) {
@@ -57,7 +62,7 @@ void setKernelArgs(cl_kernel kernel, DfcOpenClBuffers *mem, int readCount) {
 }
 
 size_t getGlobalGroupSize(size_t localGroupSize, int inputLength) {
-  const float threadCount = ceil(((float)inputLength) / THREAD_GRANULARITY);
+  const float threadCount = getThreadCountForBytes(inputLength);
 
   const size_t globalGroupSize =
       ceil(threadCount / localGroupSize) * localGroupSize;
@@ -90,19 +95,19 @@ int handleMatches(uint8_t *result, int inputLength, DFC_PATTERNS *patterns,
   VerifyResult *pidCounts = (VerifyResult *)result;
 
   int matches = 0;
-  for (int i = 0; i < inputLength; ++i) {
+  for (int i = 0; i < getThreadCountForBytes(inputLength); ++i) {
     VerifyResult *res = &pidCounts[i];
 
-    for (int j = 0; j < res->matchCount && j < MAX_MATCHES; ++j) {
+    for (int j = 0; j < res->matchCount && j < MAX_MATCHES_PER_THREAD; ++j) {
       onMatch(&patterns->dfcMatchList[res->matches[j]]);
       ++matches;
     }
 
-    if (res->matchCount >= MAX_MATCHES) {
+    if (res->matchCount > MAX_MATCHES_PER_THREAD) {
       printf(
           "%d patterns matched at position %d, but space was only allocated "
           "for %d patterns\n",
-          res->matchCount, i, MAX_MATCHES);
+          res->matchCount, i, MAX_MATCHES_PER_THREAD);
     }
   }
   return matches;

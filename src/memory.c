@@ -1,5 +1,8 @@
 #include "memory.h"
 
+#include <math.h>
+
+#include "shared-internal.h"
 #include "timer.h"
 
 DfcHostMemory DFC_HOST_MEMORY;
@@ -13,7 +16,8 @@ int sizeInBytesOfResultVector(int inputLength) {
     return inputLength - 1;
   }
 
-  return (inputLength - 1) * sizeof(VerifyResult);
+  return ceil((inputLength - 1) * sizeof(VerifyResult) /
+              (float)(THREAD_GRANULARITY));
 }
 
 cl_platform_id getPlatform() {
@@ -91,9 +95,12 @@ void buildProgram(cl_program *program, cl_device_id device) {
           "-cl-std=CL1.2 "
           "-D THREAD_GRANULARITY=%d "
           "-D LOCAL_MEMORY_LOAD_PER_ITEM=%d "
+          "-D MAX_MATCHES=%d "
+          "-D MAX_MATCHES_PER_THREAD=%d "
           "-D DFC_OPENCL "
           "-I ../src",
-          THREAD_GRANULARITY, DF_SIZE_REAL / WORK_GROUP_SIZE);
+          THREAD_GRANULARITY, DF_SIZE_REAL / WORK_GROUP_SIZE, MAX_MATCHES,
+          MAX_MATCHES_PER_THREAD);
   cl_int status = clBuildProgram(*program, 1, &device, arguments, NULL, NULL);
 
   if (status != CL_SUCCESS) {

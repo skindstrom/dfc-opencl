@@ -30,8 +30,6 @@
 #define MAX_EQUAL_PATTERNS 220
 #define MAX_PATTERN_LENGTH 64
 
-#define MAX_MATCHES 5
-
 #define BINDEX(x) ((x) >> 3)
 #define BMASK(x) (1 << ((x)&0x7))
 
@@ -68,11 +66,5 @@ typedef struct _dfc_fixed_pattern {
   int32_t external_id_count;
   PID_TYPE external_ids[MAX_EQUAL_PATTERNS];
 } DFC_FIXED_PATTERN;
-
-typedef struct VerifyResult_ {
-  PID_TYPE matches[MAX_MATCHES];
-
-  int8_t matchCount;
-} VerifyResult;
 
 #endif

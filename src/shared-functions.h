@@ -1,7 +1,7 @@
 #ifndef DFC_SHARED_FUNCTIONS
 #define DFC_SHARED_FUNCTIONS
 
-#include "shared.h"
+#include "shared-internal.h"
 
 static uint32_t hashForLargeCompactTable(uint32_t input) {
   return (input * 8389) & (COMPACT_TABLE_SIZE_LARGE - 1);

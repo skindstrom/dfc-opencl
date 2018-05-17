@@ -19,14 +19,14 @@ add_definitions(-DCL_USE_DEPRECATED_OPENCL_1_2_APIS)
 
 # Feature flags
 # These SEARCH_WITH_GPU and HETEROGENEOUS_DESIGN are mutually exclusive
-set(DFC_SEARCH_WITH_GPU 0)
-set(DFC_HETEROGENEOUS_DESIGN 1)
+set(DFC_SEARCH_WITH_GPU 1)
+set(DFC_HETEROGENEOUS_DESIGN 0)
 
-set(DFC_MAP_MEMORY 0)
+set(DFC_MAP_MEMORY 1)
 
-set(DFC_VECTORIZE_KERNEL 1)
+set(DFC_VECTORIZE_KERNEL 0)
 
-set(DFC_USE_TEXTURE_MEMORY 0)
+set(DFC_USE_TEXTURE_MEMORY 1)
 set(DFC_USE_LOCAL_MEMORY 0)
 
 
@@ -34,12 +34,17 @@ set(DFC_USE_LOCAL_MEMORY 0)
 set(DFC_WORK_GROUP_SIZE 128)
 # the amount positions in the input that gets checked per thread
 # higher value = more work per thread = fewer threads
-set(DFC_THREAD_GRANULARITY 8)
+set(DFC_THREAD_GRANULARITY 24)
+# amount of patterns that may be matched at each position
+set(DFC_MAX_MATCHES 2)
 
+# 200 MB
 set(DFC_INPUT_READ_CHUNK_BYTES 20000000)
 set(DFC_BLOCKING_DEVICE_ACCESS 1)
 
 #########################################
+
+math(EXPR DFC_MAX_MATCHES_PER_THREAD "${DFC_THREAD_GRANULARITY} * ${DFC_MAX_MATCHES}")
 
 if (${DFC_SEARCH_WITH_GPU} AND ${DFC_HETEROGENEOUS_DESIGN})
   message( FATAL_ERROR "DFC: DFC_SEARCH_WITH_GPU and DFC_HETEROGENEOUS_DESIGN are mutually exclusive")
@@ -137,6 +142,8 @@ target_compile_definitions(dfc PRIVATE
     INPUT_READ_CHUNK_BYTES=${DFC_INPUT_READ_CHUNK_BYTES}
     BLOCKING_DEVICE_ACCESS=${DFC_BLOCKING_DEVICE_ACCESS}
     VECTORIZE_KERNEL=${DFC_VECTORIZE_KERNEL}
+    MAX_MATCHES=${DFC_MAX_MATCHES}
+    MAX_MATCHES_PER_THREAD=${DFC_MAX_MATCHES_PER_THREAD}
     )
 
 add_subdirectory(${EXT_PROJECTS_DIR}/catch)

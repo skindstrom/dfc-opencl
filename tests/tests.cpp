@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <chrono>
 #include <thread>
+#include <set>
 
 #include "catch.hpp"
 
@@ -569,10 +570,14 @@ TEST_CASE("DFC") {
     DFC_FreePatternsInit(patternInit);
     DFC_FreeStructure();
 
+    std::set<std::string> matchedPatterns;
+    matchedPatterns.insert(matches[0].pattern);
+    matchedPatterns.insert(matches[1].pattern);
+
     REQUIRE(matchCount == 2);
     REQUIRE(matches.size() == 2);
-    REQUIRE(matches[0].pattern == "start");
-    REQUIRE(matches[1].pattern == "end");
+    REQUIRE(matchedPatterns.count("start") == 1);
+    REQUIRE(matchedPatterns.count("end") == 1);
   }
 
   SECTION("Matches binary pattern with null") {
