@@ -10,8 +10,7 @@ ushort directFilterHashCL(const int32_t val) {
 
 int my_strncmp(__global const unsigned char *a, __global const unsigned char *b,
                const int n) {
-  int i;
-  for (i = 0; i < n; i++) {
+  for (int i = 0; i < n; ++i) {
     if (a[i] != b[i]) return -1;
   }
   return 0;
@@ -26,8 +25,7 @@ uchar tolower(const uchar c) {
 
 int my_strncasecmp(__global const unsigned char *a,
                    __global const unsigned char *b, const int n) {
-  int i;
-  for (i = 0; i < n; i++) {
+  for (int i = 0; i < n; ++i) {
     if (tolower(a[i]) != tolower(b[i])) return -1;
   }
   return 0;
@@ -49,7 +47,7 @@ void verifySmall(__global const CompactTableSmallEntry *ct,
                  const int inputLength, __global VerifyResult *result) {
   ct += input[0];  // input[0] is the "hash"
 
-  for (int i = 0; i < ct->pidCount; ++i) {
+  for (ushort i = 0; i < ct->pidCount; ++i) {
     PID_TYPE pid = (pids + ct->offset)[i];
 
     if (inputLength - currentPos >= (patterns + pid)->pattern_length &&
@@ -73,13 +71,13 @@ void verifyLarge(__global const CompactTableLargeBucket *buckets,
                  const int currentPos, const int inputLength,
                  __global VerifyResult *result) {
   buckets += hashForLargeCompactTable(bytePattern);
-  int entryOffset = buckets->entryOffset;
+  ushort entryOffset = buckets->entryOffset;
 
-  for (int i = 0; i < buckets->entryCount; ++i) {
+  for (ushort i = 0; i < buckets->entryCount; ++i) {
     if ((entries + entryOffset + i)->pattern == bytePattern) {
-      int pidOffset = (entries + entryOffset + i)->pidOffset;
+      ushort pidOffset = (entries + entryOffset + i)->pidOffset;
 
-      for (int j = 0; j < (entries + entryOffset + i)->pidCount; ++j) {
+      for (ushort j = 0; j < (entries + entryOffset + i)->pidCount; ++j) {
         PID_TYPE pid = pids[pidOffset + j];
 
         if (inputLength - currentPos >= (patterns + pid)->pattern_length) {

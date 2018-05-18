@@ -12,7 +12,7 @@
 #include <stdint.h>
 #endif
 
-#define PID_TYPE int32_t
+#define PID_TYPE uint16_t
 
 #define DF_SIZE 0x10000
 #define DF_SIZE_REAL 0x2000
@@ -41,29 +41,29 @@
 
 typedef struct CompactTableSmallEntry_ {
   uint8_t pattern;
-  int32_t pidCount;
-  int32_t offset;
+  uint16_t pidCount;
+  uint16_t offset;
 } CompactTableSmallEntry;
 
 typedef struct CompactTableLargeEntry_ {
   uint32_t pattern;
-  int32_t pidCount;
-  int32_t pidOffset;
+  uint16_t pidCount;
+  uint16_t pidOffset;
 } CompactTableLargeEntry;
 
 typedef struct CompactTableLargeBucket_ {
-  int32_t entryCount;
-  int32_t entryOffset;
+  uint16_t entryCount;
+  uint16_t entryOffset;
 } CompactTableLargeBucket;
 
 typedef struct _dfc_fixed_pattern {
-  int32_t pattern_length;
-  int32_t is_case_insensitive;
+  uint8_t pattern_length;
+  uint8_t is_case_insensitive;
+  uint8_t external_id_count;
 
   uint8_t upper_case_pattern[MAX_PATTERN_LENGTH];
   uint8_t original_pattern[MAX_PATTERN_LENGTH];
 
-  int32_t external_id_count;
   PID_TYPE external_ids[MAX_EQUAL_PATTERNS];
 } DFC_FIXED_PATTERN;
 

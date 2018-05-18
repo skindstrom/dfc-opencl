@@ -4,9 +4,8 @@
 #include "shared.h"
 
 typedef struct VerifyResult_ {
-  PID_TYPE matches[MAX_MATCHES_PER_THREAD];
-
   uint8_t matchCount;
+  PID_TYPE matches[MAX_MATCHES_PER_THREAD];
 } VerifyResult;
 
 #endif
