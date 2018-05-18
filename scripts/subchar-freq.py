@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 CT_LARGE_OFFSET = 0
 CT_LARGE_LENGTH = 4
 
-CT_LARGE_SIZE = int('0x1000', 16)
-CT_LARGE_HASH = 1223
+CT_LARGE_SIZE = int('0x20000', 16)
+CT_LARGE_HASH = 8339
 
 
 def hash_large_ct(val):

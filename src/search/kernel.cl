@@ -57,7 +57,7 @@ void verifySmall(__global const CompactTableSmallEntry *ct,
       if (result->matchCount < MAX_MATCHES_PER_THREAD) {
         result->matches[result->matchCount] = pid;
       }
-      
+
       ++result->matchCount;
     }
   }
@@ -87,7 +87,7 @@ void verifyLarge(__global const CompactTableLargeBucket *buckets,
             if (result->matchCount < MAX_MATCHES_PER_THREAD) {
               result->matches[result->matchCount] = pid;
             }
-            
+
             ++result->matchCount;
           }
         }
@@ -144,7 +144,6 @@ __kernel void search(const int inputLength, __global const uchar *input,
     }
   }
 }
-/*
 typedef union {
   uchar scalar[TEXTURE_CHANNEL_BYTE_SIZE];
   uint4 vector;
@@ -153,35 +152,51 @@ typedef union {
 #define SHIFT_BY_CHANNEL_SIZE(x) (x >> 4)
 
 __kernel void search_with_image(
-    int inputLength, __global uchar *input,
-    __global DFC_FIXED_PATTERN *patterns, __read_only image1d_t dfSmall,
-    __read_only image1d_t dfLarge, __global uchar *dfLargeHash,
-    __global CompactTableSmallEntry *ctSmallEntries,
-    __global PID_TYPE *ctSmallPids,
-    __global CompactTableLargeBucket *ctLargeBuckets,
-    __global CompactTableLargeEntry *ctLargeEntries,
-    __global PID_TYPE *ctLargePids, __global VerifyResult *result) {
-  uint threadId = (get_group_id(0) * get_local_size(0) + get_local_id(0));
-  result[threadId].matchCount = 0;
+    const int inputLength, __global const uchar *input,
+    __global const DFC_FIXED_PATTERN *patterns, __read_only const image1d_t dfSmall,
+    __read_only const image1d_t dfLarge, __global const uchar *dfLargeHash,
+    __global const CompactTableSmallEntry *ctSmallEntries,
+    __global const PID_TYPE *ctSmallPids,
+    __global const CompactTableLargeBucket *ctLargeBuckets,
+    __global const CompactTableLargeEntry *ctLargeEntries,
+    __global const PID_TYPE *ctLargePids, __global VerifyResult *result) {
+  int i;
+  {
+    const uint threadId =
+        (get_group_id(0) * get_local_size(0) + get_local_id(0));
 
-  for (int j = 0, i = threadId * THREAD_GRANULARITY; j < THREAD_GRANULARITY && i
-< inputLength; ++j, ++i) { short data = *(input + i + 1) << 8 | *(input + i);
-    short byteIndex = BINDEX(data & DF_MASK);
-    short bitMask = BMASK(data & DF_MASK);
+    i = threadId * THREAD_GRANULARITY;
+    input += i;
+    result += threadId;
+  }
 
-    // divide by 16 as we actually just want a single byte, but we're getting 16
-    img_read df =
-        (img_read)read_imageui(dfSmall, SHIFT_BY_CHANNEL_SIZE(byteIndex));
-    if (df.scalar[byteIndex % TEXTURE_CHANNEL_BYTE_SIZE] & bitMask) {
-      verifySmall(ctSmallEntries, ctSmallPids, patterns, input + i, i,
-                  inputLength, result + threadId);
+  result->matchCount = 0;
+
+  const int end = min(i + THREAD_GRANULARITY, inputLength);
+
+  for (; i < end; ++i, ++input) {
+    const short data = (*((__global short *)input));
+    const short byteIndex = BINDEX(data & DF_MASK);
+    const short bitMask = BMASK(data & DF_MASK);
+
+    {
+      // divide by 16 as we actually just want a single byte, but we're getting 16
+      const img_read df =
+          (img_read)read_imageui(dfSmall, SHIFT_BY_CHANNEL_SIZE(byteIndex));
+      if (df.scalar[byteIndex % TEXTURE_CHANNEL_BYTE_SIZE] & bitMask) {
+        verifySmall(ctSmallEntries, ctSmallPids, patterns, input, i, inputLength,
+                    result);
+      }
     }
 
-    df = (img_read)read_imageui(dfLarge, SHIFT_BY_CHANNEL_SIZE(byteIndex));
-    if ((df.scalar[byteIndex % TEXTURE_CHANNEL_BYTE_SIZE] & bitMask) &&
-        i < inputLength - 3 && isInHashDf(dfLargeHash, input + i)) {
-      verifyLarge(ctLargeBuckets, ctLargeEntries, ctLargePids, patterns,
-                  input + i, i, inputLength, result + threadId);
+    {
+      const uint dataLong = *((__global uint *)input);
+      const img_read df = (img_read)read_imageui(dfLarge, SHIFT_BY_CHANNEL_SIZE(byteIndex));
+      if ((df.scalar[byteIndex % TEXTURE_CHANNEL_BYTE_SIZE] & bitMask) &&
+          isInHashDf(dfLargeHash, dataLong)) {
+        verifyLarge(ctLargeBuckets, ctLargeEntries, ctLargePids, patterns,
+                    dataLong, input, i, inputLength, result);
+      }
     }
   }
 }
@@ -194,6 +209,7 @@ bool isInHashDfLocal(__local uchar *df, __global uchar *input) {
   return df[byteIndex] & bitMask;
 }
 
+/*
 __kernel void search_with_local(
     int inputLength, __global uchar *input,
     __global DFC_FIXED_PATTERN *patterns, __global uchar *dfSmall,
@@ -203,8 +219,19 @@ __kernel void search_with_local(
     __global CompactTableLargeBucket *ctLargeBuckets,
     __global CompactTableLargeEntry *ctLargeEntries,
     __global PID_TYPE *ctLargePids, __global VerifyResult *result) {
-  uint threadId = (get_group_id(0) * get_local_size(0) + get_local_id(0));
-  result[threadId].matchCount = 0;
+  int i;
+  {
+    const uint threadId =
+        (get_group_id(0) * get_local_size(0) + get_local_id(0));
+
+    i = threadId * THREAD_GRANULARITY;
+    input += i;
+    result += threadId;
+  }
+
+  result->matchCount = 0;
+
+  const int end = min(i + THREAD_GRANULARITY, inputLength);
 
   __local uchar dfSmallLocal[DF_SIZE_REAL];
   __local uchar dfLargeLocal[DF_SIZE_REAL];
@@ -219,10 +246,12 @@ __kernel void search_with_local(
 
   barrier(CLK_LOCAL_MEM_FENCE);
 
-  for (int j = 0, i = threadId * THREAD_GRANULARITY; j < THREAD_GRANULARITY && i
-< inputLength; ++j, ++i) { uchar matches = 0; short data = *(input + i + 1) << 8
-| *(input + i); short byteIndex = BINDEX(data & DF_MASK); short bitMask =
-BMASK(data & DF_MASK);
+  for (int j = 0, i = threadId * THREAD_GRANULARITY;
+       j < THREAD_GRANULARITY && i < inputLength; ++j, ++i) {
+    uchar matches = 0;
+    short data = *(input + i + 1) << 8 | *(input + i);
+    short byteIndex = BINDEX(data & DF_MASK);
+    short bitMask = BMASK(data & DF_MASK);
 
     if (dfSmall[byteIndex] & bitMask) {
       verifySmall(ctSmallEntries, ctSmallPids, patterns, input + i, i,

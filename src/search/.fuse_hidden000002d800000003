@@ -97,8 +97,7 @@ int handleMatches(uint8_t *result, int inputLength, DFC_PATTERNS *patterns,
   for (int i = 0; i < getThreadCountForBytes(inputLength); ++i) {
     VerifyResult *res = &pidCounts[i];
 
-    for (uint8_t j = 0; j < res->matchCount && j < MAX_MATCHES_PER_THREAD;
-         ++j) {
+    for (uint8_t j = 0; j < res->matchCount && j < MAX_MATCHES_PER_THREAD; ++j) {
       onMatch(&patterns->dfcMatchList[res->matches[j]]);
       ++matches;
     }
