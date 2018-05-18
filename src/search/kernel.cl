@@ -261,7 +261,6 @@ __kernel void search_with_local(const int inputLength, __global const uchar *inp
     }
   }
 }
-/*
 
 typedef union {
   uchar16 vector_raw;
@@ -284,52 +283,51 @@ __kernel void search_vec(const int inputLength, __global const uchar *input,
                      __global const PID_TYPE *ctLargePids,
                      __global VerifyResult *result) {
   uint threadId = (get_group_id(0) * get_local_size(0) + get_local_id(0));
-  result[threadId].matchCount = 0;
+  result += threadId;
+  result->matchCount = 0;
 
-  int i = threadId * THREAD_GRANULARITY
+  int i = threadId * THREAD_GRANULARITY;
   const int end = min(i + THREAD_GRANULARITY, inputLength);
 
-  for (; i < end; i += 8) {
+  input += i;
 
-    uchar8 dataThis = vload8(i >> 3, input);
-    uchar8 dataNext = vload8((i >> 3) + 1, input);
+  Vec8 matchesSmall[THREAD_GRANULARITY >> 3];
+  Vec8 matchesLarge[THREAD_GRANULARITY >> 3];
+
+  for (uchar matchIdx = 0; i < end; ++matchIdx, i += 8) {
+    uchar8 dataThis = vload8(matchIdx, input);
     uchar16 shuffleMask =
         (uchar16)(0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 0);
     Vec8 overlappingData = (Vec8)shuffle(dataThis, shuffleMask);
-    overlappingData.vector_raw.sf = dataNext.s0;
+    overlappingData.vector_raw.sf = input[matchIdx << 3];
 
-    overlappingData.vector = overlappingData.vector & (short8)(DF_MASK);
+    overlappingData.vector = overlappingData.vector & (short8)(CL_DF_MASK);
     short8 bitMasks = BMASK_VEC(overlappingData.vector);
     Vec8 bitIndices = (Vec8)BINDEX_VEC(overlappingData.vector);
 
-    Vec8 dfGather;
-    // Gather can't be vectorized on OpenCL
+    Vec8 dfGatherSmall;
+    Vec8 dfGatherLarge;
+
     for (int k = 0; k < 8; ++k) {
-      dfGather.scalar[k] = dfSmall[bitIndices.scalar[k]];
+      dfGatherSmall.scalar[k] = dfSmall[bitIndices.scalar[k]];
+      dfGatherLarge.scalar[k] = dfLarge[bitIndices.scalar[k]];
     }
 
-    Vec8 filterResult = (Vec8)(dfGather.vector & bitMasks);
+    matchesSmall[matchIdx] = (Vec8)(dfGatherSmall.vector & bitMasks);
+    matchesLarge[matchIdx] = (Vec8)(dfGatherLarge.vector & bitMasks);
+  }
 
-    for (int k = 0; k < 8 && i + k < inputLength; ++k) {
-      if (filterResult.scalar[k]) {
-        verifySmall(ctSmallEntries, ctSmallPids, patterns, input + i + k, i + k,
-                    inputLength, result + threadId);
-      }
+  i = threadId * THREAD_GRANULARITY;
+  for (uchar k = 0; i < end; ++k, ++i, ++input) {
+    if (matchesSmall[k >> 3].scalar[k % 8]) {
+      verifySmall(ctSmallEntries, ctSmallPids, patterns, input, i,
+                  inputLength, result);
     }
 
-    // Gather can't be vectorized on OpenCL
-    for (int k = 0; k < 8; ++k) {
-      dfGather.scalar[k] = dfLarge[bitIndices.scalar[k]];
-    }
-
-    filterResult = (Vec8)(dfGather.vector & bitMasks);
-
-    for (int k = 0; k < 8 && i + k < inputLength; ++k) {
-      if (filterResult.scalar[k] && i + k < inputLength - 3 &&
-          isInHashDf(dfLargeHash, input + i + k)) {
-        verifyLarge(ctLargeBuckets, ctLargeEntries, ctLargePids, patterns,
-                    input + i + k, i + k, inputLength, result + threadId);
-      }
+    const uint dataLong = *((__global uint *)(input));
+    if (matchesLarge[k >> 3].scalar[k % 8] && isInHashDf(dfLargeHash, dataLong)) {
+      verifyLarge(ctLargeBuckets, ctLargeEntries, ctLargePids, patterns,
+                  dataLong, input, i, inputLength, result);
     }
   }
 }

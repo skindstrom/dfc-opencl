@@ -192,9 +192,9 @@ int performSearch(ReadFunction read, MatchFunction onMatch) {
 
   int matches = 0;
   int readCount = 0;
-  // read fewer bytes to allow a bit of extra read
+  // read fewer bytes to allow a bit of extra read on the GPU without conditionals
   while ((readCount =
-              read(INPUT_READ_CHUNK_BYTES - 4, MAX_PATTERN_LENGTH, input))) {
+              read(INPUT_READ_CHUNK_BYTES - 8, MAX_PATTERN_LENGTH, input))) {
     writeInputBufferToDevice(input, readCount);
 
     setKernelArgs(DFC_OPENCL_ENVIRONMENT.kernel, &DFC_OPENCL_BUFFERS,
