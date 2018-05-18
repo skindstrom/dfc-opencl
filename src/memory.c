@@ -97,10 +97,12 @@ void buildProgram(cl_program *program, cl_device_id device) {
           "-D LOCAL_MEMORY_LOAD_PER_ITEM=%d "
           "-D MAX_MATCHES=%d "
           "-D MAX_MATCHES_PER_THREAD=%d "
+          "-D CL_DF_MASK=%d "
+          "-D CL_CT_LARGE_MASK=%d "
           "-D DFC_OPENCL "
           "-I ../src",
           THREAD_GRANULARITY, DF_SIZE_REAL / WORK_GROUP_SIZE, MAX_MATCHES,
-          MAX_MATCHES_PER_THREAD);
+          MAX_MATCHES_PER_THREAD, DF_MASK, COMPACT_TABLE_SIZE_LARGE - 1);
   cl_int status = clBuildProgram(*program, 1, &device, arguments, NULL, NULL);
 
   if (status != CL_SUCCESS) {

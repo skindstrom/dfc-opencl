@@ -1,6 +1,15 @@
 #include "shared-functions.h"
 
-int my_strncmp(__global unsigned char *a, __global unsigned char *b, int n) {
+uint hashForLargeCompactTableCL(const uint32_t input) {
+  return (input * 8389) & (CL_CT_LARGE_MASK);
+}
+
+ushort directFilterHashCL(const int32_t val) {
+  return BINDEX((val * 8387) & CL_DF_MASK);
+}
+
+int my_strncmp(__global const unsigned char *a, __global const unsigned char *b,
+               const int n) {
   int i;
   for (i = 0; i < n; i++) {
     if (a[i] != b[i]) return -1;
@@ -8,15 +17,15 @@ int my_strncmp(__global unsigned char *a, __global unsigned char *b, int n) {
   return 0;
 }
 
-uchar tolower(uchar c) {
+uchar tolower(const uchar c) {
   if (c >= 65 && c <= 90) {
     return c + 32;
   }
   return c;
 }
 
-int my_strncasecmp(__global unsigned char *a, __global unsigned char *b,
-                   int n) {
+int my_strncasecmp(__global const unsigned char *a,
+                   __global const unsigned char *b, const int n) {
   int i;
   for (i = 0; i < n; i++) {
     if (tolower(a[i]) != tolower(b[i])) return -1;
@@ -24,64 +33,63 @@ int my_strncasecmp(__global unsigned char *a, __global unsigned char *b,
   return 0;
 }
 
-bool doesPatternMatch(__global uchar *start, __global uchar *pattern,
-                      int length, bool isCaseInsensitive) {
+bool doesPatternMatch(__global const uchar *start,
+                      __global const uchar *pattern, const int length,
+                      const bool isCaseInsensitive) {
   if (isCaseInsensitive) {
     return !my_strncasecmp(start, pattern, length);
   }
   return !my_strncmp(start, pattern, length);
 }
 
-void verifySmall(__global CompactTableSmallEntry *ct, __global PID_TYPE *pids,
-                 __global DFC_FIXED_PATTERN *patterns, __global uchar *input,
-                 int currentPos, int inputLength,
-                 __global VerifyResult *result) {
-  uchar hash = input[0];
-  pids += (ct + hash)->offset;
+void verifySmall(__global const CompactTableSmallEntry *ct,
+                 __global const PID_TYPE *pids,
+                 __global const DFC_FIXED_PATTERN *patterns,
+                 __global uchar *input, const int currentPos,
+                 const int inputLength, __global VerifyResult *result) {
+  ct += input[0];  // input[0] is the "hash"
 
-  int matches = 0;
-  for (int i = 0; i < (ct + hash)->pidCount; ++i) {
-    PID_TYPE pid = pids[i];
+  for (int i = 0; i < ct->pidCount; ++i) {
+    PID_TYPE pid = (pids + ct->offset)[i];
 
-    int patternLength = (patterns + pid)->pattern_length;
-
-    if (inputLength - currentPos >= patternLength &&
+    if (inputLength - currentPos >= (patterns + pid)->pattern_length &&
         doesPatternMatch(input, (patterns + pid)->original_pattern,
-                         patternLength,
+                         (patterns + pid)->pattern_length,
                          (patterns + pid)->is_case_insensitive)) {
       if (result->matchCount < MAX_MATCHES_PER_THREAD) {
         result->matches[result->matchCount] = pid;
       }
+      
       ++result->matchCount;
     }
   }
 }
 
-void verifyLarge(__global CompactTableLargeBucket *buckets,
-                 __global CompactTableLargeEntry *entries,
-                 __global PID_TYPE *pids, __global DFC_FIXED_PATTERN *patterns,
-                 __global uchar *input, int currentPos, int inputLength,
+void verifyLarge(__global const CompactTableLargeBucket *buckets,
+                 __global const CompactTableLargeEntry *entries,
+                 __global const PID_TYPE *pids,
+                 __global const DFC_FIXED_PATTERN *patterns,
+                 const uint bytePattern, __global const uchar *input,
+                 const int currentPos, const int inputLength,
                  __global VerifyResult *result) {
-  uint bytePattern = input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
-  uint hash = hashForLargeCompactTable(bytePattern);
+  buckets += hashForLargeCompactTable(bytePattern);
+  int entryOffset = buckets->entryOffset;
 
-  int entryOffset = (buckets + hash)->entryOffset;
-
-  for (int i = 0; i < (buckets + hash)->entryCount; ++i) {
+  for (int i = 0; i < buckets->entryCount; ++i) {
     if ((entries + entryOffset + i)->pattern == bytePattern) {
       int pidOffset = (entries + entryOffset + i)->pidOffset;
 
       for (int j = 0; j < (entries + entryOffset + i)->pidCount; ++j) {
         PID_TYPE pid = pids[pidOffset + j];
 
-        int patternLength = (patterns + pid)->pattern_length;
-        if (inputLength - currentPos >= patternLength) {
+        if (inputLength - currentPos >= (patterns + pid)->pattern_length) {
           if (doesPatternMatch(input, (patterns + pid)->original_pattern,
-                               patternLength,
+                               (patterns + pid)->pattern_length,
                                (patterns + pid)->is_case_insensitive)) {
             if (result->matchCount < MAX_MATCHES_PER_THREAD) {
               result->matches[result->matchCount] = pid;
             }
+            
             ++result->matchCount;
           }
         }
@@ -92,45 +100,53 @@ void verifyLarge(__global CompactTableLargeBucket *buckets,
   }
 }
 
-bool isInHashDf(__global uchar *df, __global uchar *input) {
-  uint data = input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
-  ushort byteIndex = directFilterHash(data);
-  ushort bitMask = BMASK(data & DF_MASK);
-
-  return df[byteIndex] & bitMask;
+bool isInHashDf(__global const uchar *df, const uint data) {
+  return df[directFilterHashCL(data)] & BMASK(data & CL_DF_MASK);
 }
 
-__kernel void search(int inputLength, __global uchar *input,
-                     __global DFC_FIXED_PATTERN *patterns,
-                     __global uchar *dfSmall, __global uchar *dfLarge,
-                     __global uchar *dfLargeHash,
-                     __global CompactTableSmallEntry *ctSmallEntries,
-                     __global PID_TYPE *ctSmallPids,
-                     __global CompactTableLargeBucket *ctLargeBuckets,
-                     __global CompactTableLargeEntry *ctLargeEntries,
-                     __global PID_TYPE *ctLargePids,
+__kernel void search(const int inputLength, __global const uchar *input,
+                     __global const DFC_FIXED_PATTERN *patterns,
+                     __global const uchar *const dfSmall,
+                     __global const uchar *const dfLarge,
+                     __global const uchar *const dfLargeHash,
+                     __global const CompactTableSmallEntry *ctSmallEntries,
+                     __global const PID_TYPE *ctSmallPids,
+                     __global const CompactTableLargeBucket *ctLargeBuckets,
+                     __global const CompactTableLargeEntry *ctLargeEntries,
+                     __global const PID_TYPE *ctLargePids,
                      __global VerifyResult *result) {
-  uint threadId = (get_group_id(0) * get_local_size(0) + get_local_id(0));
-  result[threadId].matchCount = 0;
+  int i;
+  {
+    const uint threadId =
+        (get_group_id(0) * get_local_size(0) + get_local_id(0));
 
-  for (int j = 0, i = threadId * THREAD_GRANULARITY; j < THREAD_GRANULARITY && i < inputLength; ++j, ++i) {
-    short data = *(input + i + 1) << 8 | *(input + i);
-    short byteIndex = BINDEX(data & DF_MASK);
-    short bitMask = BMASK(data & DF_MASK);
+    i = threadId * THREAD_GRANULARITY;
+    input += i;
+    result += threadId;
+  }
+
+  result->matchCount = 0;
+
+  const int end = min(i + THREAD_GRANULARITY, inputLength);
+
+  for (; i < end; ++i, ++input) {
+    const short data = (*((__global short *)input));
+    const short byteIndex = BINDEX(data & CL_DF_MASK);
+    const short bitMask = BMASK(data & CL_DF_MASK);
 
     if (dfSmall[byteIndex] & bitMask) {
-      verifySmall(ctSmallEntries, ctSmallPids, patterns, input + i, i,
-                  inputLength, result + threadId);
+      verifySmall(ctSmallEntries, ctSmallPids, patterns, input, i, inputLength,
+                  result);
     }
 
-    if ((dfLarge[byteIndex] & bitMask) && i < inputLength - 3 &&
-        isInHashDf(dfLargeHash, input + i)) {
+    const uint dataLong = *((__global uint *)input);
+    if ((dfLarge[byteIndex] & bitMask) && isInHashDf(dfLargeHash, dataLong)) {
       verifyLarge(ctLargeBuckets, ctLargeEntries, ctLargePids, patterns,
-                  input + i, i, inputLength, result + threadId);
+                  dataLong, input, i, inputLength, result);
     }
   }
 }
-
+/*
 typedef union {
   uchar scalar[TEXTURE_CHANNEL_BYTE_SIZE];
   uint4 vector;
@@ -150,8 +166,8 @@ __kernel void search_with_image(
   uint threadId = (get_group_id(0) * get_local_size(0) + get_local_id(0));
   result[threadId].matchCount = 0;
 
-  for (int j = 0, i = threadId * THREAD_GRANULARITY; j < THREAD_GRANULARITY && i < inputLength; ++j, ++i) {
-    short data = *(input + i + 1) << 8 | *(input + i);
+  for (int j = 0, i = threadId * THREAD_GRANULARITY; j < THREAD_GRANULARITY && i
+< inputLength; ++j, ++i) { short data = *(input + i + 1) << 8 | *(input + i);
     short byteIndex = BINDEX(data & DF_MASK);
     short bitMask = BMASK(data & DF_MASK);
 
@@ -205,11 +221,10 @@ __kernel void search_with_local(
 
   barrier(CLK_LOCAL_MEM_FENCE);
 
-  for (int j = 0, i = threadId * THREAD_GRANULARITY; j < THREAD_GRANULARITY && i < inputLength; ++j, ++i) {
-    uchar matches = 0;
-    short data = *(input + i + 1) << 8 | *(input + i);
-    short byteIndex = BINDEX(data & DF_MASK);
-    short bitMask = BMASK(data & DF_MASK);
+  for (int j = 0, i = threadId * THREAD_GRANULARITY; j < THREAD_GRANULARITY && i
+< inputLength; ++j, ++i) { uchar matches = 0; short data = *(input + i + 1) << 8
+| *(input + i); short byteIndex = BINDEX(data & DF_MASK); short bitMask =
+BMASK(data & DF_MASK);
 
     if (dfSmall[byteIndex] & bitMask) {
       verifySmall(ctSmallEntries, ctSmallPids, patterns, input + i, i,
@@ -246,7 +261,8 @@ __kernel void search_vec(int inputLength, __global uchar *input,
   uint threadId = (get_group_id(0) * get_local_size(0) + get_local_id(0));
   result[threadId].matchCount = 0;
 
-  for (int j = 0, i = threadId * THREAD_GRANULARITY; j < THREAD_GRANULARITY && i < inputLength; j += 8, i += 8) {
+  for (int j = 0, i = threadId * THREAD_GRANULARITY; j < THREAD_GRANULARITY && i
+< inputLength; j += 8, i += 8) {
 
     uchar8 dataThis = vload8(i >> 3, input);
     uchar8 dataNext = vload8((i >> 3) + 1, input);
@@ -428,3 +444,5 @@ __kernel void filter_vec(int inputLength, __global uchar *input,
     vstore8(resultVector.vector, i >> 3, result);
   }
 }
+
+*/

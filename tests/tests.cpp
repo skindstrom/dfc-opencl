@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <chrono>
-#include <thread>
 #include <set>
+#include <thread>
 
 #include "catch.hpp"
 
@@ -555,7 +555,7 @@ TEST_CASE("DFC") {
 
   SECTION("Matches input with null character") {
     PID_TYPE pid = 0;
-    
+
     input = "start0end";
     input[5] = 0x00;
 

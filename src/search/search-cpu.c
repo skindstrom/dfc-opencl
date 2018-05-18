@@ -127,7 +127,8 @@ int searchCpuEmulateGpu(ReadFunction read, MatchFunction onMatch) {
   int readCount = 0;
   // read 1 byte less to allow matching of 1-byte patterns without accessing
   // invalid memory at the very last character
-  while ((readCount = read(INPUT_READ_CHUNK_BYTES - 1, MAX_PATTERN_LENGTH, (char *)input))) {
+  while ((readCount = read(INPUT_READ_CHUNK_BYTES - 1, MAX_PATTERN_LENGTH,
+                           (char *)input))) {
     for (int i = 0; i < readCount; ++i) {
       int16_t data = input[i + 1] << 8 | input[i];
       int16_t byteIndex = BINDEX(data & DF_MASK);
@@ -244,7 +245,8 @@ int searchCpu(ReadFunction read, MatchFunction onMatch) {
   int readCount = 0;
   // read 1 byte less to allow matching of 1-byte patterns without accessing
   // invalid memory at the very last character
-  while ((readCount = read(INPUT_READ_CHUNK_BYTES - 1, MAX_PATTERN_LENGTH, (char *)input))) {
+  while ((readCount = read(INPUT_READ_CHUNK_BYTES - 1, MAX_PATTERN_LENGTH,
+                           (char *)input))) {
     for (int i = 0; i < readCount; ++i) {
       int16_t data = input[i + 1] << 8 | input[i];
       int16_t byteIndex = BINDEX(data & DF_MASK);

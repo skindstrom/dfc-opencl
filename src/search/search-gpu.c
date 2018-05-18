@@ -10,9 +10,8 @@
 
 #include "memory.h"
 #include "search.h"
-#include "timer.h"
 #include "shared-internal.h"
-
+#include "timer.h"
 
 extern int exactMatchingUponFiltering(uint8_t *result, int length,
                                       DFC_PATTERNS *patterns, MatchFunction);
@@ -192,9 +191,9 @@ int performSearch(ReadFunction read, MatchFunction onMatch) {
 
   int matches = 0;
   int readCount = 0;
-  // read 1 byte less to allow matching of 1-byte patterns without accessing
-  // invalid memory at the very last character
-  while ((readCount = read(INPUT_READ_CHUNK_BYTES - 1, MAX_PATTERN_LENGTH, input))) {
+  // read fewer bytes to allow a bit of extra read
+  while ((readCount =
+              read(INPUT_READ_CHUNK_BYTES - 4, MAX_PATTERN_LENGTH, input))) {
     writeInputBufferToDevice(input, readCount);
 
     setKernelArgs(DFC_OPENCL_ENVIRONMENT.kernel, &DFC_OPENCL_BUFFERS,
