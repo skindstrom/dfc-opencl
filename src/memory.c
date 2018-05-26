@@ -535,6 +535,10 @@ char *allocateInput(int size) {
   return DFC_HOST_MEMORY.input;
 }
 
+char *getInputPtr() {
+  return DFC_HOST_MEMORY.input;
+}
+
 void freeDfcPatterns() {
   if (!shouldMapPatternMemory()) {
     freeDfcPatternsOnHost();
@@ -797,6 +801,8 @@ cl_mem createMappedBuffer(cl_context context, int inputLength) {
 }
 
 void prepareOpenClBuffersForSearch() {
+  allocateInput(INPUT_READ_CHUNK_BYTES + 8);
+
   if (MAP_MEMORY) {
     unmapOpenClInputBuffers();
     DFC_OPENCL_BUFFERS.result =

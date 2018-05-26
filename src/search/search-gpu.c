@@ -133,7 +133,7 @@ int handleResultsFromGpu(uint8_t *result, int inputLength,
 int readResultWithoutMap(DfcOpenClBuffers *mem, cl_command_queue queue,
                          DFC_PATTERNS *patterns, int readCount,
                          MatchFunction onMatch) {
-  uint8_t *output = calloc(1, sizeInBytesOfResultVector(readCount + 1));
+  uint8_t *output = calloc(1, sizeInBytesOfResultVector(readCount));
 
   startTimer(TIMER_READ_FROM_DEVICE);
   int status = clEnqueueReadBuffer(queue, mem->result, CL_BLOCKING, 0,
@@ -162,7 +162,7 @@ int readResultWithMap(DfcOpenClBuffers *mem, cl_command_queue queue,
   startTimer(TIMER_READ_FROM_DEVICE);
   uint8_t *output = clEnqueueMapBuffer(
       queue, mem->result, CL_BLOCKING, CL_MAP_READ, 0,
-      sizeInBytesOfResultVector(readCount + 1), 0, NULL, NULL, &status);
+      sizeInBytesOfResultVector(readCount), 0, NULL, NULL, &status);
   stopTimer(TIMER_READ_FROM_DEVICE);
 
   if (status != CL_SUCCESS) {
@@ -188,8 +188,7 @@ int readResult(DfcOpenClBuffers *mem, cl_command_queue queue,
 }
 
 int performSearch(ReadFunction read, MatchFunction onMatch) {
-  // allocate some extra bytes to allow some extra reading without reading invalid memory
-  char *input = allocateInput(INPUT_READ_CHUNK_BYTES + 8);
+  char *input = getInputPtr();
 
   int matches = 0;
   int readCount = 0;
@@ -216,8 +215,6 @@ int performSearch(ReadFunction read, MatchFunction onMatch) {
 }
 
 int searchGpu(ReadFunction read, MatchFunction onMatch) {
-  prepareOpenClBuffersForSearch();
-
   int matches = performSearch(read, onMatch);
 
   freeOpenClBuffers();

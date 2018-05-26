@@ -63,6 +63,9 @@ void releaseExecutionEnvironment();
 
 void allocateDfcStructure(DfcMemoryRequirements requirements);
 char *allocateInput(int size);
+char *getInputPtr();
+
+bool shouldUseOpenCl();
 
 void freeDfcStructure();
 void freeDfcInput();

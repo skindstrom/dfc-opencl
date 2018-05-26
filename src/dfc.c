@@ -286,6 +286,10 @@ DFC_STRUCTURE *DFC_Compile(DFC_PATTERN_INIT *patterns) {
   freeDynamicSmallCt(ctSmall);
   freeDynamicLargeCt(ctLarge);
 
+  if (shouldUseOpenCl()) {
+    prepareOpenClBuffersForSearch();
+  }
+
   stopTimer(TIMER_COMPILE_DFC);
 
   return dfc;
