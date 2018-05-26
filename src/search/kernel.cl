@@ -123,6 +123,11 @@ __kernel void search(const int inputLength, __global const uchar *input,
         (get_group_id(0) * get_local_size(0) + get_local_id(0));
 
     i = threadId * THREAD_GRANULARITY;
+
+    if (i >= inputLength) {
+      return;
+    }
+
     input += i;
     result += threadId;
   }
@@ -170,6 +175,11 @@ __kernel void search_with_image(
         (get_group_id(0) * get_local_size(0) + get_local_id(0));
 
     i = threadId * THREAD_GRANULARITY;
+
+    if (i >= inputLength) {
+      return;
+    }
+
     input += i;
     result += threadId;
   }
@@ -236,6 +246,10 @@ __kernel void search_with_local(const int inputLength, __global const uchar *inp
         (get_group_id(0) * get_local_size(0) + get_local_id(0));
 
     i = threadId * THREAD_GRANULARITY;
+    if (i >= inputLength) {
+      return;
+    }
+
     input += i;
     result += threadId;
   }
@@ -283,10 +297,15 @@ __kernel void search_vec(const int inputLength, __global const uchar *input,
                      __global const PID_TYPE *ctLargePids,
                      __global VerifyResult *result) {
   uint threadId = (get_group_id(0) * get_local_size(0) + get_local_id(0));
+  int i = threadId * THREAD_GRANULARITY;
+  
+  if (i >= inputLength) {
+    return;
+  }
+
   result += threadId;
   result->matchCount = 0;
 
-  int i = threadId * THREAD_GRANULARITY;
   const int end = min(i + THREAD_GRANULARITY, inputLength);
 
   input += i;
