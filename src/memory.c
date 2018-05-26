@@ -13,10 +13,10 @@ DfcOpenClEnvironment DFC_OPENCL_ENVIRONMENT;
 
 int sizeInBytesOfResultVector(int inputLength) {
   if (HETEROGENEOUS_DESIGN) {
-    return inputLength - 1;
+    return inputLength;
   }
 
-  return ceil((inputLength - 1) * sizeof(VerifyResult) /
+  return ceil((inputLength) * sizeof(VerifyResult) /
               (float)(THREAD_GRANULARITY));
 }
 

@@ -4,3 +4,4 @@ build
 *.gch
 *.iptables
 *.swp
+compile_commands.json
