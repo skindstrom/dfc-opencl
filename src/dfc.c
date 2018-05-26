@@ -364,7 +364,7 @@ static inline int DFC_InitHashAdd(DFC_PATTERN_INIT *ctx, DFC_PATTERN *p) {
 }
 
 static DFC_FIXED_PATTERN createFixed(DFC_PATTERN *original) {
-  if (original->n >= MAX_PATTERN_LENGTH) {
+  if (original->n > MAX_PATTERN_LENGTH) {
     fprintf(stderr,
             "Pattern %d \"%s\" is too long with length %d. Please remove it or "
             "increase "
@@ -373,7 +373,7 @@ static DFC_FIXED_PATTERN createFixed(DFC_PATTERN *original) {
             MAX_PATTERN_LENGTH);
     exit(PATTERN_TOO_LARGE_EXIT_CODE);
   }
-  if (original->sids_size >= MAX_EQUAL_PATTERNS) {
+  if (original->sids_size > MAX_EQUAL_PATTERNS) {
     fprintf(stderr,
             "Too many patterns that are equal, but with different ID. Please "
             "either manually cull duplicates or increase MAX_EQUAL_PATTERNS. "

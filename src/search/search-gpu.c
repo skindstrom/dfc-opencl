@@ -188,13 +188,12 @@ int readResult(DfcOpenClBuffers *mem, cl_command_queue queue,
 }
 
 int performSearch(ReadFunction read, MatchFunction onMatch) {
-  char *input = allocateInput(INPUT_READ_CHUNK_BYTES);
+  // allocate some extra bytes to allow some extra reading without reading invalid memory
+  char *input = allocateInput(INPUT_READ_CHUNK_BYTES + 8);
 
   int matches = 0;
   int readCount = 0;
-  // read fewer bytes to allow a bit of extra read on the GPU without
-  // conditionals
-  while ((readCount = read(INPUT_READ_CHUNK_BYTES - 8,
+  while ((readCount = read(INPUT_READ_CHUNK_BYTES,
                            MAX_PATTERN_LENGTH, input))) {
     writeInputBufferToDevice(input, readCount);
 
