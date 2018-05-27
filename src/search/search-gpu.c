@@ -137,7 +137,7 @@ int readResultWithoutMap(DfcOpenClBuffers *mem, cl_command_queue queue,
 
   startTimer(TIMER_READ_FROM_DEVICE);
   int status = clEnqueueReadBuffer(queue, mem->result, CL_BLOCKING, 0,
-                                   sizeInBytesOfResultVector(readCount + 1),
+                                   sizeInBytesOfResultVector(readCount),
                                    output, 0, NULL, NULL);
   stopTimer(TIMER_READ_FROM_DEVICE);
 

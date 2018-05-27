@@ -5,3 +5,4 @@ build
 *.iptables
 *.swp
 compile_commands.json
+.fuse*
