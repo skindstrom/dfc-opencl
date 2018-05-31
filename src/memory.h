@@ -26,6 +26,10 @@ typedef struct {
   cl_mem ctLargePids;
 
   cl_mem result;
+
+  // only used for overlapping execution between the CPU and GPU
+  cl_mem input2;
+  cl_mem result2;
 } DfcOpenClBuffers;
 
 typedef struct {
@@ -40,11 +44,16 @@ typedef struct {
 extern DfcOpenClBuffers DFC_OPENCL_BUFFERS;
 extern DfcOpenClEnvironment DFC_OPENCL_ENVIRONMENT;
 
+void unmapOpenClBuffer(cl_command_queue queue, void *host, cl_mem buffer);
 void unmapOpenClInputBuffers();
 
 typedef struct {
   char *input;
+
   DFC_STRUCTURE *dfcStructure;
+
+  // only used in overlapping execution
+  char *input2;
 } DfcHostMemory;
 
 typedef struct {
@@ -65,7 +74,13 @@ void allocateDfcStructure(DfcMemoryRequirements requirements);
 char *allocateInput(int size);
 char *getInputPtr();
 
-bool shouldUseOpenCl();
+static inline bool shouldUseOpenCl() {
+  return SEARCH_WITH_GPU || HETEROGENEOUS_DESIGN;
+}
+
+static inline bool shouldUseOverlappingExecution() {
+  return shouldUseOpenCl() && OVERLAPPING_EXECUTION;
+}
 
 void freeDfcStructure();
 void freeDfcInput();
@@ -77,5 +92,8 @@ int sizeInBytesOfResultVector(int inputLength);
 
 char *getOwnershipOfInputBuffer();
 void writeInputBufferToDevice(char *buffer, int count);
+void leaveOwnershipOfInputPointer(cl_mem buffer, char* host);
+
+void swapMemoryInOverlappingExecution();
 
 #endif

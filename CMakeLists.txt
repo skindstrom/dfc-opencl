@@ -22,12 +22,14 @@ add_definitions(-DCL_USE_DEPRECATED_OPENCL_1_2_APIS)
 set(DFC_SEARCH_WITH_GPU 1)
 set(DFC_HETEROGENEOUS_DESIGN 0)
 
-set(DFC_MAP_MEMORY 1)
+set(DFC_MAP_MEMORY 0)
 
 set(DFC_VECTORIZE_KERNEL 0)
 
 set(DFC_USE_TEXTURE_MEMORY 0)
 set(DFC_USE_LOCAL_MEMORY 0)
+
+set(DFC_OVERLAPPING_EXECUTION 0)
 
 
 # Continous values
@@ -106,6 +108,10 @@ if(${DFC_MAP_MEMORY})
   message("DFC: Mapping memory to reduce memory transfers")
 endif()
 
+if(${DFC_OVERLAPPING_EXECUTION})
+  message("DFC: Overlapping execution of CPU and GPU")
+endif()
+
 if(${DFC_USE_TEXTURE_MEMORY})
   message("DFC: Using texture memory for some data structures")
 endif()
@@ -144,6 +150,7 @@ target_compile_definitions(dfc PRIVATE
     VECTORIZE_KERNEL=${DFC_VECTORIZE_KERNEL}
     MAX_MATCHES=${DFC_MAX_MATCHES}
     MAX_MATCHES_PER_THREAD=${DFC_MAX_MATCHES_PER_THREAD}
+    OVERLAPPING_EXECUTION=${DFC_OVERLAPPING_EXECUTION}
     )
 
 add_subdirectory(${EXT_PROJECTS_DIR}/catch)

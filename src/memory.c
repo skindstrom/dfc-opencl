@@ -25,7 +25,7 @@ cl_platform_id getPlatform() {
   int amountOfPlatformsToReturn = 1;
   int status = clGetPlatformIDs(amountOfPlatformsToReturn, &id, NULL);
   if (status != CL_SUCCESS) {
-    fprintf(stderr, "Could not get platform");
+    fprintf(stderr, "Could not get platform: %d\n", status);
     exit(OPENCL_NO_PLATFORM_EXIT_CODE);
   }
 
@@ -38,7 +38,7 @@ cl_device_id getDevice(cl_platform_id platform) {
   int status = clGetDeviceIDs(platform, CL_DEVICE_TYPE_DEFAULT,
                               amountOfDevicesToReturn, &id, NULL);
   if (status != CL_SUCCESS) {
-    fprintf(stderr, "Could not get device");
+    fprintf(stderr, "Could not get device: %d\n", status);
     exit(OPENCL_NO_DEVICE_EXIT_CODE);
   }
 
@@ -186,8 +186,6 @@ void releaseOpenClEnvironment(DfcOpenClEnvironment *environment) {
   clReleaseContext(environment->context);
 }
 
-bool shouldUseOpenCl() { return SEARCH_WITH_GPU || HETEROGENEOUS_DESIGN; }
-
 void setupExecutionEnvironment() {
   startTimer(TIMER_ENVIRONMENT_SETUP);
   if (shouldUseOpenCl()) {
@@ -218,22 +216,30 @@ void mapBuffer(cl_command_queue queue, void **host, cl_mem buffer,
   }
 }
 
-void createBufferAndMap(cl_context context, cl_command_queue queue, void **host,
-                        cl_mem *buffer, size_t size) {
+cl_mem createMappedBuffer(cl_context context, int size) {
   cl_int errcode;
-
-  size = size == 0 ? 1 : size;
 
   startTimer(TIMER_WRITE_TO_DEVICE);
 
-  *buffer = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR,
+  cl_mem buffer = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR,
                            size, NULL, &errcode);
+  stopTimer(TIMER_WRITE_TO_DEVICE);
 
   if (errcode != CL_SUCCESS) {
     fprintf(stderr, "Could not create mapped DFC buffer: %d\n", errcode);
     exit(OPENCL_COULD_NOT_CREATE_MAPPED_DFC_BUFFER);
   }
 
+
+  return buffer;
+}
+
+
+void createBufferAndMap(cl_context context, cl_command_queue queue, void **host,
+                        cl_mem *buffer, size_t size) {
+  size = size == 0 ? 1 : size;
+
+  *buffer = createMappedBuffer(context, size);
   mapBuffer(queue, host, *buffer, size);
 
   memset(*host, 0, size);
@@ -271,7 +277,7 @@ void createTextureBufferAndMap(cl_context context, cl_command_queue queue,
                           &imageDescription, NULL, &errcode);
 
   if (errcode != CL_SUCCESS) {
-    fprintf(stderr, "Could not create mapped DFC buffer");
+    fprintf(stderr, "Could not create mapped DFC buffer: %d", errcode);
     exit(OPENCL_COULD_NOT_CREATE_MAPPED_DFC_BUFFER);
   }
 
@@ -286,7 +292,7 @@ void createTextureBufferAndMap(cl_context context, cl_command_queue queue,
   stopTimer(TIMER_WRITE_TO_DEVICE);
 
   if (errcode != CL_SUCCESS) {
-    fprintf(stderr, "Could not map DFC texture buffer to host memory");
+    fprintf(stderr, "Could not map DFC texture buffer to host memory: %d\n", errcode);
     exit(OPENCL_COULD_NOT_MAP_DFC_TO_HOST);
   }
 
@@ -395,6 +401,10 @@ void allocateInputWithMap(int size) {
 
   createBufferAndMap(context, queue, (void *)&DFC_HOST_MEMORY.input,
                      &DFC_OPENCL_BUFFERS.input, size);
+
+  if (shouldUseOverlappingExecution()) {
+    DFC_OPENCL_BUFFERS.input2 = createMappedBuffer(context, size);
+  }
 }
 
 void unmapOpenClBuffer(cl_command_queue queue, void *host, cl_mem buffer) {
@@ -405,7 +415,7 @@ void unmapOpenClBuffer(cl_command_queue queue, void *host, cl_mem buffer) {
   stopTimer(TIMER_WRITE_TO_DEVICE);
 
   if (errcode != CL_SUCCESS) {
-    fprintf(stderr, "Could not unmap DFC");
+    fprintf(stderr, "Could not unmap DFC: %d\n", errcode);
     exit(OPENCL_COULD_NOT_UNMAP_DFC);
   }
 }
@@ -454,7 +464,12 @@ void allocateDfcPatternsOnHost(int numPatterns) {
   DFC_HOST_MEMORY.dfcStructure->patterns = patterns;
 }
 
-void allocateInputOnHost(int size) { DFC_HOST_MEMORY.input = calloc(1, size); }
+void allocateInputOnHost(int size) {
+  DFC_HOST_MEMORY.input = calloc(1, size);
+  if (shouldUseOverlappingExecution()) {
+    DFC_HOST_MEMORY.input2 = calloc(1, size);
+  }
+}
 
 void freeDfcStructureOnHost() {
   DFC_STRUCTURE *dfc = DFC_HOST_MEMORY.dfcStructure;
@@ -497,7 +512,12 @@ void freeDfcPatternsOnHost() {
   free(DFC_HOST_MEMORY.dfcStructure->patterns);
 }
 
-void freeDfcInputOnHost() { free(DFC_HOST_MEMORY.input); }
+void freeDfcInputOnHost() {
+  free(DFC_HOST_MEMORY.input);
+  if (shouldUseOverlappingExecution()) {
+    free(DFC_HOST_MEMORY.input2);
+  }
+}
 
 bool shouldUseMappedMemory() { return MAP_MEMORY && shouldUseOpenCl(); }
 
@@ -532,12 +552,12 @@ char *allocateInput(int size) {
     allocateInputOnHost(size);
   }
 
+  // it's fine to return input1, even when it's overlapping execution,
+  // because it'll be the first one to use
   return DFC_HOST_MEMORY.input;
 }
 
-char *getInputPtr() {
-  return DFC_HOST_MEMORY.input;
-}
+char *getInputPtr() { return DFC_HOST_MEMORY.input; }
 
 void freeDfcPatterns() {
   if (!shouldMapPatternMemory()) {
@@ -591,7 +611,7 @@ cl_mem createReadWriteBuffer(cl_context context, int size) {
   stopTimer(TIMER_WRITE_TO_DEVICE);
 
   if (errcode != CL_SUCCESS) {
-    fprintf(stderr, "Could not create read write buffer");
+    fprintf(stderr, "Could not create read write buffer: %d\n", errcode);
     exit(1);
   }
 
@@ -631,7 +651,7 @@ cl_mem createReadOnlyTextureBuffer(cl_context context, int size) {
   stopTimer(TIMER_WRITE_TO_DEVICE);
 
   if (errcode != CL_SUCCESS) {
-    fprintf(stderr, "Could not create texture buffer");
+    fprintf(stderr, "Could not create texture buffer: %d\n", errcode);
     exit(1);
   }
 
@@ -680,11 +700,22 @@ DfcOpenClBuffers createOpenClBuffers(DfcOpenClEnvironment *environment,
         context, sizeof(DFC_FIXED_PATTERN) * dfcPatterns->numPatterns);
   }
 
+  cl_mem input = createReadOnlyBuffer(DFC_OPENCL_ENVIRONMENT.context,
+                                      INPUT_READ_CHUNK_BYTES);
+
   cl_mem result = createReadWriteBuffer(
       context, sizeInBytesOfResultVector(INPUT_READ_CHUNK_BYTES));
 
-  cl_mem input = createReadOnlyBuffer(DFC_OPENCL_ENVIRONMENT.context,
-                                      INPUT_READ_CHUNK_BYTES);
+
+  cl_mem input2;
+  cl_mem result2;
+
+  if (shouldUseOverlappingExecution()) {
+    input2 = createReadOnlyBuffer(DFC_OPENCL_ENVIRONMENT.context,
+                                  INPUT_READ_CHUNK_BYTES);
+    result2 = createReadWriteBuffer(
+        context, sizeInBytesOfResultVector(INPUT_READ_CHUNK_BYTES));
+  }
 
   DfcOpenClBuffers memory = {.patterns = patterns,
 
@@ -700,8 +731,12 @@ DfcOpenClBuffers createOpenClBuffers(DfcOpenClEnvironment *environment,
                              .ctLargeEntries = ctLargeEntries,
                              .ctLargePids = ctLargePids,
 
+                             .input = input,
                              .result = result,
-                             .input = input};
+
+                             .input2 = input2,
+                             .result2 = result2,
+                           };
 
   return memory;
 }
@@ -788,24 +823,15 @@ void writeOpenClBuffers(DfcOpenClBuffers *deviceMemory, cl_command_queue queue,
   }
 }
 
-cl_mem createMappedBuffer(cl_context context, int inputLength) {
-  startTimer(TIMER_WRITE_TO_DEVICE);
-
-  cl_mem buffer =
-      clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR,
-                     inputLength, NULL, NULL);
-
-  stopTimer(TIMER_WRITE_TO_DEVICE);
-
-  return buffer;
-}
-
 void prepareOpenClBuffersForSearch() {
   allocateInput(INPUT_READ_CHUNK_BYTES + 8);
 
   if (MAP_MEMORY) {
     unmapOpenClInputBuffers();
     DFC_OPENCL_BUFFERS.result =
+        createMappedBuffer(DFC_OPENCL_ENVIRONMENT.context,
+                           sizeInBytesOfResultVector(INPUT_READ_CHUNK_BYTES));
+    DFC_OPENCL_BUFFERS.result2 =
         createMappedBuffer(DFC_OPENCL_ENVIRONMENT.context,
                            sizeInBytesOfResultVector(INPUT_READ_CHUNK_BYTES));
   } else {
@@ -836,6 +862,11 @@ void freeOpenClBuffers() {
   }
 
   clReleaseMemObject(DFC_OPENCL_BUFFERS.result);
+
+  if (shouldUseOverlappingExecution()) {
+    clReleaseMemObject(DFC_OPENCL_BUFFERS.input2);
+    clReleaseMemObject(DFC_OPENCL_BUFFERS.result2);
+  }
 }
 
 char *getOwnershipOfInputBuffer() {
@@ -862,4 +893,31 @@ void writeInputBufferToDevice(char *host, int count) {
   } else {
     writeOpenClBuffer(queue, host, buffer, count);
   }
+}
+
+void leaveOwnershipOfInputPointer(cl_mem buffer, char *host) {
+  if (MAP_MEMORY) {
+    unmapOpenClBuffer(DFC_OPENCL_ENVIRONMENT.queue, host, buffer);
+  }
+}
+
+void swapOpenClBuffersInOverlappingexecution() {
+  cl_mem tmp = DFC_OPENCL_BUFFERS.input;
+  DFC_OPENCL_BUFFERS.input = DFC_OPENCL_BUFFERS.input2;
+  DFC_OPENCL_BUFFERS.input2 = tmp;
+
+  tmp = DFC_OPENCL_BUFFERS.result;
+  DFC_OPENCL_BUFFERS.result = DFC_OPENCL_BUFFERS.result2;
+  DFC_OPENCL_BUFFERS.result2 = tmp;
+}
+
+void swapHostPointersInOverlappingExecution() {
+  char *tmp = DFC_HOST_MEMORY.input;
+  DFC_HOST_MEMORY.input = DFC_HOST_MEMORY.input2;
+  DFC_HOST_MEMORY.input2 = tmp;
+}
+
+void swapMemoryInOverlappingExecution() {
+  swapOpenClBuffersInOverlappingexecution();
+  swapHostPointersInOverlappingExecution();
 }

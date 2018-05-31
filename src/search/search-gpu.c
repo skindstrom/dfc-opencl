@@ -13,7 +13,7 @@
 #include "shared-internal.h"
 #include "timer.h"
 
-extern int exactMatchingUponFiltering(uint8_t *result, int length,
+extern int exactMatchingUponFiltering(uint8_t* input, uint8_t *result, int length,
                                       DFC_PATTERNS *patterns, MatchFunction);
 int getThreadCountForBytes(int size) {
   return ceil(size / (float)(THREAD_GRANULARITY));
@@ -113,13 +113,13 @@ int handleMatches(uint8_t *result, int inputLength, DFC_PATTERNS *patterns,
   return matches;
 }
 
-int handleResultsFromGpu(uint8_t *result, int inputLength,
+int handleResultsFromGpu(uint8_t* input, uint8_t *result, int inputLength,
                          DFC_PATTERNS *patterns, MatchFunction onMatch) {
   int matches;
   if (HETEROGENEOUS_DESIGN) {
     startTimer(TIMER_EXECUTE_HETEROGENEOUS);
     matches =
-        exactMatchingUponFiltering(result, inputLength, patterns, onMatch);
+        exactMatchingUponFiltering(input, result, inputLength, patterns, onMatch);
     stopTimer(TIMER_EXECUTE_HETEROGENEOUS);
   } else {
     startTimer(TIMER_PROCESS_MATCHES);
@@ -130,15 +130,12 @@ int handleResultsFromGpu(uint8_t *result, int inputLength,
   return matches;
 }
 
-int readResultWithoutMap(DfcOpenClBuffers *mem, cl_command_queue queue,
-                         DFC_PATTERNS *patterns, int readCount,
-                         MatchFunction onMatch) {
-  uint8_t *output = calloc(1, sizeInBytesOfResultVector(readCount));
-
+void readResultWithoutMap(DfcOpenClBuffers *mem, cl_command_queue queue,
+                          int readCount, uint8_t *output) {
   startTimer(TIMER_READ_FROM_DEVICE);
   int status = clEnqueueReadBuffer(queue, mem->result, CL_BLOCKING, 0,
-                                   sizeInBytesOfResultVector(readCount),
-                                   output, 0, NULL, NULL);
+                                   sizeInBytesOfResultVector(readCount), output,
+                                   0, NULL, NULL);
   stopTimer(TIMER_READ_FROM_DEVICE);
 
   if (status != CL_SUCCESS) {
@@ -146,17 +143,10 @@ int readResultWithoutMap(DfcOpenClBuffers *mem, cl_command_queue queue,
     fprintf(stderr, "Could not read result: %d\n", status);
     exit(OPENCL_COULD_NOT_READ_RESULTS);
   }
-
-  int matches = handleResultsFromGpu(output, readCount, patterns, onMatch);
-
-  free(output);
-
-  return matches;
 }
 
-int readResultWithMap(DfcOpenClBuffers *mem, cl_command_queue queue,
-                      DFC_PATTERNS *patterns, int readCount,
-                      MatchFunction onMatch) {
+uint8_t *readResultWithMap(DfcOpenClBuffers *mem, cl_command_queue queue,
+                           int readCount) {
   cl_int status;
 
   startTimer(TIMER_READ_FROM_DEVICE);
@@ -166,34 +156,60 @@ int readResultWithMap(DfcOpenClBuffers *mem, cl_command_queue queue,
   stopTimer(TIMER_READ_FROM_DEVICE);
 
   if (status != CL_SUCCESS) {
-    free(output);
     fprintf(stderr, "Could not read result: %d\n", status);
     exit(OPENCL_COULD_NOT_READ_RESULTS);
   }
 
-  int matches = handleResultsFromGpu(output, readCount, patterns, onMatch);
-
-  status = clEnqueueUnmapMemObject(queue, mem->result, output, 0, NULL, NULL);
-
-  return matches;
+  return output;
 }
 
-int readResult(DfcOpenClBuffers *mem, cl_command_queue queue,
-               DFC_PATTERNS *patterns, int readCount, MatchFunction onMatch) {
+// make sure to clean output later
+void readResult(DfcOpenClBuffers *mem, cl_command_queue queue,
+                              int readCount, uint8_t **output) {
   if (MAP_MEMORY) {
-    return readResultWithMap(mem, queue, patterns, readCount, onMatch);
+    *output = readResultWithMap(mem, queue, readCount);
   } else {
-    return readResultWithoutMap(mem, queue, patterns, readCount, onMatch);
+    if (*output == NULL ) {
+      *output = calloc(1, sizeInBytesOfResultVector(INPUT_READ_CHUNK_BYTES));
+    }
+    readResultWithoutMap(mem, queue, readCount, *output);
   }
+}
+
+void cleanResult(cl_mem result, cl_command_queue queue, uint8_t **output) {
+  if (MAP_MEMORY) {
+    unmapOpenClBuffer(queue, *output, result);
+  } else {
+    free(*output);
+    *output = NULL;
+  }
+}
+
+int readResultAndCountMatches(uint8_t* input, DfcOpenClBuffers *mem, cl_command_queue queue,
+                              DFC_PATTERNS *patterns, int readCount,
+                              MatchFunction onMatch) {
+  uint8_t *output = NULL;
+  readResult(mem, queue, readCount, &output);
+  int matches = handleResultsFromGpu(input, output, readCount, patterns, onMatch);
+  cleanResult(mem->result, queue, &output);
+
+  return matches;
 }
 
 int performSearch(ReadFunction read, MatchFunction onMatch) {
   char *input = getInputPtr();
 
+  uint8_t *output = NULL;
+
+  uint8_t *prev_output = NULL;
+  char *prev_input = NULL;
+  int prev_readCount = 0;
+
+
   int matches = 0;
   int readCount = 0;
-  while ((readCount = read(INPUT_READ_CHUNK_BYTES,
-                           MAX_PATTERN_LENGTH, input))) {
+  while (
+      (readCount = read(INPUT_READ_CHUNK_BYTES, MAX_PATTERN_LENGTH, input))) {
     writeInputBufferToDevice(input, readCount);
 
     setKernelArgs(DFC_OPENCL_ENVIRONMENT.kernel, &DFC_OPENCL_BUFFERS,
@@ -201,15 +217,41 @@ int performSearch(ReadFunction read, MatchFunction onMatch) {
     startKernelForQueue(DFC_OPENCL_ENVIRONMENT.kernel,
                         DFC_OPENCL_ENVIRONMENT.queue, readCount);
 
-    matches +=
-        readResult(&DFC_OPENCL_BUFFERS, DFC_OPENCL_ENVIRONMENT.queue,
-                   DFC_HOST_MEMORY.dfcStructure->patterns, readCount, onMatch);
+
+    if (shouldUseOverlappingExecution()) {
+      if (prev_input && prev_output) {
+        matches += handleResultsFromGpu((uint8_t*)prev_input, output, prev_readCount, DFC_HOST_MEMORY.dfcStructure->patterns, onMatch);
+        cleanResult(DFC_OPENCL_BUFFERS.result2, DFC_OPENCL_ENVIRONMENT.queue, &output);
+      }
+
+      readResult(&DFC_OPENCL_BUFFERS, DFC_OPENCL_ENVIRONMENT.queue, readCount, &output);
+
+      prev_output = output;
+      prev_input = input;
+      prev_readCount = readCount;
+
+      swapMemoryInOverlappingExecution();
+    } else {
+      matches += readResultAndCountMatches(
+          (uint8_t*)input,
+          &DFC_OPENCL_BUFFERS, DFC_OPENCL_ENVIRONMENT.queue,
+          DFC_HOST_MEMORY.dfcStructure->patterns, readCount, onMatch);
+
+    }
 
     input = getOwnershipOfInputBuffer();
   }
-  // should be nop since readCount == 0. Needed to make sure that buffer is not
-  // owned
-  writeInputBufferToDevice(input, readCount);
+
+
+  // have to handle the last one too
+  if (shouldUseOverlappingExecution()) {
+    if (prev_input && prev_output) {
+      matches += handleResultsFromGpu((uint8_t*)prev_input, output, prev_readCount, DFC_HOST_MEMORY.dfcStructure->patterns, onMatch);
+      cleanResult(DFC_OPENCL_BUFFERS.result2, DFC_OPENCL_ENVIRONMENT.queue, &output);
+    }
+  }
+
+  leaveOwnershipOfInputPointer(DFC_OPENCL_BUFFERS.input, input);
 
   return matches;
 }

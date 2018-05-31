@@ -25,16 +25,29 @@ struct Pattern {
 };
 
 std::string input;
-bool didRead = 0;
+int readCount = 0;
 int readInput(int maxLength, int maxPatternLength, char* inputBuffer) {
-  if (didRead) {
+  if (readCount) {
     return 0;
   }
 
   REQUIRE(maxPatternLength == MAX_PATTERN_LENGTH);
   REQUIRE(maxLength >= input.size());
   memcpy(inputBuffer, input.data(), input.size());
-  didRead = true;
+  readCount = 1;
+
+  return input.size();
+}
+
+int readInputTwice(int maxLength, int maxPatternLength, char* inputBuffer) {
+  if (readCount == 2) {
+    return 0;
+  }
+
+  REQUIRE(maxPatternLength == MAX_PATTERN_LENGTH);
+  REQUIRE(maxLength >= input.size());
+  memcpy(inputBuffer, input.data(), input.size());
+  ++readCount;
 
   return input.size();
 }
@@ -55,7 +68,7 @@ TEST_CASE("DFC") {
   DFC_SetupEnvironment();
 
   input.clear();
-  didRead = false;
+  readCount = 0;
   matches.clear();
 
   SECTION("Matches if input and pattern is equal") {
@@ -649,6 +662,26 @@ TEST_CASE("DFC") {
     REQUIRE(matches.size() == 1);
     REQUIRE(matches[0].pattern[0] == 0x00);
     REQUIRE(matches[0].pattern[1] == 0x00);
+  }
+
+  SECTION("Matches if input and pattern is equal: Read twice") {
+    PID_TYPE pid = 0;
+    input = "attack";
+
+    DFC_PATTERN_INIT* patternInit = DFC_PATTERN_INIT_New();
+    addCaseSensitivePattern(patternInit, input, pid);
+
+    DFC_Compile(patternInit);
+
+    auto matchCount = DFC_Search(readInputTwice, onMatch);
+
+    DFC_FreePatternsInit(patternInit);
+    DFC_FreeStructure();
+
+    REQUIRE(matchCount == 2);
+    REQUIRE(matches.size() == 2);
+    REQUIRE(matches[0].pattern == "attack");
+    REQUIRE(matches[1].pattern == "attack");
   }
 
   DFC_ReleaseEnvironment();
