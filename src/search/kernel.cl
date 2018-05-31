@@ -137,7 +137,7 @@ __kernel void search(const int inputLength, __global const uchar *input,
   const int end = min(i + THREAD_GRANULARITY, inputLength);
 
   for (; i < end; ++i, ++input) {
-    const short data = (*((__global short *)input));
+    const short data = input[1] << 8 | input[0];
     const short byteIndex = BINDEX(data & CL_DF_MASK);
     const short bitMask = BMASK(data & CL_DF_MASK);
 
@@ -146,7 +146,7 @@ __kernel void search(const int inputLength, __global const uchar *input,
                   result);
     }
 
-    const uint dataLong = *((__global uint *)input);
+    const uint dataLong = input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
     if ((dfLarge[byteIndex] & bitMask) && isInHashDf(dfLargeHash, dataLong)) {
       verifyLarge(ctLargeBuckets, ctLargeEntries, ctLargePids, patterns,
                   dataLong, input, i, inputLength, result);
@@ -189,7 +189,7 @@ __kernel void search_with_image(
   const int end = min(i + THREAD_GRANULARITY, inputLength);
 
   for (; i < end; ++i, ++input) {
-    const short data = (*((__global short *)input));
+    const short data = input[1] << 8 | input[0];
     const short byteIndex = BINDEX(data & DF_MASK);
     const short bitMask = BMASK(data & DF_MASK);
 
@@ -204,7 +204,7 @@ __kernel void search_with_image(
     }
 
     {
-      const uint dataLong = *((__global uint *)input);
+      const uint dataLong = input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
       const img_read df = (img_read)read_imageui(dfLarge, SHIFT_BY_CHANNEL_SIZE(byteIndex));
       if ((df.scalar[byteIndex % TEXTURE_CHANNEL_BYTE_SIZE] & bitMask) &&
           isInHashDf(dfLargeHash, dataLong)) {
@@ -259,7 +259,7 @@ __kernel void search_with_local(const int inputLength, __global const uchar *inp
   const int end = min(i + THREAD_GRANULARITY, inputLength);
 
   for (; i < end; ++i, ++input) {
-    const short data = (*((__global short *)input));
+    const short data = input[1] << 8 | input[0];
     const short byteIndex = BINDEX(data & CL_DF_MASK);
     const short bitMask = BMASK(data & CL_DF_MASK);
 
@@ -268,7 +268,7 @@ __kernel void search_with_local(const int inputLength, __global const uchar *inp
                   result);
     }
 
-    const uint dataLong = *((__global uint *)input);
+    const uint dataLong = input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
     if ((dfLargeLocal[byteIndex] & bitMask) && isInHashDfLocal(dfLargeHashLocal, dataLong)) {
       verifyLarge(ctLargeBuckets, ctLargeEntries, ctLargePids, patterns,
                   dataLong, input, i, inputLength, result);
@@ -298,7 +298,7 @@ __kernel void search_vec(const int inputLength, __global const uchar *input,
                      __global VerifyResult *result) {
   uint threadId = (get_group_id(0) * get_local_size(0) + get_local_id(0));
   int i = threadId * THREAD_GRANULARITY;
-  
+
   if (i >= inputLength) {
     return;
   }
@@ -343,7 +343,7 @@ __kernel void search_vec(const int inputLength, __global const uchar *input,
                   inputLength, result);
     }
 
-    const uint dataLong = *((__global uint *)(input));
+    const uint dataLong = input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
     if (matchesLarge[k >> 3].scalar[k % 8] && isInHashDf(dfLargeHash, dataLong)) {
       verifyLarge(ctLargeBuckets, ctLargeEntries, ctLargePids, patterns,
                   dataLong, input, i, inputLength, result);
