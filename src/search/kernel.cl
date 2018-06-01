@@ -369,7 +369,7 @@ __kernel void filter(int inputLength, __global uchar *input,
 
     // set the second bit
     result[i] |= ((dfLarge[byteIndex] & bitMask) && i < inputLength - 3 &&
-                  isInHashDf(dfLargeHash, *((__global uint *)(input + i))))
+                  isInHashDf(dfLargeHash, (input[3 + i] << 24 | input[2 + i] << 16 | input[1 + i] << 8 | input[i])))
                  << 1;
   }
 }
@@ -396,7 +396,7 @@ __kernel void filter_with_image(int inputLength, __global uchar *input,
     df = (img_read)read_imageui(dfLarge, SHIFT_BY_CHANNEL_SIZE(byteIndex));
     result[i] |=
         ((df.scalar[byteIndex % TEXTURE_CHANNEL_BYTE_SIZE] & bitMask) &&
-         i < inputLength - 3 && isInHashDf(dfLargeHash, *((__global uint *)(input + i))))
+         i < inputLength - 3 && isInHashDf(dfLargeHash, (input[3 + i] << 24 | input[2 + i] << 16 | input[1 + i] << 8 | input[i])))
         << 1;
   }
 }
@@ -433,7 +433,7 @@ __kernel void filter_with_local(int inputLength, __global uchar *input,
 
     // set the second bit
     result[i] |= ((dfLargeLocal[byteIndex] & bitMask) && i < inputLength - 3 &&
-                  isInHashDfLocal(dfLargeHashLocal, *((__global uint *)(input + i))))
+                  isInHashDfLocal(dfLargeHashLocal, (input[3 + i] << 24 | input[2 + i] << 16 | input[1 + i] << 8 | input[i])))
                  << 1;
   }
 }
@@ -480,7 +480,7 @@ __kernel void filter_vec(int inputLength, __global uchar *input,
     for (int k = 0; k < 8 && i + k < inputLength; ++k) {
       resultVector.scalar[k] |=
           (filterResultLarge.scalar[k] && i + k < inputLength - 3 &&
-           isInHashDf(dfLargeHash, *((__global uint *)(input + i + k))))
+           isInHashDf(dfLargeHash, (input[3 + i + k] << 24 | input[2 + i + k] << 16 | input[1 + i + k] << 8 | input[i + k])))
           << 1;
     }
 
