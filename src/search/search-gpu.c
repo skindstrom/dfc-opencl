@@ -257,9 +257,5 @@ int performSearch(ReadFunction read, MatchFunction onMatch) {
 }
 
 int searchGpu(ReadFunction read, MatchFunction onMatch) {
-  int matches = performSearch(read, onMatch);
-
-  freeOpenClBuffers();
-
-  return matches;
+  return performSearch(read, onMatch);
 }

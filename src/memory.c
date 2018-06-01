@@ -195,6 +195,7 @@ void setupExecutionEnvironment() {
 }
 void releaseExecutionEnvironment() {
   startTimer(TIMER_ENVIRONMENT_TEARDOWN);
+  freeOpenClBuffers();
   if (shouldUseOpenCl()) {
     releaseOpenClEnvironment(&DFC_OPENCL_ENVIRONMENT);
   }
