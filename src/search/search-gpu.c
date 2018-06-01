@@ -214,7 +214,17 @@ void swapReadEvents() {
 
 cl_event getPrevReadEvent() { return resultEvent2; }
 
-void waitForReadEvent(cl_event e) { clWaitForEvents(1, &e); }
+void waitForReadEvent(cl_event e) {
+  startTimer(TIMER_READ_FROM_DEVICE);
+  clWaitForEvents(1, &e);
+  stopTimer(TIMER_READ_FROM_DEVICE);
+}
+
+void waitForWriteEvent(cl_event e) {
+  startTimer(TIMER_WRITE_TO_DEVICE);
+  clWaitForEvents(1, &e);
+  stopTimer(TIMER_WRITE_TO_DEVICE);
+}
 
 int performSearch(ReadFunction read, MatchFunction onMatch) {
   char *input = getInputPtr();
@@ -259,7 +269,7 @@ int performSearch(ReadFunction read, MatchFunction onMatch) {
       swapOpenClResultBuffers();
       swapReadEvents();
 
-      clWaitForEvents(1, &inputEvent);
+      waitForWriteEvent(inputEvent);
       input = new_input;
     } else {
       matches += readResultAndCountMatches(
