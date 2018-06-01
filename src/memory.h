@@ -91,9 +91,11 @@ void freeOpenClBuffers();
 int sizeInBytesOfResultVector(int inputLength);
 
 char *getOwnershipOfInputBuffer();
+char *getOwnershipOfInputBufferAsync(cl_event *event);
 void writeInputBufferToDevice(char *buffer, int count);
 void leaveOwnershipOfInputPointer(cl_mem buffer, char *host);
 
-void swapMemoryInOverlappingExecution();
+void swapOpenClInputBuffers();
+void swapOpenClResultBuffers();
 
 #endif

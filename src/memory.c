@@ -217,6 +217,21 @@ void mapBuffer(cl_command_queue queue, void **host, cl_mem buffer,
   }
 }
 
+void mapBufferAsync(cl_command_queue queue, void **host, cl_mem buffer,
+               size_t size, cl_event* event) {
+  cl_int errcode;
+  startTimer(TIMER_WRITE_TO_DEVICE);
+  *host =
+      clEnqueueMapBuffer(queue, buffer, false, CL_MAP_READ | CL_MAP_WRITE,
+                         0, size, 0, NULL, event, &errcode);
+  stopTimer(TIMER_WRITE_TO_DEVICE);
+
+  if (errcode != CL_SUCCESS) {
+    fprintf(stderr, "Could not map DFC buffer to host memory: %d\n", errcode);
+    exit(OPENCL_COULD_NOT_MAP_DFC_TO_HOST);
+  }
+}
+
 cl_mem createMappedBuffer(cl_context context, int size) {
   cl_int errcode;
 
@@ -885,6 +900,23 @@ char *getOwnershipOfInputBuffer() {
 
   return *host;
 }
+char *getOwnershipOfInputBufferAsync(cl_event *event) {
+  void **host = (void **)&DFC_HOST_MEMORY.input;
+  cl_command_queue queue = DFC_OPENCL_ENVIRONMENT.queue;
+  cl_mem buffer = DFC_OPENCL_BUFFERS.input;
+  size_t size = INPUT_READ_CHUNK_BYTES;
+
+  if (MAP_MEMORY) {
+    mapBufferAsync(queue, host, buffer, size, event);
+  } else {
+    if (*host == NULL) {
+      *host = malloc(size);
+    }
+  }
+
+  return *host;
+}
+
 void writeInputBufferToDevice(char *host, int count) {
   cl_command_queue queue = DFC_OPENCL_ENVIRONMENT.queue;
   cl_mem buffer = DFC_OPENCL_BUFFERS.input;
@@ -901,12 +933,14 @@ void leaveOwnershipOfInputPointer(cl_mem buffer, char *host) {
   }
 }
 
-void swapOpenClBuffersInOverlappingexecution() {
+void swapOpenClInputBuffers() {
   cl_mem tmp = DFC_OPENCL_BUFFERS.input;
   DFC_OPENCL_BUFFERS.input = DFC_OPENCL_BUFFERS.input2;
   DFC_OPENCL_BUFFERS.input2 = tmp;
+}
 
-  tmp = DFC_OPENCL_BUFFERS.result;
+void swapOpenClResultBuffers() {
+  cl_mem tmp = DFC_OPENCL_BUFFERS.result;
   DFC_OPENCL_BUFFERS.result = DFC_OPENCL_BUFFERS.result2;
   DFC_OPENCL_BUFFERS.result2 = tmp;
 }
@@ -918,6 +952,7 @@ void swapHostPointersInOverlappingExecution() {
 }
 
 void swapMemoryInOverlappingExecution() {
-  swapOpenClBuffersInOverlappingexecution();
+  swapOpenClInputBuffers();
+  swapOpenClResultBuffers();
   swapHostPointersInOverlappingExecution();
 }
