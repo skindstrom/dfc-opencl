@@ -92,7 +92,7 @@ int sizeInBytesOfResultVector(int inputLength);
 
 char *getOwnershipOfInputBuffer();
 void writeInputBufferToDevice(char *buffer, int count);
-void leaveOwnershipOfInputPointer(cl_mem buffer, char* host);
+void leaveOwnershipOfInputPointer(cl_mem buffer, char *host);
 
 void swapMemoryInOverlappingExecution();
 

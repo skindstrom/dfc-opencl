@@ -146,7 +146,8 @@ __kernel void search(const int inputLength, __global const uchar *input,
                   result);
     }
 
-    const uint dataLong = input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
+    const uint dataLong =
+        input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
     if ((dfLarge[byteIndex] & bitMask) && isInHashDf(dfLargeHash, dataLong)) {
       verifyLarge(ctLargeBuckets, ctLargeEntries, ctLargePids, patterns,
                   dataLong, input, i, inputLength, result);
@@ -162,8 +163,9 @@ typedef union {
 
 __kernel void search_with_image(
     const int inputLength, __global const uchar *input,
-    __global const DFC_FIXED_PATTERN *patterns, __read_only const image1d_t dfSmall,
-    __read_only const image1d_t dfLarge, __global const uchar *dfLargeHash,
+    __global const DFC_FIXED_PATTERN *patterns,
+    __read_only const image1d_t dfSmall, __read_only const image1d_t dfLarge,
+    __global const uchar *dfLargeHash,
     __global const CompactTableSmallEntry *ctSmallEntries,
     __global const PID_TYPE *ctSmallPids,
     __global const CompactTableLargeBucket *ctLargeBuckets,
@@ -194,18 +196,21 @@ __kernel void search_with_image(
     const short bitMask = BMASK(data & DF_MASK);
 
     {
-      // divide by 16 as we actually just want a single byte, but we're getting 16
+      // divide by 16 as we actually just want a single byte, but we're getting
+      // 16
       const img_read df =
           (img_read)read_imageui(dfSmall, SHIFT_BY_CHANNEL_SIZE(byteIndex));
       if (df.scalar[byteIndex % TEXTURE_CHANNEL_BYTE_SIZE] & bitMask) {
-        verifySmall(ctSmallEntries, ctSmallPids, patterns, input, i, inputLength,
-                    result);
+        verifySmall(ctSmallEntries, ctSmallPids, patterns, input, i,
+                    inputLength, result);
       }
     }
 
     {
-      const uint dataLong = input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
-      const img_read df = (img_read)read_imageui(dfLarge, SHIFT_BY_CHANNEL_SIZE(byteIndex));
+      const uint dataLong =
+          input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
+      const img_read df =
+          (img_read)read_imageui(dfLarge, SHIFT_BY_CHANNEL_SIZE(byteIndex));
       if ((df.scalar[byteIndex % TEXTURE_CHANNEL_BYTE_SIZE] & bitMask) &&
           isInHashDf(dfLargeHash, dataLong)) {
         verifyLarge(ctLargeBuckets, ctLargeEntries, ctLargePids, patterns,
@@ -215,18 +220,16 @@ __kernel void search_with_image(
   }
 }
 
-__kernel void search_with_local(const int inputLength, __global const uchar *input,
-                     __global const DFC_FIXED_PATTERN *patterns,
-                     __global const uchar *const dfSmall,
-                     __global const uchar *const dfLarge,
-                     __global const uchar *const dfLargeHash,
-                     __global const CompactTableSmallEntry *ctSmallEntries,
-                     __global const PID_TYPE *ctSmallPids,
-                     __global const CompactTableLargeBucket *ctLargeBuckets,
-                     __global const CompactTableLargeEntry *ctLargeEntries,
-                     __global const PID_TYPE *ctLargePids,
-                     __global VerifyResult *result) {
-
+__kernel void search_with_local(
+    const int inputLength, __global const uchar *input,
+    __global const DFC_FIXED_PATTERN *patterns,
+    __global const uchar *const dfSmall, __global const uchar *const dfLarge,
+    __global const uchar *const dfLargeHash,
+    __global const CompactTableSmallEntry *ctSmallEntries,
+    __global const PID_TYPE *ctSmallPids,
+    __global const CompactTableLargeBucket *ctLargeBuckets,
+    __global const CompactTableLargeEntry *ctLargeEntries,
+    __global const PID_TYPE *ctLargePids, __global VerifyResult *result) {
   __local uchar dfSmallLocal[DF_SIZE_REAL];
   __local uchar dfLargeLocal[DF_SIZE_REAL];
   __local uchar dfLargeHashLocal[DF_SIZE_REAL];
@@ -268,8 +271,10 @@ __kernel void search_with_local(const int inputLength, __global const uchar *inp
                   result);
     }
 
-    const uint dataLong = input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
-    if ((dfLargeLocal[byteIndex] & bitMask) && isInHashDfLocal(dfLargeHashLocal, dataLong)) {
+    const uint dataLong =
+        input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
+    if ((dfLargeLocal[byteIndex] & bitMask) &&
+        isInHashDfLocal(dfLargeHashLocal, dataLong)) {
       verifyLarge(ctLargeBuckets, ctLargeEntries, ctLargePids, patterns,
                   dataLong, input, i, inputLength, result);
     }
@@ -286,16 +291,16 @@ typedef union {
 #define BMASK_VEC(x) ((short8)(1) << ((x) & (short8)(0x7)))
 
 __kernel void search_vec(const int inputLength, __global const uchar *input,
-                     __global const DFC_FIXED_PATTERN *patterns,
-                     __global const uchar *const dfSmall,
-                     __global const uchar *const dfLarge,
-                     __global const uchar *const dfLargeHash,
-                     __global const CompactTableSmallEntry *ctSmallEntries,
-                     __global const PID_TYPE *ctSmallPids,
-                     __global const CompactTableLargeBucket *ctLargeBuckets,
-                     __global const CompactTableLargeEntry *ctLargeEntries,
-                     __global const PID_TYPE *ctLargePids,
-                     __global VerifyResult *result) {
+                         __global const DFC_FIXED_PATTERN *patterns,
+                         __global const uchar *const dfSmall,
+                         __global const uchar *const dfLarge,
+                         __global const uchar *const dfLargeHash,
+                         __global const CompactTableSmallEntry *ctSmallEntries,
+                         __global const PID_TYPE *ctSmallPids,
+                         __global const CompactTableLargeBucket *ctLargeBuckets,
+                         __global const CompactTableLargeEntry *ctLargeEntries,
+                         __global const PID_TYPE *ctLargePids,
+                         __global VerifyResult *result) {
   uint threadId = (get_group_id(0) * get_local_size(0) + get_local_id(0));
   int i = threadId * THREAD_GRANULARITY;
 
@@ -339,12 +344,14 @@ __kernel void search_vec(const int inputLength, __global const uchar *input,
   i = threadId * THREAD_GRANULARITY;
   for (uchar k = 0; i < end; ++k, ++i, ++input) {
     if (matchesSmall[k >> 3].scalar[k % 8]) {
-      verifySmall(ctSmallEntries, ctSmallPids, patterns, input, i,
-                  inputLength, result);
+      verifySmall(ctSmallEntries, ctSmallPids, patterns, input, i, inputLength,
+                  result);
     }
 
-    const uint dataLong = input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
-    if (matchesLarge[k >> 3].scalar[k % 8] && isInHashDf(dfLargeHash, dataLong)) {
+    const uint dataLong =
+        input[3] << 24 | input[2] << 16 | input[1] << 8 | input[0];
+    if (matchesLarge[k >> 3].scalar[k % 8] &&
+        isInHashDf(dfLargeHash, dataLong)) {
       verifyLarge(ctLargeBuckets, ctLargeEntries, ctLargePids, patterns,
                   dataLong, input, i, inputLength, result);
     }
@@ -368,9 +375,11 @@ __kernel void filter(int inputLength, __global uchar *input,
     result[i] = (dfSmall[byteIndex] & bitMask) > 0;
 
     // set the second bit
-    result[i] |= ((dfLarge[byteIndex] & bitMask) && i < inputLength - 3 &&
-                  isInHashDf(dfLargeHash, (input[3 + i] << 24 | input[2 + i] << 16 | input[1 + i] << 8 | input[i])))
-                 << 1;
+    result[i] |=
+        ((dfLarge[byteIndex] & bitMask) && i < inputLength - 3 &&
+         isInHashDf(dfLargeHash, (input[3 + i] << 24 | input[2 + i] << 16 |
+                                  input[1 + i] << 8 | input[i])))
+        << 1;
   }
 }
 
@@ -396,7 +405,9 @@ __kernel void filter_with_image(int inputLength, __global uchar *input,
     df = (img_read)read_imageui(dfLarge, SHIFT_BY_CHANNEL_SIZE(byteIndex));
     result[i] |=
         ((df.scalar[byteIndex % TEXTURE_CHANNEL_BYTE_SIZE] & bitMask) &&
-         i < inputLength - 3 && isInHashDf(dfLargeHash, (input[3 + i] << 24 | input[2 + i] << 16 | input[1 + i] << 8 | input[i])))
+         i < inputLength - 3 &&
+         isInHashDf(dfLargeHash, (input[3 + i] << 24 | input[2 + i] << 16 |
+                                  input[1 + i] << 8 | input[i])))
         << 1;
   }
 }
@@ -433,7 +444,9 @@ __kernel void filter_with_local(int inputLength, __global uchar *input,
 
     // set the second bit
     result[i] |= ((dfLargeLocal[byteIndex] & bitMask) && i < inputLength - 3 &&
-                  isInHashDfLocal(dfLargeHashLocal, (input[3 + i] << 24 | input[2 + i] << 16 | input[1 + i] << 8 | input[i])))
+                  isInHashDfLocal(dfLargeHashLocal,
+                                  (input[3 + i] << 24 | input[2 + i] << 16 |
+                                   input[1 + i] << 8 | input[i])))
                  << 1;
   }
 }
@@ -480,7 +493,9 @@ __kernel void filter_vec(int inputLength, __global uchar *input,
     for (int k = 0; k < 8 && i + k < inputLength; ++k) {
       resultVector.scalar[k] |=
           (filterResultLarge.scalar[k] && i + k < inputLength - 3 &&
-           isInHashDf(dfLargeHash, (input[3 + i + k] << 24 | input[2 + i + k] << 16 | input[1 + i + k] << 8 | input[i + k])))
+           isInHashDf(dfLargeHash,
+                      (input[3 + i + k] << 24 | input[2 + i + k] << 16 |
+                       input[1 + i + k] << 8 | input[i + k])))
           << 1;
     }
 

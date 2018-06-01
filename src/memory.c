@@ -222,8 +222,8 @@ cl_mem createMappedBuffer(cl_context context, int size) {
 
   startTimer(TIMER_WRITE_TO_DEVICE);
 
-  cl_mem buffer = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR,
-                           size, NULL, &errcode);
+  cl_mem buffer = clCreateBuffer(
+      context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR, size, NULL, &errcode);
   stopTimer(TIMER_WRITE_TO_DEVICE);
 
   if (errcode != CL_SUCCESS) {
@@ -231,10 +231,8 @@ cl_mem createMappedBuffer(cl_context context, int size) {
     exit(OPENCL_COULD_NOT_CREATE_MAPPED_DFC_BUFFER);
   }
 
-
   return buffer;
 }
-
 
 void createBufferAndMap(cl_context context, cl_command_queue queue, void **host,
                         cl_mem *buffer, size_t size) {
@@ -293,7 +291,8 @@ void createTextureBufferAndMap(cl_context context, cl_command_queue queue,
   stopTimer(TIMER_WRITE_TO_DEVICE);
 
   if (errcode != CL_SUCCESS) {
-    fprintf(stderr, "Could not map DFC texture buffer to host memory: %d\n", errcode);
+    fprintf(stderr, "Could not map DFC texture buffer to host memory: %d\n",
+            errcode);
     exit(OPENCL_COULD_NOT_MAP_DFC_TO_HOST);
   }
 
@@ -707,7 +706,6 @@ DfcOpenClBuffers createOpenClBuffers(DfcOpenClEnvironment *environment,
   cl_mem result = createReadWriteBuffer(
       context, sizeInBytesOfResultVector(INPUT_READ_CHUNK_BYTES));
 
-
   cl_mem input2 = NULL;
   cl_mem result2 = NULL;
 
@@ -718,26 +716,27 @@ DfcOpenClBuffers createOpenClBuffers(DfcOpenClEnvironment *environment,
         context, sizeInBytesOfResultVector(INPUT_READ_CHUNK_BYTES));
   }
 
-  DfcOpenClBuffers memory = {.patterns = patterns,
+  DfcOpenClBuffers memory = {
+      .patterns = patterns,
 
-                             .dfSmall = dfSmall,
+      .dfSmall = dfSmall,
 
-                             .ctSmallEntries = ctSmallEntries,
-                             .ctSmallPids = ctSmallPids,
+      .ctSmallEntries = ctSmallEntries,
+      .ctSmallPids = ctSmallPids,
 
-                             .dfLarge = dfLarge,
-                             .dfLargeHash = dfLargeHash,
+      .dfLarge = dfLarge,
+      .dfLargeHash = dfLargeHash,
 
-                             .ctLargeBuckets = ctLargeBuckets,
-                             .ctLargeEntries = ctLargeEntries,
-                             .ctLargePids = ctLargePids,
+      .ctLargeBuckets = ctLargeBuckets,
+      .ctLargeEntries = ctLargeEntries,
+      .ctLargePids = ctLargePids,
 
-                             .input = input,
-                             .result = result,
+      .input = input,
+      .result = result,
 
-                             .input2 = input2,
-                             .result2 = result2,
-                           };
+      .input2 = input2,
+      .result2 = result2,
+  };
 
   return memory;
 }
