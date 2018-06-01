@@ -13,6 +13,9 @@
 #include "shared-internal.h"
 #include "timer.h"
 
+cl_event event;
+cl_event event2;
+
 extern int exactMatchingUponFiltering(uint8_t* input, uint8_t *result, int length,
                                       DFC_PATTERNS *patterns, MatchFunction);
 int getThreadCountForBytes(int size) {
@@ -133,9 +136,9 @@ int handleResultsFromGpu(uint8_t* input, uint8_t *result, int inputLength,
 void readResultWithoutMap(DfcOpenClBuffers *mem, cl_command_queue queue,
                           int readCount, uint8_t *output) {
   startTimer(TIMER_READ_FROM_DEVICE);
-  int status = clEnqueueReadBuffer(queue, mem->result, CL_BLOCKING, 0,
+  int status = clEnqueueReadBuffer(queue, mem->result, !OVERLAPPING_EXECUTION, 0,
                                    sizeInBytesOfResultVector(readCount), output,
-                                   0, NULL, NULL);
+                                   0, NULL, &event);
   stopTimer(TIMER_READ_FROM_DEVICE);
 
   if (status != CL_SUCCESS) {
@@ -151,8 +154,8 @@ uint8_t *readResultWithMap(DfcOpenClBuffers *mem, cl_command_queue queue,
 
   startTimer(TIMER_READ_FROM_DEVICE);
   uint8_t *output = clEnqueueMapBuffer(
-      queue, mem->result, CL_BLOCKING, CL_MAP_READ, 0,
-      sizeInBytesOfResultVector(readCount), 0, NULL, NULL, &status);
+      queue, mem->result, !OVERLAPPING_EXECUTION, CL_MAP_READ, 0,
+      sizeInBytesOfResultVector(readCount), 0, NULL, &event, &status);
   stopTimer(TIMER_READ_FROM_DEVICE);
 
   if (status != CL_SUCCESS) {
@@ -196,6 +199,20 @@ int readResultAndCountMatches(uint8_t* input, DfcOpenClBuffers *mem, cl_command_
   return matches;
 }
 
+void swapReadEvents() {
+  cl_event tmp = event;
+  event = event2;
+  event2 = tmp;
+}
+
+cl_event getPrevReadEvent() {
+  return event2;
+}
+
+void waitForReadEvent(cl_event e) {
+  clWaitForEvents(1, &e);
+}
+
 int performSearch(ReadFunction read, MatchFunction onMatch) {
   char *input = getInputPtr();
 
@@ -220,6 +237,7 @@ int performSearch(ReadFunction read, MatchFunction onMatch) {
 
     if (shouldUseOverlappingExecution()) {
       if (prev_input && prev_output) {
+        waitForReadEvent(getPrevReadEvent());
         matches += handleResultsFromGpu((uint8_t*)prev_input, output, prev_readCount, DFC_HOST_MEMORY.dfcStructure->patterns, onMatch);
         cleanResult(DFC_OPENCL_BUFFERS.result2, DFC_OPENCL_ENVIRONMENT.queue, &output);
       }
@@ -231,6 +249,7 @@ int performSearch(ReadFunction read, MatchFunction onMatch) {
       prev_readCount = readCount;
 
       swapMemoryInOverlappingExecution();
+      swapReadEvents();
     } else {
       matches += readResultAndCountMatches(
           (uint8_t*)input,
