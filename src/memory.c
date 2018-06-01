@@ -708,8 +708,8 @@ DfcOpenClBuffers createOpenClBuffers(DfcOpenClEnvironment *environment,
       context, sizeInBytesOfResultVector(INPUT_READ_CHUNK_BYTES));
 
 
-  cl_mem input2;
-  cl_mem result2;
+  cl_mem input2 = NULL;
+  cl_mem result2 = NULL;
 
   if (shouldUseOverlappingExecution()) {
     input2 = createReadOnlyBuffer(DFC_OPENCL_ENVIRONMENT.context,
