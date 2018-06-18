@@ -141,9 +141,9 @@ void readResultWithoutMap(DfcOpenClBuffers *mem, cl_command_queue queue,
   bool blocking = OVERLAPPING_EXECUTION ? 0 : CL_BLOCKING;
 
   startTimer(TIMER_READ_FROM_DEVICE);
-  int status = clEnqueueReadBuffer(queue, mem->result, blocking,
-                                   0, sizeInBytesOfResultVector(readCount),
-                                   output, 0, NULL, &resultEvent);
+  int status = clEnqueueReadBuffer(queue, mem->result, blocking, 0,
+                                   sizeInBytesOfResultVector(readCount), output,
+                                   0, NULL, &resultEvent);
   stopTimer(TIMER_READ_FROM_DEVICE);
 
   if (status != CL_SUCCESS) {
@@ -277,7 +277,6 @@ int performSearch(ReadFunction read, MatchFunction onMatch) {
           DFC_HOST_MEMORY.dfcStructure->patterns, readCount, onMatch);
       input = getOwnershipOfInputBuffer();
     }
-
   }
 
   // have to handle the last one too

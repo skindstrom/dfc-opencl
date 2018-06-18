@@ -283,12 +283,12 @@ __kernel void search_with_local(
 
 typedef union {
   uchar16 vector_raw;
-  short8 vector;
-  short scalar[8];
+  ushort8 vector;
+  ushort scalar[8];
 } Vec8;
 
-#define BINDEX_VEC(x) ((x) >> (short8)(3))
-#define BMASK_VEC(x) ((short8)(1) << ((x) & (short8)(0x7)))
+#define BINDEX_VEC(x) ((x) >> (ushort8)(3))
+#define BMASK_VEC(x) ((ushort8)(1) << ((x) & (ushort8)(0x7)))
 
 __kernel void search_vec(const int inputLength, __global const uchar *input,
                          __global const DFC_FIXED_PATTERN *patterns,
@@ -323,10 +323,10 @@ __kernel void search_vec(const int inputLength, __global const uchar *input,
     uchar16 shuffleMask =
         (uchar16)(0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 0);
     Vec8 overlappingData = (Vec8)shuffle(dataThis, shuffleMask);
-    overlappingData.vector_raw.sf = input[matchIdx << 3];
+    overlappingData.vector_raw.sf = input[(matchIdx + 1) << 3];
 
-    overlappingData.vector = overlappingData.vector & (short8)(CL_DF_MASK);
-    short8 bitMasks = BMASK_VEC(overlappingData.vector);
+    overlappingData.vector = overlappingData.vector & (ushort8)(CL_DF_MASK);
+    ushort8 bitMasks = BMASK_VEC(overlappingData.vector);
     Vec8 bitIndices = (Vec8)BINDEX_VEC(overlappingData.vector);
 
     Vec8 dfGatherSmall;
@@ -470,8 +470,8 @@ __kernel void filter_vec(int inputLength, __global uchar *input,
     Vec8 overlappingData = (Vec8)shuffle(dataThis, shuffleMask);
     overlappingData.vector_raw.sf = dataNext.s0;
 
-    overlappingData.vector = overlappingData.vector & (short8)(DF_MASK);
-    short8 bitMasks = BMASK_VEC(overlappingData.vector);
+    overlappingData.vector = overlappingData.vector & (ushort8)(DF_MASK);
+    ushort8 bitMasks = BMASK_VEC(overlappingData.vector);
     Vec8 bitIndices = (Vec8)BINDEX_VEC(overlappingData.vector);
 
     Vec8 dfGatherSmall;
